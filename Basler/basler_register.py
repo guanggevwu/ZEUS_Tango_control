@@ -1,0 +1,56 @@
+import sys
+import tango
+
+
+def register_device(device):
+    dev_info = tango.DbDevInfo()
+    if device in reg_dict:
+        for attr in reg_dict[device]:
+            setattr(dev_info, attr, reg_dict[device][attr])
+        db.add_device(dev_info)
+        print(f'{device} is added')
+    else:
+        print("wrong device name")
+
+
+def delete_server(device):
+    if device in reg_dict:
+        db.delete_server(reg_dict[device]['server'])
+        print(f'{device} deleted')
+
+
+def get_properties(device):
+    prop = db.get_device_property_list(reg_dict[device]['name'], '*')
+    print(db.get_device_property(
+        reg_dict[device]['name'], list(prop.value_string)))
+    # db.get_device_property(device_name,[property_name]) : return {property_name : value}
+
+
+def delete_properties(device, *args):
+    if not len(args):
+        prop = db.get_device_property_list(reg_dict[device]['name'], '*')
+        db.delete_device_property(
+            reg_dict[device]['name'], list(prop.value_string))
+        print(f'{list(prop.value_string)} is deleted')
+    elif len(args) == 1:
+        db.delete_device_property(reg_dict[device]['name'], args[0])
+        print(f'{args[0]} is deleted')
+
+
+db = tango.Database()
+reg_dict = {"power_supply": {'server': 'PowerSupply/test', '_class': 'PowerSupply', 'name': 'test/power_supply/1'},
+            "basler": {'server': 'Basler/test', '_class': 'Basler', 'name': 'test/basler/1'}}
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        print("not enough input arguments")
+    elif sys.argv[1] == "add":
+        for i in sys.argv[2:]:
+            register_device(i)
+    elif sys.argv[1] == "delete":
+        for i in sys.argv[2:]:
+            delete_server(i)
+    elif sys.argv[1] == "info":
+        for i in sys.argv[2:]:
+            get_properties(i)

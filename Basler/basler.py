@@ -79,7 +79,7 @@ class Basler(Device):
     )
 
     repetition = attribute(
-        label="repetition",
+        label="triggers per shot",
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
@@ -120,12 +120,12 @@ class Basler(Device):
         polling_period=polling,
     )
 
-    framerate = attribute(
-        label="max framerate",
-        dtype=float,
-        access=AttrWriteType.READ,
-        polling_period=polling_infinite,
-    )
+    # framerate = attribute(
+    #     label="max framerate",
+    #     dtype=float,
+    #     access=AttrWriteType.READ,
+    #     polling_period=polling_infinite,
+    # )
 
     binning_horizontal = attribute(
         label="binning_horizontal",
@@ -297,8 +297,8 @@ class Basler(Device):
     def write_offsetY(self, value):
         self.camera.OffsetY.Value = value
 
-    def read_framerate(self):
-        return self.camera.ResultingFrameRateAbs()
+    # def read_framerate(self):
+    #     return self.camera.ResultingFrameRateAbs()
 
     def read_binning_horizontal(self):
         return self.camera.BinningHorizontal()
@@ -404,10 +404,6 @@ class Basler(Device):
             self.set_state(DevState.STANDBY)
 
     @command()
-    def relax(self):
-        self.camera.StopGrabbing()
-
-    @command()
     def send_software_trigger(self):
         if self.camera.TriggerSource.Value != "Software":
             logging.info(
@@ -416,6 +412,10 @@ class Basler(Device):
         logging.info("Sending software trigger....................")
         self.camera.TriggerSoftware.Execute()
         self.set_state(DevState.ON)
+
+    @command()
+    def relax(self):
+        self.camera.StopGrabbing()
 
 
 if __name__ == "__main__":
