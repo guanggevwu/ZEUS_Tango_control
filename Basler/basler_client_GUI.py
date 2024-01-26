@@ -26,7 +26,9 @@ def add_value_pairs(values):
 #                      '__init__': add_value_pairs((('Off', 'Off'), ('Software', 'Software')))})
 
 
-changeDefaultPollingPeriod(1000)
+# if the polling periods in Taurus is shorter than these in Tango, it either doesn't work or is wasted.
+# if the polling periods in Taurus is longer than these in Tango, it only retrives part of information from the server.
+changeDefaultPollingPeriod(500)
 device_name = 'test/basler/1'
 dp = Device(device_name)
 
@@ -35,8 +37,8 @@ commands = dp.get_command_list()
 model = [device_name] + [device_name + '/' + attr for attr in attrs]
 
 
-with open("modification.json") as outfile:
-    modification = json.load(outfile)
+# with open("modification.json") as outfile:
+#     modification = json.load(outfile)
 
 
 app = TaurusApplication(cmd_line_parser=None, app_name='MyGui')
@@ -64,7 +66,7 @@ for cmd in commands:
         panel1_1_layout.addWidget(panel1_1_w)
 panel1_layout.addWidget(panel1_1)
 
-gui.createPanel(panel1, modification['image_widget'])
+gui.createPanel(panel1, 'image')
 
 
 panel2 = Qt.QWidget()
