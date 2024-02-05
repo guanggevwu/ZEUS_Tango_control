@@ -6,8 +6,10 @@ from pypylon import pylon
 from numpy import array
 import numpy as np
 import time
+import datetime
 import logging
-
+from PIL import Image
+import os
 
 # -----------------------------
 
@@ -20,8 +22,10 @@ class Basler(Device):
 
     polling = 1000
     polling_infinite = -1
-    # is_memorized means the previous entered set value is remembered and is only for Read_WRITE access. For example in GUI, the previous set value,instead of 0, will be shown at the set value field.
+    # is_memorized = True means the previous entered set value is remembered and is only for Read_WRITE access. For example in GUI, the previous set value,instead of 0, will be shown at the set value field.
+    # hw_memorized=True, means the set value is written at the initialization step. Some of the properties are remembered in the camera's memory, so no need to remember them.
     is_memorized = True
+
     image = attribute(
         label="image",
         max_dim_x=4096,
@@ -51,11 +55,32 @@ class Basler(Device):
         polling_period=polling_infinite,
     )
 
+    save_data = attribute(
+        label="save data",
+        dtype=bool,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        hw_memorized=True,
+        polling_period=polling,
+        doc='save the images or not'
+    )
+
+    save_path = attribute(
+        label='save path',
+        dtype=str,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        hw_memorized=True,
+        polling_period=polling,
+        doc='save data path, use ";" to seperate multiple paths'
+    )
+
     trigger_source = attribute(
         label="trigger source",
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
+        hw_memorized=True,
         polling_period=polling,
         doc='off or software or external'
     )
@@ -83,6 +108,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
+        hw_memorized=True,
         polling_period=polling,
         doc='triggers to be received before transferring the data'
     )
@@ -101,6 +127,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
+        hw_memorized=True,
         polling_period=polling,
     )
 
@@ -109,6 +136,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
+        hw_memorized=True,
         polling_period=polling,
     )
 
@@ -132,6 +160,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
+        hw_memorized=True,
         polling_period=polling,
     )
 
@@ -140,6 +169,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
+        hw_memorized=True,
         polling_period=polling,
     )
 
@@ -254,6 +284,7 @@ class Basler(Device):
                 self._repetition = 1
             print(f'Camera is connected: {self.device.GetSerialNumber()}')
             self.set_state(DevState.ON)
+            # self.set_change_event('image', True)
         except:
             print("Could not open camera with serial: {:s}".format(
                 self.serial_number))
@@ -272,6 +303,31 @@ class Basler(Device):
 
     # def read_serial_number(self):
     #     return self.device.GetSerialNumber()
+
+    def read_save_data(self):
+        if not hasattr(self, '_save_data'):
+            self._save_data = False
+        return self._save_data
+
+    def write_save_data(self, value):
+        if not hasattr(self, '_save_data'):
+            self._save_data = value
+        if self._save_data != value:
+            self._save_data = value
+            logging.info(f'save status is changed to {value}')
+
+    def read_save_path(self):
+        if not hasattr(self, '_save_path'):
+            self._save_path = os.path.join(
+                os.path.dirname(__file__), 'basler_tmp_data')
+            os.makedirs(self._save_path, exist_ok=True)
+        if len(self._save_path) > 20:
+            return f'{self._save_path[0:10]}...{self._save_path[-10:-1]}'
+        else:
+            return self._save_path_trimmed
+
+    def write_save_path(self, value):
+        self._save_path = value
 
     def read_model(self):
         return self.camera.GetDeviceInfo().GetModelName()
@@ -305,14 +361,14 @@ class Basler(Device):
 
     def write_binning_horizontal(self, value):
         # To check limit. Use self.camera.BinningHorizontal.Min
-        self.camera.BinningHorizontal = value
+        self.camera.BinningHorizontal.Value = value
 
     def read_binning_vertical(self):
         return self.camera.BinningVertical()
 
     def write_binning_vertical(self, value):
 
-        self.camera.BinningVertical = value
+        self.camera.BinningVertical.Value = value
 
     def read_sensor_readout_mode(self):
         return self.camera.SensorReadoutMode.GetValue()
@@ -377,15 +433,25 @@ class Basler(Device):
                     self._image = grabResult.Array
                     grabResult.Release()
                     logging.info(f"mean instensity: {np.mean(self._image)}")
+                    # self.push_change_event('image', self._image)
+                    if self._save_data:
+                        data = Image.fromarray(self._image)
+                        parse_save_path = self._save_path.split(';')
+                        for path in parse_save_path:
+                            os.makedirs(path, exist_ok=True)
+                            now = datetime.datetime.strftime(
+                                datetime.datetime.now(), '%Y-%m-%d-%H-%M-%S-%f')
+                            image_name = f'{now}.tiff'
+                            data.save(os.path.join(path, image_name))
                     return self._image
         except Exception as ex:
             if ex.__class__.__name__ == "TimeoutException":
-                logging.info("Started grabbing but no images retrieved yet!")
+                pass
+                # logging.info("Started grabbing but no images retrieved yet!")
         if not hasattr(self, "_image"):
             self._image = np.zeros(
                 (self.camera.Height.Value, self.camera.Width.Value))
-        logging.info(f'no new images retrieved! Showing old image.')
-        logging.info(f"mean instensity: {np.mean(self._image)}")
+        # logging.info(f"mean instensity: {np.mean(self._image)}")
         return self._image
 
     @command()
@@ -400,14 +466,15 @@ class Basler(Device):
             self.camera.StartGrabbingMax(
                 self.camera.AcquisitionFrameCount.Value * self._repetition, pylon.GrabStrategy_OneByOne)
             logging.info(
-                f'Ready to receive triggers. Select "send_software_trigger" to start live mode. Image retrieve will be stopped after receiving {self.camera.AcquisitionFrameCount.Value * self._repetition} images')
+                f'Ready to receive triggers. Either "send_software_trigger" or send external triggers. Image retrieve will be stopped after receiving {self.camera.AcquisitionFrameCount.Value * self._repetition} images')
             self.set_state(DevState.STANDBY)
 
     @command()
     def send_software_trigger(self):
         if self.camera.TriggerSource.Value != "Software":
+            self.write_trigger_source(self, "Software")
             logging.info(
-                f'change trigger source from {self.camera.TriggerSource.Value} to Software')
+                f'Trigger source is changed from {self.camera.TriggerSource.Value} to Software')
         time.sleep(0.5)
         logging.info("Sending software trigger....................")
         self.camera.TriggerSoftware.Execute()
@@ -416,6 +483,7 @@ class Basler(Device):
     @command()
     def relax(self):
         self.camera.StopGrabbing()
+        self.set_state(DevState.ON)
 
 
 if __name__ == "__main__":
