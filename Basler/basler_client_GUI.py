@@ -35,9 +35,10 @@ def add_value_pairs(values):
 # TriggerSource = type('TriggerSource', (TaurusValueComboBox,), {
 #                      '__init__': add_value_pairs((('Off', 'Off'), ('Software', 'Software')))})
 
+
 # if the polling periods in Taurus is shorter than these in Tango, it either doesn't work or is wasted.
 # if the polling periods in Taurus is longer than these in Tango, it only retrives part of information from the server.
-changeDefaultPollingPeriod(250)
+changeDefaultPollingPeriod(500)
 device_name = 'test/basler/1'
 dp = Device(device_name)
 
