@@ -7,7 +7,7 @@ from taurus.qt.qtgui.panel import TaurusForm
 from taurus.qt.qtgui.input import TaurusValueComboBox, TaurusValueCheckBox
 from taurus.qt.qtgui.button import TaurusCommandButton
 from taurus.qt.qtgui.display import TaurusLabel
-
+import sys
 import json
 
 
@@ -38,7 +38,11 @@ def add_value_pairs(values):
 
 # if the polling periods in Taurus is shorter than these in Tango, it either doesn't work or is wasted.
 # if the polling periods in Taurus is longer than these in Tango, it only retrives part of information from the server.
-changeDefaultPollingPeriod(500)
+if len(sys.argv) > 1:
+    polling = int(sys.argv[1])
+else:
+    polling = 500
+changeDefaultPollingPeriod(polling)
 device_name = 'test/basler/1'
 dp = Device(device_name)
 
