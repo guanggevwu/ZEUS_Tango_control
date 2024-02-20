@@ -1,15 +1,17 @@
 import sys
 import taurus
+from taurus import changeDefaultPollingPeriod
 from taurus.qt.qtgui.panel import TaurusForm
 from taurus.external.qt import Qt
 # from taurus.qt.qtgui import extra_guiqwt
 from taurus.qt.qtgui.application import TaurusApplication
 import tango
 
+# changeDefaultPollingPeriod(500)
 app = TaurusApplication(sys.argv, cmd_line_parser=None)
 w = TaurusForm()
 
-device_name = 'test/basler/1'
+device_name = 'test/gentec/1'
 dp = tango.DeviceProxy(device_name)
 # dp = taurus.Device(device_name)
 

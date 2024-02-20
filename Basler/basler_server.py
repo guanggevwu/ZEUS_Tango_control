@@ -324,7 +324,7 @@ class Basler(Device):
         if len(self._save_path) > 20:
             return f'{self._save_path[0:10]}...{self._save_path[-10:-1]}'
         else:
-            return self._save_path_trimmed
+            return self._save_path
 
     def write_save_path(self, value):
         self._save_path = value
