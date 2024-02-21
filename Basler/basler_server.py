@@ -32,7 +32,7 @@ class Basler(Device):
         max_dim_y=4096,
         dtype=((DevFloat,),),
         access=AttrWriteType.READ,
-        polling_period=polling_infinite,
+        polling_period=polling,
     )
 
     serial_number = device_property(dtype=str)
@@ -52,7 +52,6 @@ class Basler(Device):
         label="model name",
         dtype=str,
         access=AttrWriteType.READ,
-        polling_period=polling_infinite,
     )
 
     save_data = attribute(
@@ -61,7 +60,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        polling_period=polling,
+        # polling_period=polling,
         doc='save the images or not'
     )
 
@@ -71,7 +70,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        polling_period=polling,
+        # polling_period=polling,
         doc='save data path, use ";" to seperate multiple paths'
     )
 
@@ -81,7 +80,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        polling_period=polling,
+        # polling_period=polling,
         doc='off or software or external'
     )
 
@@ -90,7 +89,7 @@ class Basler(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        polling_period=polling,
+        # polling_period=polling,
         doc='usually use acquisition start'
     )
 
@@ -99,7 +98,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        polling_period=polling,
+        # polling_period=polling,
         doc='frames generated per trigger'
     )
 
@@ -109,7 +108,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        polling_period=polling,
+        # polling_period=polling,
         doc='triggers to be received before transferring the data'
     )
 
@@ -118,7 +117,7 @@ class Basler(Device):
         dtype=float,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        polling_period=polling,
+        # polling_period=polling,
         doc='frame rate (only applicable when frames per trigger is large than 1)'
     )
 
@@ -128,7 +127,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        polling_period=polling,
+        # polling_period=polling,
     )
 
     offsetY = attribute(
@@ -137,7 +136,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        polling_period=polling,
+        # polling_period=polling,
     )
 
     format_pixel = attribute(
@@ -145,7 +144,7 @@ class Basler(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        polling_period=polling,
+        # polling_period=polling,
     )
 
     # framerate = attribute(
@@ -161,7 +160,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        polling_period=polling,
+        # polling_period=polling,
     )
 
     binning_vertical = attribute(
@@ -170,14 +169,14 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        polling_period=polling,
+        # polling_period=polling,
     )
 
     sensor_readout_mode = attribute(
         label="sensor readout mode",
         dtype=str,
         access=AttrWriteType.READ,
-        polling_period=polling_infinite,
+        # polling_period=polling_infinite,
     )
 
     timeoutt = 1000
@@ -191,7 +190,7 @@ class Basler(Device):
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
 
-            polling_period=self.polling,
+            # polling_period=self.polling,
             unit="us",
             min_value=self.camera.ExposureTimeAbs.Min,
             max_value=self.camera.ExposureTimeAbs.Max
@@ -203,7 +202,7 @@ class Basler(Device):
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
 
-            polling_period=self.polling,
+            # polling_period=self.polling,
             min_value=self.camera.GainRaw.Min,
             max_value=self.camera.GainRaw.Max
         )
@@ -214,7 +213,7 @@ class Basler(Device):
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
 
-            polling_period=self.polling,
+            # polling_period=self.polling,
             min_value=self.camera.Width.Min,
             max_value=self.camera.Width.Max,
         )
@@ -226,7 +225,7 @@ class Basler(Device):
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
 
-            polling_period=self.polling,
+            # polling_period=self.polling,
             min_value=self.camera.Height.Min,
             max_value=self.camera.Height.Max,
         )

@@ -103,12 +103,6 @@ for key, value in boolwidget.items():
     idx = form_model.index(f'{device_name}/{key}')
     panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
 
-boolwidget = {'save_path': None}
-for key, value in boolwidget.items():
-    idx = form_model.index(f'{device_name}/{key}')
-    panel2_w1[idx].readWidgetClass = TaurusLabel
-
-
 # change the text write widget to dropdown list and set auto apply
 dropdown = {'trigger_source': (('Off', 'Off'), ('Software', 'Software'), ('External', 'Line1')), 'trigger_selector': (
     ('AcquisitionStart', 'AcquisitionStart'), ('FrameStart', 'FrameStart')), }
