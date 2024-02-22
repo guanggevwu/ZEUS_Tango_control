@@ -332,10 +332,10 @@ class GentecEO(Device):
             self._save_path = os.path.join(
                 os.path.dirname(__file__), 'gentec_tmp_data')
             os.makedirs(self._save_path, exist_ok=True)
-        # if len(self._save_path) > 20:
-        #     return f'{self._save_path[0:10]}...{self._save_path[-10:-1]}'
-        # else:
-        return self._save_path
+        if len(self._save_path) > 20:
+            return f'{self._save_path[0:10]}...{self._save_path[-10:-1]}'
+        else:
+            return self._save_path
 
     def write_save_path(self, value):
         self._save_path = value
