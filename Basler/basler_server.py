@@ -35,7 +35,7 @@ class Basler(Device):
         polling_period=polling,
     )
 
-    serial_number = device_property(dtype=str)
+    serial_number = device_property(dtype=str, default_value='40222934')
 
     # image_encoded = attribute(label='encnoded image',
     #            access=AttrWriteType.READ)
