@@ -24,12 +24,6 @@ class MyTaurusValueCheckBox(TaurusValueCheckBox):
         self.showText = False
 
 
-class MyTaurusLabel(TaurusLabel):
-    def __init__(self):
-        super().__init__()
-        print(self.resetAutoTrim())
-
-
 def add_value_pairs(values):
     def constructor(self):
         TaurusValueComboBox.__init__(self)
@@ -65,10 +59,10 @@ panel2.setLayout(panel2_layout)
 panel2_w1 = TaurusForm()
 
 form_model = model
-# form_model.remove(f'{device_name}/exposure')
-# form_model.remove(f'{device_name}/gain')
-# form_model.insert(6, f'{device_name}/exposure')
-# form_model.insert(7, f'{device_name}/gain')
+form_model.remove(f'{device_name}/main_value')
+form_model.remove(f'{device_name}/display_range')
+form_model.insert(2, f'{device_name}/main_value')
+form_model.insert(3, f'{device_name}/display_range')
 panel2_w1.model = form_model
 panel2_layout.addWidget(panel2_w1)
 
@@ -78,15 +72,14 @@ for key in boolwidget:
     idx = form_model.index(f'{device_name}/{key}')
     panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
 
-boolwidget = {'save_path': None}
-for key, value in boolwidget.items():
-    idx = form_model.index(f'{device_name}/{key}')
-    panel2_w1[idx].readWidgetClass = MyTaurusLabel
-
-
+# TaurusLabel auto trim function not work in TaurusForm
 # change the text write widget to dropdown list and set auto apply
 dropdown = {'display_range': ((text, value) for text, value in zip(
-    dp.hide_display_range_dropdown_text_list, dp.hide_display_range_dropdown_text_value)), 'measure_mode': (('power', 'power'), ('energy', 'energy'), ('SSE', 'SSE'))}
+    dp.hide_display_range_dropdown_text_list, dp.hide_display_range_dropdown_text_value))}
+if dp.model == "PH100-Si-HA-OD1":
+    dropdown['measure_mode'] = (('Power', '0'), ('SSE', '2'))
+else:
+    dropdown['measure_mode'] = (('Energy', '1'), ('SSE', '2'))
 for key, value in dropdown.items():
     idx = form_model.index(f'{device_name}/{key}')
     panel2_w1[idx].writeWidgetClass = type(key, (TaurusValueComboBox,), {

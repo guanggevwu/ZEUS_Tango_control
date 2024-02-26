@@ -38,19 +38,23 @@ class GentecEO(Device):
             if p.manufacturer == 'Gentec-EO':
                 return p
 
-    # make dynamic
-    energy = attribute(
-        label="energy",
-        dtype=str,
+    model = attribute(
+        label="model",
+        dtype="str",
         access=AttrWriteType.READ,
-        polling_period=polling,
-        doc='energy or power'
     )
 
-    def read_energy(self):
-        self.device.write(b'*CVU')
-        self._energy = self.device.readline().strip().decode()
-        return self._energy
+    def read_model(self):
+        return self._model
+
+    serial_number = attribute(
+        label="serial number",
+        dtype="str",
+        access=AttrWriteType.READ,
+    )
+
+    def read_serial_number(self):
+        return self._serial_number
 
     wavelength = attribute(
         label="wavelength",
@@ -76,62 +80,6 @@ class GentecEO(Device):
     def write_wavelength(self, value):
         self.device.write(f'*PWC{value:05}'.encode())
         time.sleep(0.2)
-
-    range_dict = {}
-    res_table = [1, 3, 10, 30, 100, 300]
-    # unit_table = ['p', 'n', 'u', 'm', '', 'k', 'M']
-    unit_table = ['p', 'n', 'u', 'm', '', 'k', 'M']
-    # 3nw to 1 w
-    for idx in range(7, 25):
-        u, res = divmod(idx, 6)
-        range_dict[f'{idx:02}'] = [res_table[res]*1000**u/1e12,
-                                   f'{res_table[res]}{unit_table[u]}']
-
-    hide_display_range_dropdown_text_list = attribute(
-        label="range",
-        dtype=(str,),
-        max_dim_x=100,
-        max_dim_y=100,
-        access=AttrWriteType.READ,
-        polling_period=polling,
-        doc='display_range_dropdown'
-    )
-
-    def read_hide_display_range_dropdown_text_list(self):
-        return [e[1] for e in self.range_dict.values()]
-
-    hide_display_range_dropdown_text_value = attribute(
-        label="range",
-        dtype=(float,),
-        max_dim_x=100,
-        max_dim_y=100,
-        access=AttrWriteType.READ,
-        polling_period=polling,
-        doc='display_range_dropdown'
-    )
-
-    def read_hide_display_range_dropdown_text_value(self):
-        return [e[0] for e in self.range_dict.values()]
-
-    display_range = attribute(
-        label="range",
-        dtype=str,
-        memorized=is_memorized,
-        access=AttrWriteType.READ_WRITE,
-        doc='range'
-    )
-
-    def read_display_range(self):
-        self.device.write(b'*GCR')
-        self._display_range = self.range_dict[self.device.readline(
-        ).strip().decode().split(' ')[-1]][1]
-        return self._display_range
-
-    def write_display_range(self, value):
-        for k, v in self.range_dict.items():
-            if float(value) == v[0]:
-                self.device.write(f'*SCS{k}'.encode())
-        time.sleep(0.5)
 
     auto_range = attribute(
         label="auto range",
@@ -170,37 +118,31 @@ class GentecEO(Device):
 
     def read_measure_mode(self):
         self.device.write(b'*GMD')
-        mode = self.device.readline().strip().decode().split(' ')[1]
-        if mode == "0":
-            self._measure_mode = 'power'
-        elif mode == "1":
-            self._measure_mode = 'energy'
-        elif mode == "2":
-            self._measure_mode = 'SSE'
+        self._measure_mode = self.device.readline().strip().decode().split(' ')[
+            1]
         return self._measure_mode
 
     def write_measure_mode(self, value):
         if not hasattr(self, '_measure_mode'):
             self.read_measure_mode()
-        if (self._measure_mode == '0' and value == "power") or (self._measure_mode == '2' and value == "SSE"):
-            return
-        else:
-            self.device.write(b'*SSE')
-            time.sleep(2)
+            if self._measure_mode != value:
+                if value == "2":
+                    self.device.write(b'*SSE1')
+                else:
+                    self.device.write(b'*SSE0')
+                time.sleep(2)
 
     set_zero = attribute(
         label="set to 0",
         dtype=bool,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized=True,
-        doc='set currrent value as 0'
+        doc='Set currrent value as 0. Better not to use this since it takes 10 secs to do the subtraction and may cause error. Why not use offset?'
     )
 
     def read_set_zero(self):
         self.device.write(b'*GZO')
         reply = self.device.readline().strip().decode()[-1]
-        self.info_stream(reply)
         if reply == '1':
             self._set_zero = True
         elif reply == '0':
@@ -208,17 +150,18 @@ class GentecEO(Device):
         return self._set_zero
 
     def write_set_zero(self, value):
-        if value:
+        if not hasattr(self, '_set_zero'):
+            self.read_set_zero()
+        if not self._set_zero and value:
+            # self.device.write(b'*SOU')
+            # SDZ for photdiodo
             self.device.write(b'*SDZ')
-            # while True:
-            #     res = self.device.readline()
-            #     if 'Done' in res.decode():
-            #         break
-            #     else:
-            #         time.sleep(1)
-        else:
+            # comment out because it takes too long to get a valid readback.
+            # readback = self.device.readlines().strip().decode()
+            # print(readback)
+        elif self._set_zero and not value:
+            # self.device.write(b'*COU')
             self.device.write(b'*COU')
-            time.sleep(1)
 
     attenuator = attribute(
         label="attenuator",
@@ -342,33 +285,102 @@ class GentecEO(Device):
         self._save_folder = os.path.dirname(self._save_path)
         os.makedirs(self._save_folder, exist_ok=True)
 
-    serial_number = attribute(
-        label="serial number",
-        dtype="str",
-        access=AttrWriteType.READ,
-    )
+    def initialize_dynamic_attributes(self):
+        #     '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
+        if self._model == "PH100-Si-HA-OD1":
+            self.main_value_unit = 'w'
+            # 3nw to 1 w
+            self.display_range_steps = range(7, 25)
+        else:
+            self.main_value_unit = 'j'
+            # 30mj to 300j
+            self.display_range_steps = range(21, 30)
 
-    def read_serial_number(self):
-        return self.find_com_number().serial_number
+        self.range_dict = {}
+        res_table = [1, 3, 10, 30, 100, 300]
+        unit_table = ['p', 'n', 'u', 'm', '', 'k', 'M']
+        unit_table = [u + self.main_value_unit for u in unit_table]
+        for idx in self.display_range_steps:
+            u, res = divmod(idx, 6)
+            self.range_dict[f'{idx:02}'] = [res_table[res]*1000**u/1e12,
+                                            f'{res_table[res]} {unit_table[u]}']
 
-    # def initialize_dynamic_attributes(self):
-    #     '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
-    #     exposure = attribute(
-    #         name="exposure",
-    #         label="exposure",
-    #         dtype=float,
-    #         access=AttrWriteType.READ_WRITE,
-    #         memorized=self.is_memorized,
+        hide_display_range_dropdown_text_list = attribute(
+            name="hide_display_range_dropdown_text_list",
+            label="hide_display_range_dropdown_text_list",
+            dtype=(str,),
+            max_dim_x=100,
+            max_dim_y=100,
+            access=AttrWriteType.READ,
+            doc='display_range_dropdown'
+        )
 
-    #         polling_period=self.polling,
-    #         unit="us",
-    #         min_value=self.camera.ExposureTimeAbs.Min,
-    #         max_value=self.camera.ExposureTimeAbs.Max
-    #     )
-    #     self.add_attribute(exposure)
-    #     # if self.camera.DeviceModelName() in ['acA640-121gm']:
-    #     self.remove_attribute('sensor_readout_mode')
+        hide_display_range_dropdown_text_value = attribute(
+            name="hide_display_range_dropdown_text_value",
+            label="hide_display_range_dropdown_text_value",
+            dtype=(float,),
+            max_dim_x=100,
+            max_dim_y=100,
+            access=AttrWriteType.READ,
+            doc='display_range_dropdown'
+        )
 
+        main_value = attribute(
+            name="main_value",
+            label="reading",
+            dtype=str,
+            access=AttrWriteType.READ,
+            polling_period=self.polling,
+            doc='reading value (energy or power)'
+        )
+        display_range = attribute(
+            name="display_range",
+            label="range",
+            dtype=str,
+            polling_period=self.polling,
+            memorized=self.is_memorized,
+            access=AttrWriteType.READ_WRITE,
+            doc='range'
+        )
+
+        self.add_attribute(main_value)
+        self.add_attribute(hide_display_range_dropdown_text_list)
+        self.add_attribute(hide_display_range_dropdown_text_value)
+        self.add_attribute(display_range)
+
+    def read_main_value(self, attr):
+        self.device.write(b'*CVU')
+        self._main_value = self.device.readline().strip().decode()
+        if float(self._main_value) < 1 and float(self._main_value) >= 1e-3:
+            self._main_value = f'{float(self._main_value)*1e3:.8g} m{self.main_value_unit}'
+        elif float(self._main_value) < 1e-3 and float(self._main_value) >= 1e-6:
+            self._main_value = f'{float(self._main_value)*1e6:.8g} u{self.main_value_unit}'
+        elif float(self._main_value) < 1e-6 and float(self._main_value) >= 1e-9:
+            self._main_value = f'{float(self._main_value)*1e9:.8g} n{self.main_value_unit}'
+        elif float(self._main_value) < 1e-9 and float(self._main_value) >= 1e-12:
+            self._main_value = f'{float(self._main_value)*1e12:.8g} p{self.main_value_unit}'
+        elif float(self._main_value) < 0:
+            self._main_value = f'{self._main_value} (negative value, try set scale down)'
+        return self._main_value
+
+    def read_hide_display_range_dropdown_text_list(self, attr):
+        return [e[1] for e in self.range_dict.values()]
+
+    def read_hide_display_range_dropdown_text_value(self, attr):
+        return [e[0] for e in self.range_dict.values()]
+
+    def read_display_range(self, attr):
+        self.device.write(b'*GCR')
+        response = self.device.readline(
+        ).strip().decode().split(' ')[-1]
+        self._display_range = self.range_dict[f'{int(response):02}'][1]
+        return self._display_range
+
+    def write_display_range(self, attr):
+        for k, v in self.range_dict.items():
+            if float(attr.get_write_value()) == v[0]:
+                self.device.write(f'*SCS{k}'.encode())
+        time.sleep(0.5)
     # def read_exposure(self, attr):
     #     return self.camera.ExposureTimeAbs.Value
 
@@ -384,10 +396,20 @@ class GentecEO(Device):
         try:
             self.device = serial.Serial(
                 port=com_number, baudrate=9600, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
-            print(
-                f'Genotec-eo device is connected: {com_obj.serial_number}')
             self.set_state(DevState.ON)
             self._save_data = False
+            self.device.write(b'*STS')
+            res = self.device.readlines()
+            res_decode = [e.strip().decode() for e in res]
+            decoded = ''
+            for i in res_decode:
+                decoded = decoded+chr(int(i[-2:], 16))
+                decoded = decoded+chr(int(i[-4:-2], 16))
+            self._serial_number = decoded[42*2:45*2]
+            self._model = decoded[26*2:41*2]
+            self._model = self._model.replace('\x00', '')
+            print(
+                f'Genotec-eo device is connected. Model: {self._model}. Serial number: {self._serial_number}')
         except:
             print("Could NOT connect to  Genotec-eo")
             self.set_state(DevState.OFF)
