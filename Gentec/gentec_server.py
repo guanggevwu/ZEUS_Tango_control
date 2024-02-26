@@ -343,10 +343,20 @@ class GentecEO(Device):
             doc='range'
         )
 
+        trigger_level = attribute(
+            name='trigger_level',
+            labe='trigger level'
+            dtype=str,
+            access=AttrWriteType.READ_WRITE,
+            doc='Set trigger level. Is the base value equal'
+        )
+
         self.add_attribute(main_value)
         self.add_attribute(hide_display_range_dropdown_text_list)
         self.add_attribute(hide_display_range_dropdown_text_value)
         self.add_attribute(display_range)
+        if self._model != "PH100-Si-HA-OD1":
+            self.add_attribute(trigger_level)
 
     def read_main_value(self, attr):
         self.device.write(b'*CVU')
@@ -380,6 +390,18 @@ class GentecEO(Device):
         for k, v in self.range_dict.items():
             if float(attr.get_write_value()) == v[0]:
                 self.device.write(f'*SCS{k}'.encode())
+        time.sleep(0.5)
+
+    def read_trigger_level(self, attr):
+        self.device.write(b'*GTL')
+        response = self.device.readline(
+        ).strip().decode().split(' ')[-1]
+        return response
+
+    def write_trigger_level(self, attr):
+        value = float(attr.get_write_value())
+        print(value)
+        self.device.write(f'*STL{value:04.1f}'.encode())
         time.sleep(0.5)
     # def read_exposure(self, attr):
     #     return self.camera.ExposureTimeAbs.Value
