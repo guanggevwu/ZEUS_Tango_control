@@ -232,7 +232,6 @@ class GentecEO(Device):
         dtype=bool,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        polling_period=polling,
         doc='save the data'
     )
 
@@ -240,10 +239,15 @@ class GentecEO(Device):
         if self._save_data:
             if not self._save_path:
                 self.read_save_path()
+            if not os.path.isdir(os.path.dirname(self._save_path)):
+                self._save_data = False
+                return self._save_data
             file_exists = os.path.isfile(self._save_path)
             with open(self._save_path, 'a', newline='') as csvfile:
-                fieldnames = ['time', 'energy', 'wavelength', 'display_range', 'auto_range',
+                fieldnames = ['time', 'main_value', 'wavelength', 'display_range', 'auto_range',
                               'measure_mode', 'set_zero', 'attenuator', 'multiplier', 'offset']
+                if self._model != "PH100-Si-HA-OD1":
+                    fieldnames.append('trigger_level')
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 if not file_exists:
                     writer.writeheader()
@@ -259,7 +263,6 @@ class GentecEO(Device):
     def write_save_data(self, value):
         if self._save_data != value:
             self._save_data = value
-            logging.info(f'save status is changed to {value}')
 
     save_path = attribute(
         label='save path',
@@ -274,7 +277,10 @@ class GentecEO(Device):
         if not hasattr(self, '_save_path'):
             self._save_path = os.path.join(
                 os.path.dirname(__file__), 'gentec_tmp_data')
-            os.makedirs(self._save_path, exist_ok=True)
+            try:
+                os.makedirs(self._save_path, exist_ok=True)
+            except:
+                pass
         if len(self._save_path) > 20:
             return f'{self._save_path[0:10]}...{self._save_path[-10:-1]}'
         else:
@@ -345,7 +351,7 @@ class GentecEO(Device):
 
         trigger_level = attribute(
             name='trigger_level',
-            labe='trigger level'
+            label='trigger level',
             dtype=str,
             access=AttrWriteType.READ_WRITE,
             doc='Set trigger level. Is the base value equal'
@@ -428,7 +434,7 @@ class GentecEO(Device):
                 decoded = decoded+chr(int(i[-2:], 16))
                 decoded = decoded+chr(int(i[-4:-2], 16))
             self._serial_number = decoded[42*2:45*2]
-            self._model = decoded[26*2:41*2]
+            self._model = decoded[26*2:35*2]
             self._model = self._model.replace('\x00', '')
             print(
                 f'Genotec-eo device is connected. Model: {self._model}. Serial number: {self._serial_number}')
