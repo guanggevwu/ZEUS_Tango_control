@@ -6,7 +6,12 @@ import sys
 
 class Gentec:
     def __init__(self, root):
-        device_name = 'test/gentec/1'
+        self.fontsize = 50
+        device_name = 'laser/gentec/1'
+        if len(sys.argv) > 1:
+            device_name = sys.argv[1]
+            if len(sys.argv) > 2:
+                self.fontsize = sys.argv[2]
         self.dp = tango.DeviceProxy(device_name)
         attrs = self.dp.get_attribute_list()
         self.required_list = {
@@ -18,7 +23,6 @@ class Gentec:
         root.rowconfigure(0, weight=1)
 
         s = ttk.Style()
-        self.fontsize = sys.argv[1] if len(sys.argv) > 1 else 50
 
         s.configure('Sty1.TLabel',
                     font=('Helvetica', self.fontsize))

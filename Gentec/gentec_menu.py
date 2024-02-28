@@ -22,6 +22,10 @@ class GentecMenu:
                     font=('Helvetica', self.fontsize))
         s.configure('Sty1.TEntry',
                     font=('Helvetica', self.fontsize))
+        root.option_add("*TCombobox*Listbox.font", "Helvetica 20")
+
+        s.configure('Sty1.TCombobox',
+                    font=('Helvetica', self.fontsize))
 
         venv_path = os.path.dirname(os.path.dirname(__file__))
         if platform.system() == 'Linux':
@@ -30,29 +34,29 @@ class GentecMenu:
             self.python_path = os.path.join(
                 venv_path, 'venv', 'Scripts', 'python.exe')
 
-        self.menu_dict = {'start server': 'gentec_server.py',
-                          'start Taurus GUI': 'gentec_GUI.py', 'start Tkinter GUI': 'tkinter_GUI.py'}
+        self.menu_dict = {'start server': ['gentec_server.py', ('testsr', 'MA2')],
+                          'start Taurus GUI': ['gentec_GUI.py', ('test/gentec/1', 'laser/gentec/1')], 'start Tkinter GUI': ['tkinter_GUI.py', ('test/gentec/1', 'laser/gentec/1')]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             ttk.Button(frame1, text=f"{key}", command=partial(self.start_window, f'{key}'), style='Sty1.TButton').grid(
                 column=0, row=idx, columnspan=1, sticky=[W, E])
-            setattr(self, value[:-3], StringVar())
-            ttk.Entry(frame1, textvariable=getattr(
-                self, value[:-3]), style='Sty1.TEntry', font=('Helvetica', self.fontsize), width=10).grid(
+            setattr(self, value[0][:-3], StringVar())
+            setattr(self, f'{value[0][:-3]}_combobox', ttk.Combobox(frame1, textvariable=getattr(
+                self, value[0][:-3]),  font=('Helvetica', self.fontsize), width=15))
+            getattr(self, f'{value[0][:-3]}_combobox').grid(
                 column=1, row=idx, columnspan=1, sticky=[N, E, S])
+            getattr(self, f'{value[0][:-3]}_combobox')['value'] = value[1]
         for child in frame1.winfo_children():
             child.grid_configure(padx=[self.fontsize, 0], pady=3)
-        key = '12'
 
     def start_window(self, key):
         script_path = os.path.join(
-            os.path.dirname(__file__), self.menu_dict[key])
-        input_txt = getattr(self, self.menu_dict[key][:-3]).get()
+            os.path.dirname(__file__), self.menu_dict[key][0])
+        input_txt = getattr(self, self.menu_dict[key][0][:-3]).get()
         # using os.system cause hang up in server code
         # os.system(
         #     f'{self.python_path} {script_path} {input_txt}')
         subprocess.Popen(
             f'{self.python_path} {script_path} {input_txt}', shell=True)
-        print('done')
 
 
 if __name__ == '__main__':
