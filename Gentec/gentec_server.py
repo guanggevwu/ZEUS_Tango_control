@@ -32,6 +32,8 @@ class GentecEO(Device):
     # hw_memorized=True, means the set value is written at the initialization step. Some of the properties are remembered in the camera's memory, so no need to remember them.
     is_memorized = True
 
+    friendly_name = device_property(dtype=str, default_value='')
+
     def find_com_number(self):
         all_ports = serial.tools.list_ports.comports()
         for p in all_ports:
@@ -55,6 +57,15 @@ class GentecEO(Device):
 
     def read_serial_number(self):
         return self._serial_number
+
+    name_attr = attribute(
+        label="name",
+        dtype="str",
+        access=AttrWriteType.READ,
+    )
+
+    def read_name_attr(self):
+        return self.friendly_name
 
     wavelength = attribute(
         label="wavelength",
@@ -86,7 +97,6 @@ class GentecEO(Device):
         dtype=bool,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized=True,
         doc='enable or disable auto range'
     )
 
@@ -131,37 +141,6 @@ class GentecEO(Device):
                 else:
                     self.device.write(b'*SSE0')
                 time.sleep(2)
-
-    set_zero = attribute(
-        label="set to 0",
-        dtype=bool,
-        access=AttrWriteType.READ_WRITE,
-        memorized=is_memorized,
-        doc='Set currrent value as 0. Better not to use this since it takes 10 secs to do the subtraction and may cause error. Why not use offset?'
-    )
-
-    def read_set_zero(self):
-        self.device.write(b'*GZO')
-        reply = self.device.readline().strip().decode()[-1]
-        if reply == '1':
-            self._set_zero = True
-        elif reply == '0':
-            self._set_zero = False
-        return self._set_zero
-
-    def write_set_zero(self, value):
-        if not hasattr(self, '_set_zero'):
-            self.read_set_zero()
-        if not self._set_zero and value:
-            # self.device.write(b'*SOU')
-            # SDZ for photdiodo
-            self.device.write(b'*SDZ')
-            # comment out because it takes too long to get a valid readback.
-            # readback = self.device.readlines().strip().decode()
-            # print(readback)
-        elif self._set_zero and not value:
-            # self.device.write(b'*COU')
-            self.device.write(b'*COU')
 
     attenuator = attribute(
         label="attenuator",
@@ -245,19 +224,22 @@ class GentecEO(Device):
             file_exists = os.path.isfile(self._save_path)
             with open(self._save_path, 'a', newline='') as csvfile:
                 fieldnames = ['time', 'main_value', 'wavelength', 'display_range', 'auto_range',
-                              'measure_mode', 'set_zero', 'attenuator', 'multiplier', 'offset']
+                              'measure_mode', 'attenuator', 'multiplier', 'offset']
                 if self._model != "PH100-Si-HA-OD1":
                     fieldnames.append('trigger_level')
+                else:
+                    fieldnames.append('set_zero')
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 if not file_exists:
                     writer.writeheader()
-                row_dict = {}
-                for key in fieldnames:
-                    if key == "time":
-                        row_dict[key] = str(datetime.datetime.now())
-                    else:
-                        row_dict[key] = getattr(self, f'_{key}')
-                writer.writerow(row_dict)
+                if self._model == "PH100-Si-HA-OD1" or self._new:
+                    row_dict = {}
+                    for key in fieldnames:
+                        if key == "time":
+                            row_dict[key] = str(datetime.datetime.now())
+                        else:
+                            row_dict[key] = getattr(self, f'_{key}')
+                    writer.writerow(row_dict)
         return self._save_data
 
     def write_save_data(self, value):
@@ -357,24 +339,43 @@ class GentecEO(Device):
             doc='Set trigger level. Is the base value equal'
         )
 
+        set_zero = attribute(
+            name="set_zero",
+            label="set to 0",
+            dtype=bool,
+            access=AttrWriteType.READ_WRITE,
+            memorized=self.is_memorized,
+            doc='Set currrent value as 0. Better not to use this since it takes 10 secs to do the subtraction and may cause error. Why not use offset?'
+        )
+
         self.add_attribute(main_value)
         self.add_attribute(hide_display_range_dropdown_text_list)
         self.add_attribute(hide_display_range_dropdown_text_value)
         self.add_attribute(display_range)
         if self._model != "PH100-Si-HA-OD1":
             self.add_attribute(trigger_level)
+        else:
+            self.add_attribute(set_zero)
 
     def read_main_value(self, attr):
+        if self._model != "PH100-Si-HA-OD1":
+            self.device.write(b'*NVU')
+            reply = self.device.readline().strip().decode()
+            if 'not' not in reply:
+                self._new = True
+            else:
+                self._new = False
+        # New data available or New data not available
         self.device.write(b'*CVU')
         self._main_value = self.device.readline().strip().decode()
         if float(self._main_value) < 1 and float(self._main_value) >= 1e-3:
-            self._main_value = f'{float(self._main_value)*1e3:.8g} m{self.main_value_unit}'
+            self._main_value = f'{float(self._main_value)*1e3:#.7g} m{self.main_value_unit}'
         elif float(self._main_value) < 1e-3 and float(self._main_value) >= 1e-6:
-            self._main_value = f'{float(self._main_value)*1e6:.8g} u{self.main_value_unit}'
+            self._main_value = f'{float(self._main_value)*1e6:#.7g} u{self.main_value_unit}'
         elif float(self._main_value) < 1e-6 and float(self._main_value) >= 1e-9:
-            self._main_value = f'{float(self._main_value)*1e9:.8g} n{self.main_value_unit}'
+            self._main_value = f'{float(self._main_value)*1e9:#.7g} n{self.main_value_unit}'
         elif float(self._main_value) < 1e-9 and float(self._main_value) >= 1e-12:
-            self._main_value = f'{float(self._main_value)*1e12:.8g} p{self.main_value_unit}'
+            self._main_value = f'{float(self._main_value)*1e12:#.7g} p{self.main_value_unit}'
         elif float(self._main_value) < 0:
             self._main_value = f'{self._main_value} (negative value, try set scale down)'
         return self._main_value
@@ -409,11 +410,30 @@ class GentecEO(Device):
         print(value)
         self.device.write(f'*STL{value:04.1f}'.encode())
         time.sleep(0.5)
-    # def read_exposure(self, attr):
-    #     return self.camera.ExposureTimeAbs.Value
 
-    # def write_exposure(self, attr):
-    #     self.camera.ExposureTimeAbs.Value = attr.get_write_value()
+    def read_set_zero(self, attr):
+        self.device.write(b'*GZO')
+        reply = self.device.readline().strip().decode()[-1]
+        if reply == '1':
+            self._set_zero = True
+        elif reply == '0':
+            self._set_zero = False
+        return self._set_zero
+
+    def write_set_zero(self, attr):
+        value = attr.get_write_value()
+        if not hasattr(self, '_set_zero'):
+            self.read_set_zero()
+        if not self._set_zero and value:
+            # self.device.write(b'*SOU')
+            # SDZ for photdiodo
+            self.device.write(b'*SDZ')
+            # comment out because it takes too long to get a valid readback and will cause a timeout problem.
+            # readback = self.device.readlines().strip().decode()
+            # print(readback)
+        elif self._set_zero and not value:
+            # self.device.write(b'*COU')
+            self.device.write(b'*COU')
 
     def init_device(self):
         Device.init_device(self)
