@@ -91,6 +91,7 @@ class GentecEO(Device):
     def write_wavelength(self, value):
         self.device.write(f'*PWC{value:05}'.encode())
         time.sleep(0.2)
+        self._wavelength = value
 
     auto_range = attribute(
         label="auto range",
@@ -115,6 +116,7 @@ class GentecEO(Device):
         else:
             self.device.write(b'*SAS0')
         time.sleep(0.5)
+        self._auto_range = value
 
     measure_mode = attribute(
         label="measure mode",
@@ -122,7 +124,6 @@ class GentecEO(Device):
         access=AttrWriteType.READ_WRITE,
         polling_period=polling,
         memorized=is_memorized,
-        hw_memorized=True,
         doc='power, energy or single shot energy'
     )
 
@@ -141,6 +142,7 @@ class GentecEO(Device):
                 else:
                     self.device.write(b'*SSE0')
                 time.sleep(2)
+        self._measure_mode = value
 
     attenuator = attribute(
         label="attenuator",
@@ -167,6 +169,7 @@ class GentecEO(Device):
         elif not value:
             self.device.write(b'*ATT0')
         time.sleep(0.5)
+        self._attenuator = value
 
     multiplier = attribute(
         label="multiplier",
@@ -186,6 +189,7 @@ class GentecEO(Device):
     def write_multiplier(self, value):
         self.device.write(f'*MUL{value:08}'.encode())
         time.sleep(0.5)
+        self._multiplier = value
 
     offset = attribute(
         label="offset",
@@ -205,6 +209,7 @@ class GentecEO(Device):
     def write_offset(self, value):
         self.device.write(f'*OFF{value:08}'.encode())
         time.sleep(0.5)
+        self._offset = value
 
     save_data = attribute(
         label="save data",
@@ -278,7 +283,7 @@ class GentecEO(Device):
         if self._model == "PH100-Si-HA-OD1":
             self.main_value_unit = 'w'
             # 3nw to 1 w
-            self.display_range_steps = range(7, 25)
+            self.display_range_steps = range(8, 25)
         else:
             self.main_value_unit = 'J'
             # 30mj to 300j
@@ -298,7 +303,6 @@ class GentecEO(Device):
             label="hide_display_range_dropdown_text_list",
             dtype=(str,),
             max_dim_x=100,
-            max_dim_y=100,
             access=AttrWriteType.READ,
             doc='display_range_dropdown'
         )
@@ -308,7 +312,6 @@ class GentecEO(Device):
             label="hide_display_range_dropdown_text_value",
             dtype=(float,),
             max_dim_x=100,
-            max_dim_y=100,
             access=AttrWriteType.READ,
             doc='display_range_dropdown'
         )
@@ -320,15 +323,6 @@ class GentecEO(Device):
             access=AttrWriteType.READ,
             polling_period=self.polling,
             doc='reading value (energy or power)'
-        )
-        display_range = attribute(
-            name="display_range",
-            label="range",
-            dtype=str,
-            polling_period=self.polling,
-            memorized=self.is_memorized,
-            access=AttrWriteType.READ_WRITE,
-            doc='range'
         )
 
         trigger_level = attribute(
@@ -351,7 +345,7 @@ class GentecEO(Device):
         self.add_attribute(main_value)
         self.add_attribute(hide_display_range_dropdown_text_list)
         self.add_attribute(hide_display_range_dropdown_text_value)
-        self.add_attribute(display_range)
+        # self.add_attribute(display_range)
         if self._model != "PH100-Si-HA-OD1":
             self.add_attribute(trigger_level)
         else:
@@ -386,7 +380,16 @@ class GentecEO(Device):
     def read_hide_display_range_dropdown_text_value(self, attr):
         return [e[0] for e in self.range_dict.values()]
 
-    def read_display_range(self, attr):
+    display_range = attribute(
+        label="range",
+        dtype=str,
+        polling_period=polling,
+        memorized=is_memorized,
+        access=AttrWriteType.READ_WRITE,
+        doc='range'
+    )
+
+    def read_display_range(self):
         self.device.write(b'*GCR')
         response = self.device.readline(
         ).strip().decode().split(' ')[-1]
@@ -395,21 +398,23 @@ class GentecEO(Device):
 
     def write_display_range(self, attr):
         for k, v in self.range_dict.items():
-            if float(attr.get_write_value()) == v[0]:
+            if float(attr) == v[0]:
                 self.device.write(f'*SCS{k}'.encode())
         time.sleep(0.5)
+        self._display_range = attr
 
     def read_trigger_level(self, attr):
         self.device.write(b'*GTL')
         response = self.device.readline(
         ).strip().decode().split(' ')[-1]
+        self._trigger_level = response
         return response
 
     def write_trigger_level(self, attr):
         value = float(attr.get_write_value())
-        print(value)
         self.device.write(f'*STL{value:04.1f}'.encode())
         time.sleep(0.5)
+        self._trigger_level = value
 
     def read_set_zero(self, attr):
         self.device.write(b'*GZO')
@@ -434,6 +439,7 @@ class GentecEO(Device):
         elif self._set_zero and not value:
             # self.device.write(b'*COU')
             self.device.write(b'*COU')
+        self._set_zero = value
 
     def init_device(self):
         Device.init_device(self)
