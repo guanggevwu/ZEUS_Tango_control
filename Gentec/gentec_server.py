@@ -280,7 +280,7 @@ class GentecEO(Device):
             # 3nw to 1 w
             self.display_range_steps = range(7, 25)
         else:
-            self.main_value_unit = 'j'
+            self.main_value_unit = 'J'
             # 30mj to 300j
             self.display_range_steps = range(21, 30)
 

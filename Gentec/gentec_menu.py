@@ -5,6 +5,8 @@ import os
 import platform
 import subprocess
 from functools import partial
+import atexit
+import signal
 
 
 class GentecMenu:
@@ -37,14 +39,16 @@ class GentecMenu:
         self.menu_dict = {'start server': ['gentec_server.py', ('testsr', 'MA2')],
                           'start Taurus GUI': ['gentec_GUI.py', ('test/gentec/1', 'laser/gentec/1')], 'start Tkinter GUI': ['tkinter_GUI.py', ('test/gentec/1', 'laser/gentec/1')]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
-            ttk.Button(frame1, text=f"{key}", command=partial(self.start_window, f'{key}'), style='Sty1.TButton').grid(
-                column=0, row=idx, columnspan=1, sticky=[W, E])
             setattr(self, value[0][:-3], StringVar())
             setattr(self, f'{value[0][:-3]}_combobox', ttk.Combobox(frame1, textvariable=getattr(
                 self, value[0][:-3]),  font=('Helvetica', self.fontsize), width=15))
             getattr(self, f'{value[0][:-3]}_combobox').grid(
-                column=1, row=idx, columnspan=1, sticky=[N, E, S])
+                column=0, row=idx, columnspan=1, sticky=[N, E, S])
+            ttk.Button(frame1, text=f"{key}", command=partial(self.start_window, f'{key}'), style='Sty1.TButton').grid(
+                column=1, row=idx, columnspan=1, sticky=[W, E])
             getattr(self, f'{value[0][:-3]}_combobox')['value'] = value[1]
+            ttk.Button(frame1, text=f"X", command=partial(self.terminate, f'{key}'), style='Sty1.TButton', width=5).grid(
+                column=2, row=idx, columnspan=1, sticky=[W])
         for child in frame1.winfo_children():
             child.grid_configure(padx=[self.fontsize, 0], pady=3)
 
@@ -55,11 +59,25 @@ class GentecMenu:
         # using os.system cause hang up in server code
         # os.system(
         #     f'{self.python_path} {script_path} {input_txt}')
-        subprocess.Popen(
-            f'{self.python_path} {script_path} {input_txt}', shell=True)
+        p = subprocess.Popen(
+            f'{self.python_path} {script_path} {input_txt}')
+        setattr(self, f'{self.menu_dict[key][0][:-3]}_subprocess', p.pid)
+        print(f'{p.pid} is started')
+
+    def terminate_all(self):
+        for key, value in self.__dict__.items():
+            if '_subprocess' in key:
+                print(f'trying to kill {key} {value}')
+                os.kill(value, signal.SIGTERM)
+
+    def terminate(self, key):
+        pid = getattr(self, f'{self.menu_dict[key][0][:-3]}_subprocess')
+        print(f'try to kill {key} {pid}')
+        os.kill(pid, signal.SIGTERM)
 
 
 if __name__ == '__main__':
     root = Tk()
     dummy = GentecMenu(root)
+    atexit.register(dummy.terminate_all)
     root.mainloop()

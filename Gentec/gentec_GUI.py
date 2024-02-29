@@ -68,6 +68,7 @@ panel2_layout.addWidget(panel2_w1)
 
 # change the bool write to auto apply.
 boolwidget = ['save_data', 'auto_range', 'set_zero', 'attenuator']
+boolwidget = [e for e in boolwidget if e in form_model]
 for key in boolwidget:
     idx = form_model.index(f'{device_name}/{key}')
     panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
