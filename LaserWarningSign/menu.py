@@ -9,9 +9,9 @@ import atexit
 import signal
 
 
-class GentecMenu:
+class Menu:
     def __init__(self, root):
-        root.title("Gentec menu")
+        root.title("Laser warning sign menu")
         frame1 = ttk.Frame(root, padding="3 3 12 12")
         frame1.grid(column=0, row=0, sticky=(N, W, E, S))
         root.columnconfigure(0, weight=1)
@@ -36,10 +36,9 @@ class GentecMenu:
             self.python_path = os.path.join(
                 venv_path, 'venv', 'Scripts', 'python.exe')
 
-        self.menu_dict = {'start server': ['gentec_server.py', ('testsr', 'MA2')],
-                          'start Taurus GUI': ['gentec_GUI.py', ('test/gentec/1', 'laser/gentec/1')], 'start Tkinter GUI': ['tkinter_GUI.py', ('test/gentec/1', 'laser/gentec/1')]}
+        self.menu_dict = {'start server': [
+            'server.py', ('testsr', 'laser_warning_sign_sr')], }
         for idx, (key, value) in enumerate(self.menu_dict.items()):
-            # value[0][:-3], i.e., 'gentec_server' is the attribute name
             setattr(self, value[0][:-3], StringVar())
             setattr(self, f'{value[0][:-3]}_combobox', ttk.Combobox(frame1, textvariable=getattr(
                 self, value[0][:-3]),  font=('Helvetica', self.fontsize), width=15))
@@ -79,6 +78,6 @@ class GentecMenu:
 
 if __name__ == '__main__':
     root = Tk()
-    dummy = GentecMenu(root)
+    dummy = Menu(root)
     atexit.register(dummy.terminate_all)
     root.mainloop()

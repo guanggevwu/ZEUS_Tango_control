@@ -1,20 +1,15 @@
 #!/usr/bin/python3 -u
 # -*- coding: utf-8 -*-
-from tango import AttrWriteType, DevState, DevFloat, EncodedAttribute
+from tango import AttrWriteType, DevState
 from tango.server import Device, attribute, command, device_property
-from pypylon import pylon
-from numpy import array
-import numpy as np
 import time
 import datetime
 import logging
-from PIL import Image
 import os
 import csv
 
 import serial
 import time
-import logging
 import serial.tools.list_ports
 
 # -----------------------------
