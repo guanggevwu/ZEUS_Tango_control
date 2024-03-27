@@ -11,7 +11,7 @@ import signal
 
 class BaslerMenu:
     def __init__(self, root):
-        root.title("Gentec menu")
+        root.title("Basler menu")
         frame1 = ttk.Frame(root, padding="3 3 12 12")
         frame1.grid(column=0, row=0, sticky=(N, W, E, S))
         root.columnconfigure(0, weight=1)
