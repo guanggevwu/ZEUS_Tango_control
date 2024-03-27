@@ -321,7 +321,9 @@ class Basler(Device):
                 os.path.dirname(__file__), 'basler_tmp_data')
             os.makedirs(self._save_path, exist_ok=True)
         if len(self._save_path) > 20:
-            return f'{self._save_path[0:10]}...{self._save_path[-10:-1]}'
+            if ";" in self._save_path:
+                return ";".join([f'{e[0:2]}...{e[-2:-1]}' for e in self._save_path.split(';')])
+            return f'{self._save_path[0:5]}...{self._save_path[-5:-1]}'
         else:
             return self._save_path
 
