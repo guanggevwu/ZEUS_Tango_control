@@ -37,7 +37,7 @@ class BaslerMenu:
                 venv_path, 'venv', 'Scripts', 'python.exe')
 
         self.menu_dict = {'start server': ['basler_server.py', ('MA2')],
-                          'start Taurus GUI': ['basler_client_GUI.py', ('laser/basler/1')]}
+                          'start Taurus GUI': ['basler_client_GUI.py', ('laser/basler/SF2')]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             # value[0][:-3], i.e., 'gentec_server' is the attribute name
             setattr(self, value[0][:-3], StringVar())

@@ -37,7 +37,7 @@ class GentecMenu:
                 venv_path, 'venv', 'Scripts', 'python.exe')
 
         self.menu_dict = {'start server': ['gentec_server.py', ('testsr', 'MA2')],
-                          'start Taurus GUI': ['gentec_GUI.py', ('test/gentec/1', 'laser/gentec/1')], 'start Tkinter GUI': ['tkinter_GUI.py', ('test/gentec/1', 'laser/gentec/1')]}
+                          'start Taurus GUI': ['gentec_GUI.py', ('test/gentec/1', 'laser/gentec/MA1', 'laser/gentec/MA2', 'laser/gentec/MA3')], 'start Tkinter GUI': ['tkinter_GUI.py', ('test/gentec/1', 'laser/gentec/MA1', 'laser/gentec/MA2', 'laser/gentec/MA3')]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             # value[0][:-3], i.e., 'gentec_server' is the attribute name
             setattr(self, value[0][:-3], StringVar())
