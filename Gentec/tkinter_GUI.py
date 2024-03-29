@@ -7,13 +7,18 @@ import sys
 class Gentec:
     def __init__(self, root):
         self.fontsize = 50
-        device_name = 'laser/gentec/1'
         if len(sys.argv) > 1:
-            device_name = sys.argv[1]
+            if sys.argv[1] == 'all':
+                device_name = ['laser/gentec/MA1',
+                               'laser/gentec/MA2', 'laser/gentec/MA3']
+            else:
+                device_name = [sys.argv[1]]
             if len(sys.argv) > 2:
                 self.fontsize = sys.argv[2]
-        self.dp = tango.DeviceProxy(device_name)
-        attrs = self.dp.get_attribute_list()
+        self.dp = []
+        for dn in device_name:
+            self.dp.append(tango.DeviceProxy(dn))
+        # attrs = self.dp.get_attribute_list()
         self.required_list = {
             'name_attr': 'name', 'main_value': 'main value'}
         root.title("Simplified Gentec")
@@ -29,10 +34,10 @@ class Gentec:
         for idx, (key, value) in enumerate(self.required_list.items()):
             ttk.Label(frame1, text=f'{value}: ', style='Sty1.TLabel').grid(
                 column=0, row=idx, sticky='W')
-
-            setattr(self, key, StringVar())
-            ttk.Label(frame1, textvariable=getattr(self, key), style='Sty1.TLabel').grid(
-                column=1, row=idx, sticky='W')
+            for device_idx, dp in enumerate(self.dp):
+                setattr(self, f'{key}_{device_idx}', StringVar())
+                ttk.Label(frame1, textvariable=getattr(self, f'{key}_{device_idx}'), style='Sty1.TLabel').grid(
+                    column=1+device_idx, row=idx, sticky='W')
 
         for child in frame1.winfo_children():
             child.grid_configure(padx=[self.fontsize, 0], pady=3)
@@ -40,7 +45,12 @@ class Gentec:
 
     def update(self):
         for key, value in self.required_list.items():
-            getattr(self, key).set(getattr(self.dp, key))
+            for device_idx, dp in enumerate(self.dp):
+                try:
+                    getattr(self, f'{key}_{device_idx}').set(
+                        getattr(self.dp[device_idx], key))
+                except:
+                    pass
         root.after(100, self.update)
 
 

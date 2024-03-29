@@ -281,8 +281,12 @@ class GentecEO(Device):
             self.display_range_steps = range(8, 25)
         else:
             self.main_value_unit = 'J'
+            # for 'QE65LP-S-MB-QED-IN', the range is 3 mj to 300j
+            if '-S-' in self._model:
+                self.display_range_steps = range(19, 30)
             # 30mj to 300j
-            self.display_range_steps = range(21, 30)
+            else:
+                self.display_range_steps = range(21, 30)
 
         self.range_dict = {}
         res_table = [1, 3, 10, 30, 100, 300]
