@@ -361,7 +361,9 @@ class GentecEO(Device):
         # New data available or New data not available
         self.device.write(b'*CVU')
         self._main_value = self.device.readline().strip().decode()
-        if float(self._main_value) < 1 and float(self._main_value) >= 1e-3:
+        if float(self._main_value) < 1000 and float(self._main_value) >= 1:
+            self._main_value = f'{float(self._main_value):#.7g} {self.main_value_unit}'
+        elif float(self._main_value) < 1 and float(self._main_value) >= 1e-3:
             self._main_value = f'{float(self._main_value)*1e3:#.7g} m{self.main_value_unit}'
         elif float(self._main_value) < 1e-3 and float(self._main_value) >= 1e-6:
             self._main_value = f'{float(self._main_value)*1e6:#.7g} u{self.main_value_unit}'
