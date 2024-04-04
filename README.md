@@ -1,4 +1,4 @@
-Use [Tango Controls](https://www.tango-controls.org) as the control system software in ZEUS. Most of the code here are written in Python and based on [pytango](https://pytango.readthedocs.io/en/latest/contents.html)
+Use [Tango Controls](https://www.tango-controls.org) as the control system software in ZEUS. Most of the code here is written in Python and is based on [pytango](https://pytango.readthedocs.io/en/latest/contents.html).
 
 # Getting Started
 
@@ -13,17 +13,17 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-- Set the enviroment variables.
+- Set the environment variables.
   TANGO_HOST = 192.168.131.90:10000
 
 ## Introduction
 
-- File structure. In each device type folder, there are a few files in it. They are device server file, client GUI file, menu file and example code file. it is recommended to use "menu.py" as the GUI to start server and client.
-- The following examples are mostly for code user. However, you should be able to find the corresponding configurations in the GUI easily.
+- File structure. In each device type folder, there are a few files. They are device server file, client GUI file, menu file and example code file. it is recommended to use "menu.py" as the GUI to start server and client.
+- The following examples are mostly for code user. However, you should be able to find the corresponding configurations in the [Taurus GUI](https://taurus-scada.org/) easily.
 
 ## Basler camera
 
-The example code shows how to trigger the Basler camera by sending a software trigger.
+The example code shows how to trigger a Basler camera by sending a software trigger.
 
 ```python
 import tango
@@ -78,7 +78,7 @@ while True
 
 ## Gentec-EO energy meter/power meter
 
-To aquire the current reading from the device:
+To acquire the current reading from the device:
 
 ```python
 import tango
