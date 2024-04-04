@@ -134,7 +134,8 @@ class LaserWarningSign(Device):
     def init_device(self):
         Device.init_device(self)
         self.config = configparser.ConfigParser()
-        self.set_state(DevState.INIT)
+        self.set_state(DevState.ON)
+        self.set_status("Laser Warning Sign is connected.")
 
 
 if __name__ == "__main__":

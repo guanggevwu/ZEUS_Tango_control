@@ -38,13 +38,19 @@ def add_value_pairs(values):
 
 # if the polling periods in Taurus is shorter than these in Tango, it either doesn't work or is wasted.
 # if the polling periods in Taurus is longer than these in Tango, it only retrives part of information from the server.
-device_name = sys.argv[1] if len(sys.argv) > 1 else 'test/basler/1'
-changeDefaultPollingPeriod(sys.argv[2]) if len(sys.argv) > 2 else None
+if len(sys.argv) > 1:
+    device_name = sys.argv[1]
+else:
+    raise NameError("name 'device_name' is not defined")
+
+exclude = ['is_new_image']
+changeDefaultPollingPeriod(int(sys.argv[2])) if len(sys.argv) > 2 else None
 dp = Device(device_name)
 
 attrs = dp.get_attribute_list()
 commands = dp.get_command_list()
-model = [device_name] + [device_name + '/' + attr for attr in attrs]
+model = [device_name] + [device_name + '/' +
+                         attr for attr in attrs if attr not in exclude]
 
 
 # with open("modification.json") as outfile:

@@ -463,6 +463,8 @@ class GentecEO(Device):
             self._model = self._model.replace('\x00', '')
             print(
                 f'Genotec-eo device is connected. Model: {self._model}. Serial number: {self._serial_number}')
+            self.set_state(DevState.ON)
+            self.set_status("Gentec device is connected.")
         except:
             print("Could NOT connect to  Genotec-eo")
             self.set_state(DevState.OFF)

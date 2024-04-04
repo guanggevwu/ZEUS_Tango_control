@@ -1,5 +1,6 @@
 #!/usr/bin/python3 -u
 # -*- coding: utf-8 -*-
+import tango
 from tango import AttrWriteType, DevState, DevFloat, EncodedAttribute
 from tango.server import Device, attribute, command, device_property
 from pypylon import pylon
@@ -19,8 +20,7 @@ logging.basicConfig(handlers=handlers,
 
 
 class Basler(Device):
-
-    polling = 1000
+    polling = 500
     polling_infinite = -1
     # is_memorized = True means the previous entered set value is remembered and is only for Read_WRITE access. For example in GUI, the previous set value,instead of 0, will be shown at the set value field.
     # hw_memorized=True, means the set value is written at the initialization step. Some of the properties are remembered in the camera's memory, so no need to remember them.
@@ -32,10 +32,10 @@ class Basler(Device):
         max_dim_y=4096,
         dtype=((DevFloat,),),
         access=AttrWriteType.READ,
-        polling_period=polling,
     )
 
     serial_number = device_property(dtype=str, default_value='40222934')
+    friendly_name = device_property(dtype=str, default_value='')
 
     # image_encoded = attribute(label='encnoded image',
     #            access=AttrWriteType.READ)
@@ -179,7 +179,13 @@ class Basler(Device):
         # polling_period=polling_infinite,
     )
 
-    timeoutt = 1000
+    is_new_image = attribute(
+        label='new',
+        dtype=bool,
+        access=AttrWriteType.READ,
+    )
+
+    timeout = 3000
 
     def initialize_dynamic_attributes(self):
         '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
@@ -263,9 +269,10 @@ class Basler(Device):
         self.camera.Height.Value = attr.get_write_value()
 
     def init_device(self):
-        Device.init_device(self)
+        super().init_device()
+        self.debug = False
         self.set_state(DevState.INIT)
-
+        self.idx = 0
         try:
             self.device = self.get_camera_device()
             if self.device is not None:
@@ -274,13 +281,18 @@ class Basler(Device):
                 self.camera = pylon.InstantCamera(
                     instance.CreateDevice(self.device))
                 self.camera.Open()
-
+                self._polling = 500
+                self._is_new_image = False
+                self._image = np.zeros(
+                    (self.camera.Height.Value, self.camera.Width.Value))
                 # always use continuous mode. Although it seems this is the default, still set it here in case.
                 self.camera.AcquisitionMode.SetValue('Continuous')
-                self.camera.TriggerSelector.SetValue('AcquisitionStart')
+                self.camera.AcquisitionFrameRateEnable.SetValue(True)
+                # self.camera.TriggerSelector.SetValue('AcquisitionStart')
                 # self.camera.TriggerMode.SetValue('On')
                 # repetition is not a parameter in the camera ifself
                 self._repetition = 1
+                self.set_change_event("image", True, False)
             print(f'Camera is connected: {self.device.GetSerialNumber()}')
             self.set_state(DevState.ON)
             # self.set_change_event('image', True)
@@ -314,6 +326,10 @@ class Basler(Device):
         if self._save_data != value:
             self._save_data = value
             logging.info(f'save status is changed to {value}')
+        if self._save_data:
+            self.disable_polling('is_new_image')
+        else:
+            self.enable_polling('is_new_image')
 
     def read_save_path(self):
         if not hasattr(self, '_save_path'):
@@ -378,13 +394,21 @@ class Basler(Device):
         return self.camera.TriggerSelector.Value
 
     def write_trigger_selector(self, value):
+        # somehow has to set trigger mode as off before changing trigger selector
+        current_trigger_source = self.read_trigger_source()
         if value.lower() == 'acquisitionstart':
+            self.camera.TriggerMode.SetValue('Off')
             value = 'AcquisitionStart'
         elif value.lower() == 'framestart':
+            self.camera.TriggerMode.SetValue('Off')
             value = 'FrameStart'
         self.camera.TriggerSelector.SetValue(value)
+        logging.info(f'trigger source is changed to {value}')
+        if current_trigger_source != 'Off':
+            self.write_trigger_source(current_trigger_source)
 
     def read_trigger_source(self):
+        # replace 'on' with 'Software' and 'Line1'
         if self.camera.TriggerMode.Value == 'Off':
             return 'Off'
         else:
@@ -416,26 +440,36 @@ class Basler(Device):
         self._repetition = value
 
     def read_fps(self):
-        return self.camera.AcquisitionFrameRateAbs.Value
+        if self.camera.AcquisitionFrameRateEnable.Value:
+            return self.camera.AcquisitionFrameRateAbs.Value
+        else:
+            return 0
 
     def write_fps(self, value):
-        self.camera.AcquisitionFrameRateAbs.SetValue(value)
+        if value:
+            self.camera.AcquisitionFrameRateEnable.SetValue(True)
+            self.camera.AcquisitionFrameRateAbs.SetValue(value)
+        else:
+            self.camera.AcquisitionFrameRateEnable.SetValue(False)
 
-    def read_image(self):
+    def read_is_new_image(self):
+        self.idx += 1
         try:
             while self.camera.IsGrabbing():
                 grabResult = self.camera.RetrieveResult(
-                    100, pylon.TimeoutHandling_ThrowException)
+                    int(self._polling/2), pylon.TimeoutHandling_ThrowException)
                 if self.read_trigger_source().lower() != "off":
                     self.i += 1
                     logging.info(
-                        f'{self.i}/{self.camera.AcquisitionFrameCount.Value * self._repetition}')
+                        f'{self.i}/{self._grab_number}')
                 if grabResult.GrabSucceeded():
                     self._image = grabResult.Array
                     grabResult.Release()
-                    logging.info(f"mean instensity: {np.mean(self._image)}")
+                    if self.debug:
+                        logging.info(
+                            f"{self.idx} new. mean instensity: {np.mean(self._image)}")
                     # self.push_change_event('image', self._image)
-                    if self._save_data:
+                    if self._save_data and self._save_path:
                         data = Image.fromarray(self._image)
                         parse_save_path = self._save_path.split(';')
                         for path in parse_save_path:
@@ -444,19 +478,56 @@ class Basler(Device):
                                 datetime.datetime.now(), '%Y-%m-%d-%H-%M-%S-%f')
                             image_name = f'{now}.tiff'
                             data.save(os.path.join(path, image_name))
-                    return self._image
+                    self._is_new_image = True
+                    self.push_change_event("image", self._image)
+                    return self._is_new_image
         except Exception as ex:
             if ex.__class__.__name__ == "TimeoutException":
-                pass
-                # logging.info("Started grabbing but no images retrieved yet!")
-        if not hasattr(self, "_image"):
-            self._image = np.zeros(
-                (self.camera.Height.Value, self.camera.Width.Value))
-        # logging.info(f"mean instensity: {np.mean(self._image)}")
+                logging.info("Started grabbing but no images retrieved yet!")
+        if self.debug:
+            logging.info(
+                f"{self.idx} old images. mean instensity: {np.mean(self._image)}")
+        self._is_new_image = False
+        return self._is_new_image
+
+    def read_image(self):
+        if self.debug:
+            if self._is_new_image:
+                logging.info("getting new images.")
+            else:
+                logging.info("getting old images.")
         return self._image
+
+    def disable_polling(self, attr):
+        if self.is_attribute_polled(attr):
+            self.stop_poll_attribute(attr)
+            logging.info(f'polling for {attr} is disabled')
+
+    def enable_polling(self, attr):
+        if not self.is_attribute_polled(attr):
+            self.poll_attribute(attr, self._polling)
+            logging.info(f'polling period of {attr} is set to {self._polling}')
+
+    # @command()
+    # def image_reader(self):
+    #     # <- with this line we force change event generation, and transmitting new image
+    #     if self._is_new_image:
+    #         logging.info("sending push event")
+    #         self.push_change_event("image", self._image)
+    #     else:
+    #         logging.info("No sending since it is an old image")
+
+    # @command()
+    # def ext_sent(self):
+    #     # I don't find a way to know if an external trigger is received. Using camera.RetrieveResult(2000, pylon.TimeoutHandling_ThrowException) is bad because the timeout is too long.
+    #     if not self._save_data:
+    #         self.enable_polling('is_new_image')
 
     @command()
     def get_ready(self):
+        """
+        If trigger mode is Off, then the trigger selector has no effect.
+        """
         if self.camera.TriggerMode.Value.lower() == 'off':
             self.camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
             logging.info(
@@ -464,10 +535,15 @@ class Basler(Device):
             self.set_state(DevState.ON)
         else:
             self.i = 0
+            if self.camera.TriggerSelector.Value == 'FrameStart':
+                self._grab_number = 1
+            else:
+                self._grab_number = self.camera.AcquisitionFrameCount.Value * self._repetition
+            # self.disable_polling('is_new_image')
             self.camera.StartGrabbingMax(
-                self.camera.AcquisitionFrameCount.Value * self._repetition, pylon.GrabStrategy_OneByOne)
+                self._grab_number, pylon.GrabStrategy_OneByOne)
             logging.info(
-                f'Ready to receive triggers. Either "send_software_trigger" or send external triggers. Image retrieve will be stopped after receiving {self.camera.AcquisitionFrameCount.Value * self._repetition} images')
+                f'Ready to receive triggers from {self.read_trigger_source()}. Image retrieve will be stopped after receiving {self._grab_number} images')
             self.set_state(DevState.STANDBY)
 
     @command()
@@ -476,9 +552,10 @@ class Basler(Device):
             self.write_trigger_source(self, "Software")
             logging.info(
                 f'Trigger source is changed from {self.camera.TriggerSource.Value} to Software')
-        time.sleep(0.5)
         logging.info("Sending software trigger....................")
         self.camera.TriggerSoftware.Execute()
+        # if not self._save_data:
+        #     self.enable_polling('is_new_image')
         self.set_state(DevState.ON)
 
     @command()
