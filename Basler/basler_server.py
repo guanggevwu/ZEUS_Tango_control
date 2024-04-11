@@ -20,7 +20,7 @@ logging.basicConfig(handlers=handlers,
 
 
 class Basler(Device):
-    polling = 500
+    polling = 200
     polling_infinite = -1
     # is_memorized = True means the previous entered set value is remembered and is only for Read_WRITE access. For example in GUI, the previous set value,instead of 0, will be shown at the set value field.
     # hw_memorized=True, means the set value is written at the initialization step. Some of the properties are remembered in the camera's memory, so no need to remember them.
@@ -79,7 +79,7 @@ class Basler(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized=True,
+        # hw_memorized=True,
         # polling_period=polling,
         doc='off or software or external'
     )
@@ -281,7 +281,7 @@ class Basler(Device):
                 self.camera = pylon.InstantCamera(
                     instance.CreateDevice(self.device))
                 self.camera.Open()
-                self._polling = 500
+                self._polling = 200
                 self._is_new_image = False
                 self._image = np.zeros(
                     (self.camera.Height.Value, self.camera.Width.Value))
@@ -424,6 +424,7 @@ class Basler(Device):
                 self.camera.TriggerSource.SetValue('Line1')
             else:
                 self.camera.TriggerSource.SetValue(value.capitalize())
+        self.get_ready()
 
     def read_frames_per_trigger(self):
         return self.camera.AcquisitionFrameCount.Value
@@ -454,40 +455,42 @@ class Basler(Device):
 
     def read_is_new_image(self):
         self.idx += 1
-        try:
-            while self.camera.IsGrabbing():
-                grabResult = self.camera.RetrieveResult(
-                    int(self._polling/2), pylon.TimeoutHandling_ThrowException)
+        self._is_new_image = False
+        while self.camera.IsGrabbing():
+            grabResult = self.camera.RetrieveResult(
+                int(self._polling/2), pylon.TimeoutHandling_Return)
+            if grabResult.GrabSucceeded():
+                self._image = grabResult.Array
+                grabResult.Release()
+                if self.debug:
+                    logging.info(
+                        f"{self.idx} new. mean instensity: {np.mean(self._image)}")
+                # self.push_change_event('image', self._image)
+                if self._save_data and self._save_path:
+                    data = Image.fromarray(self._image)
+                    parse_save_path = self._save_path.split(';')
+                    for path in parse_save_path:
+                        os.makedirs(path, exist_ok=True)
+                        now = datetime.datetime.strftime(
+                            datetime.datetime.now(), '%Y-%m-%d-%H-%M-%S-%f')
+                        image_name = f'{now}.tiff'
+                        data.save(os.path.join(path, image_name))
+                self._is_new_image = True
+                self.push_change_event("image", self._image)
                 if self.read_trigger_source().lower() != "off":
                     self.i += 1
                     logging.info(
                         f'{self.i}/{self._grab_number}')
-                if grabResult.GrabSucceeded():
-                    self._image = grabResult.Array
-                    grabResult.Release()
-                    if self.debug:
-                        logging.info(
-                            f"{self.idx} new. mean instensity: {np.mean(self._image)}")
-                    # self.push_change_event('image', self._image)
-                    if self._save_data and self._save_path:
-                        data = Image.fromarray(self._image)
-                        parse_save_path = self._save_path.split(';')
-                        for path in parse_save_path:
-                            os.makedirs(path, exist_ok=True)
-                            now = datetime.datetime.strftime(
-                                datetime.datetime.now(), '%Y-%m-%d-%H-%M-%S-%f')
-                            image_name = f'{now}.tiff'
-                            data.save(os.path.join(path, image_name))
-                    self._is_new_image = True
-                    self.push_change_event("image", self._image)
-                    return self._is_new_image
-        except Exception as ex:
-            if ex.__class__.__name__ == "TimeoutException":
+                    # get ready after successfully acquiring a set of images
+                    if self.i == self._grab_number:
+                        self.get_ready()
+                return self._is_new_image
+            else:
                 logging.info("Started grabbing but no images retrieved yet!")
+                return self._is_new_image
         if self.debug:
             logging.info(
                 f"{self.idx} old images. mean instensity: {np.mean(self._image)}")
-        self._is_new_image = False
         return self._is_new_image
 
     def read_image(self):
@@ -562,6 +565,7 @@ class Basler(Device):
     def relax(self):
         self.camera.StopGrabbing()
         self.set_state(DevState.ON)
+        logging.info("Grabbing stops")
 
 
 if __name__ == "__main__":

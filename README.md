@@ -33,7 +33,6 @@ import numpy as np
 dp = tango.DeviceProxy('test/basler/1')
 dp.save_data = True
 dp.trigger_source = 'Software'
-dp.get_ready()
 dp.send_software_trigger()
 while True
     if dp.is_new_image:
@@ -49,7 +48,6 @@ import tango
 # replace 'test/basler/1' with your device name
 dp = tango.DeviceProxy('test/basler/1')
 dp.trigger_source = 'Off'
-dp.get_ready()
 ```
 
 To acquire a set of images from the camera with external triggers.
@@ -61,11 +59,10 @@ import numpy as np
 # replace 'test/basler/1' with your device name
 dp = tango.DeviceProxy('test/basler/1')
 dp.save_data = True
-dp.trigger_source = 'External'
 dp.trigger_selector = 'AcquisitionStart'
 dp.repetition = 3
 dp.frames_per_trigger = 3
-dp.get_ready()
+dp.trigger_source = 'External'
 img_num_to_acquire = dp.repetition * dp.frames_per_trigger
 acquired = 0
 while True
