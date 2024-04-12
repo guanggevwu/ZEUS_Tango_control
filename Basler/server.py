@@ -26,6 +26,7 @@ class Basler(Device):
     # hw_memorized=True, means the set value is written at the initialization step. Some of the properties are remembered in the camera's memory, so no need to remember them.
     is_memorized = True
 
+    # The image attribute should not be polled periodically since images are large. They will be pushed when is_new_image attribute is True.
     image = attribute(
         label="image",
         max_dim_x=4096,
@@ -34,7 +35,7 @@ class Basler(Device):
         access=AttrWriteType.READ,
     )
 
-    serial_number = device_property(dtype=str, default_value='40222934')
+    serial_number = device_property(dtype=str, default_value='')
     friendly_name = device_property(dtype=str, default_value='')
 
     # image_encoded = attribute(label='encnoded image',
@@ -49,10 +50,19 @@ class Basler(Device):
     # )
 
     model = attribute(
-        label="model name",
+        label="model",
         dtype=str,
         access=AttrWriteType.READ,
     )
+
+    user_defined_name = attribute(
+        label="name",
+        dtype=str,
+        access=AttrWriteType.READ_WRITE,
+    )
+
+    def read_user_defined_name(self):
+        return self.camera.GetDeviceInfo().GetUserDefinedName()
 
     save_data = attribute(
         label="save data",
@@ -298,13 +308,12 @@ class Basler(Device):
                 # always use continuous mode. Although it seems this is the default, still set it here in case.
                 self.camera.AcquisitionMode.SetValue('Continuous')
                 self.camera.AcquisitionFrameRateEnable.SetValue(True)
-                # self.camera.TriggerSelector.SetValue('AcquisitionStart')
-                # self.camera.TriggerMode.SetValue('On')
-                # repetition is not a parameter in the camera ifself
+                # repetition is not a parameter in the camera itself
                 self._repetition = 1
                 self.set_change_event("image", True, False)
                 self.camera.MaxNumBuffer.SetValue(1000)
-            print(f'Camera is connected: {self.device.GetSerialNumber()}')
+            print(
+                f'Camera is connected. {self.device.GetUserDefinedName()}: {self.device.GetSerialNumber()}')
             self.set_state(DevState.ON)
             # self.set_change_event('image', True)
         except:
@@ -315,7 +324,7 @@ class Basler(Device):
     def get_camera_device(self):
         print("we get camera device")
         for device in pylon.TlFactory.GetInstance().EnumerateDevices():
-            if device.GetSerialNumber() == self.serial_number:
+            if device.GetSerialNumber() == self.serial_number or device.GetUserDefinedName() == self.friendly_name:
                 return device
         # factory = pylon.TlFactory.GetInstance()
         # empty_camera_info = pylon.DeviceInfo()
@@ -488,6 +497,7 @@ class Basler(Device):
                         data.save(os.path.join(path, image_name))
                 self._is_new_image = True
                 self.push_change_event("image", self._image)
+                # show image count while not in live mode
                 if self.read_trigger_source().lower() != "off":
                     self.i += 1
                     logging.info(
@@ -496,12 +506,14 @@ class Basler(Device):
                     if self.i == self._grab_number:
                         self.get_ready()
                 return self._is_new_image
+            # the else statement may never be triggered. may delete later.
             else:
                 logging.info("Started grabbing but no images retrieved yet!")
                 return self._is_new_image
         if self._debug:
             logging.info(
                 f"{self.idx} old images. mean intensity: {np.mean(self._image)}")
+        # return False if there is no new image
         return self._is_new_image
 
     def read_image(self):

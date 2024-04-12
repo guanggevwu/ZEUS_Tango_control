@@ -94,8 +94,9 @@ panel2_w1 = TaurusForm()
 form_model = [model[0]]+model[2:]
 form_model.remove(f'{device_name}/exposure')
 form_model.remove(f'{device_name}/gain')
-form_model.insert(6, f'{device_name}/exposure')
-form_model.insert(7, f'{device_name}/gain')
+trigger_selector_idx = form_model.index(f'{device_name}/trigger_selector')
+form_model.insert(trigger_selector_idx+1, f'{device_name}/exposure')
+form_model.insert(trigger_selector_idx+2, f'{device_name}/gain')
 panel2_w1.model = form_model
 panel2_layout.addWidget(panel2_w1)
 

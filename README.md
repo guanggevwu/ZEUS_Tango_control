@@ -15,7 +15,7 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-- Set the environment variables. Search "Environment" and select "Edit the system environment variables". On the pop-up window, select "Environment variables", then "New..". Enter "Variable name": TANGO_HOST. Enter "Variable value": 192.168.131.90:10000
+- Set the environment variables. Search "Environment" and select "Edit the system environment variables". On the pop-up window, select "Environment variables", then "New..". Enter "Variable name": TANGO_HOST. Enter "Variable value": 192.168.131.90:10000.
 
 ### Unix computer
 
@@ -43,7 +43,7 @@ TANGO_HOST = 192.168.131.90:10000
 ## Introduction
 
 - File structure. In each device type folder, there are a few files. They are device server file, client GUI file, menu file and example code file. it is recommended to use "menu.py" as the GUI to start server and client.
-- The following examples are mostly for code user. However, you should be able to find the corresponding configurations in the [Taurus GUI](https://taurus-scada.org/) easily.
+- You can either use the GUI, do the programming or do both. The following examples are mostly for code users and the commands are self-explanatory. However, you should be able to find the corresponding configurations in the [Taurus GUI](https://taurus-scada.org/) easily.
 
 ## Quick start
 
@@ -87,7 +87,7 @@ dp = tango.DeviceProxy('test/basler/1')
 dp.trigger_source = 'Off'
 ```
 
-To acquire a set of images from the camera with external triggers. When the bandwidth is smaller than data generation rate, the camera stores images in its buffer and transfers the files to the host computer later.
+Acquire a set of images from the camera with external triggers. When the bandwidth is smaller than data generation rate, the camera stores images in its buffer and transfers the files to the host computer later.
 
 ```python
 import tango
