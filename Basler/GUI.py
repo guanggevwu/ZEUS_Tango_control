@@ -100,10 +100,10 @@ panel2_w1.model = form_model
 panel2_layout.addWidget(panel2_w1)
 
 # change the bool write to auto apply.
-boolwidget = {'save_data': None}
-for key, value in boolwidget.items():
-    idx = form_model.index(f'{device_name}/{key}')
-    panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
+for i in form_model:
+    if i.split('/')[-1] in attrs and dp.attribute_query(i.split('/')[-1]).data_type == 1:
+        idx = form_model.index(i)
+        panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
 
 # change the text write widget to dropdown list and set auto apply
 dropdown = {'trigger_source': (('Off', 'Off'), ('Software', 'Software'), ('External', 'Line1')), 'trigger_selector': (

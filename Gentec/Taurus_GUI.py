@@ -67,12 +67,10 @@ panel2_w1.model = form_model
 panel2_layout.addWidget(panel2_w1)
 
 # change the bool write to auto apply.
-boolwidget = ['save_data', 'auto_range', 'set_zero', 'attenuator']
-boolwidget = [e for e in boolwidget if e in [
-    f.split('/')[-1] for f in form_model]]
-for key in boolwidget:
-    idx = form_model.index(f'{device_name}/{key}')
-    panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
+for i in form_model:
+    if i.split('/')[-1] in attrs and dp.attribute_query(i.split('/')[-1]).data_type == 1:
+        idx = form_model.index(i)
+        panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
 
 # TaurusLabel auto trim function not work in TaurusForm
 # change the text write widget to dropdown list and set auto apply

@@ -185,7 +185,17 @@ class Basler(Device):
         access=AttrWriteType.READ,
     )
 
-    timeout = 3000
+    is_debug_mode = attribute(
+        label='debug',
+        dtype=bool,
+        access=AttrWriteType.READ_WRITE,
+    )
+
+    def read_is_debug_mode(self):
+        return self._debug
+
+    def write_is_debug_mode(self, value):
+        self._debug = value
 
     def initialize_dynamic_attributes(self):
         '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
@@ -270,7 +280,7 @@ class Basler(Device):
 
     def init_device(self):
         super().init_device()
-        self.debug = False
+        self._debug = False
         self.set_state(DevState.INIT)
         self.idx = 0
         try:
@@ -293,6 +303,7 @@ class Basler(Device):
                 # repetition is not a parameter in the camera ifself
                 self._repetition = 1
                 self.set_change_event("image", True, False)
+                self.camera.MaxNumBuffer.SetValue(1000)
             print(f'Camera is connected: {self.device.GetSerialNumber()}')
             self.set_state(DevState.ON)
             # self.set_change_event('image', True)
@@ -462,9 +473,9 @@ class Basler(Device):
             if grabResult.GrabSucceeded():
                 self._image = grabResult.Array
                 grabResult.Release()
-                if self.debug:
+                if self._debug:
                     logging.info(
-                        f"{self.idx} new. mean instensity: {np.mean(self._image)}")
+                        f"{self.idx} new. mean intensity: {np.mean(self._image)}")
                 # self.push_change_event('image', self._image)
                 if self._save_data and self._save_path:
                     data = Image.fromarray(self._image)
@@ -488,13 +499,13 @@ class Basler(Device):
             else:
                 logging.info("Started grabbing but no images retrieved yet!")
                 return self._is_new_image
-        if self.debug:
+        if self._debug:
             logging.info(
-                f"{self.idx} old images. mean instensity: {np.mean(self._image)}")
+                f"{self.idx} old images. mean intensity: {np.mean(self._image)}")
         return self._is_new_image
 
     def read_image(self):
-        if self.debug:
+        if self._debug:
             if self._is_new_image:
                 logging.info("getting new images.")
             else:
@@ -547,14 +558,13 @@ class Basler(Device):
                 self._grab_number, pylon.GrabStrategy_OneByOne)
             logging.info(
                 f'Ready to receive triggers from {self.read_trigger_source()}. Image retrieve will be stopped after receiving {self._grab_number} images')
-            self.set_state(DevState.STANDBY)
 
     @command()
     def send_software_trigger(self):
         if self.camera.TriggerSource.Value != "Software":
-            self.write_trigger_source(self, "Software")
             logging.info(
-                f'Trigger source is changed from {self.camera.TriggerSource.Value} to Software')
+                f'Please set the "trigger source" to "software" to send software trigger. Abort!')
+            return
         logging.info("Sending software trigger....................")
         self.camera.TriggerSoftware.Execute()
         # if not self._save_data:

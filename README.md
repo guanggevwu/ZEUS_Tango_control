@@ -4,6 +4,8 @@ Use [Tango Controls](https://www.tango-controls.org) as the control system softw
 
 ## Installation
 
+### Windows computer
+
 - Install the required packages on a Windows computer.
 
 ```
@@ -13,17 +15,51 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-- Set the environment variables.
-  TANGO_HOST = 192.168.131.90:10000
+- Set the environment variables. Search "Environment" and select "Edit the system environment variables". On the pop-up window, select "Environment variables", then "New..". Enter "Variable name": TANGO_HOST. Enter "Variable value": 192.168.131.90:10000
+
+### Unix computer
+
+- Install the required packages on a Unix computer.
+
+```
+#go to the required destination folder
+python -m venv venv
+source ./venv/bin/activate
+pip install -r requirements.txt
+```
+
+- Set the environment variables. First open the file,
+
+```
+  nano ~/.bashrc
+```
+
+- Then insert the following code to the top of the file.
+
+```
+TANGO_HOST = 192.168.131.90:10000
+```
 
 ## Introduction
 
 - File structure. In each device type folder, there are a few files. They are device server file, client GUI file, menu file and example code file. it is recommended to use "menu.py" as the GUI to start server and client.
 - The following examples are mostly for code user. However, you should be able to find the corresponding configurations in the [Taurus GUI](https://taurus-scada.org/) easily.
 
+## Quick start
+
+Assuming you are working on a computer with all the required software installed, start the menu file in from the terminal:
+
+```
+python path/to/menu.py
+```
+
+- To use a computer as a device server, select the name of the device and "start server".
+- To use a computer as a client, select the name of the device and "start Taurus GUI".
+- To shut down the device server or the client, click the 'X' button.
+
 ## Basler camera
 
-The example code shows how to trigger a Basler camera by sending a software trigger.
+The example code shows how to obtain one image by triggerring a Basler camera with a software trigger.
 
 ```python
 import tango
@@ -32,6 +68,7 @@ import numpy as np
 # replace 'test/basler/1' with your device name
 dp = tango.DeviceProxy('test/basler/1')
 dp.save_data = True
+dp.trigger_selector = 'FrameStart'
 dp.trigger_source = 'Software'
 dp.send_software_trigger()
 while True
@@ -50,7 +87,7 @@ dp = tango.DeviceProxy('test/basler/1')
 dp.trigger_source = 'Off'
 ```
 
-To acquire a set of images from the camera with external triggers.
+To acquire a set of images from the camera with external triggers. When the bandwidth is smaller than data generation rate, the camera stores images in its buffer and transfers the files to the host computer later.
 
 ```python
 import tango
