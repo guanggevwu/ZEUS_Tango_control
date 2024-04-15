@@ -39,7 +39,7 @@ def delete_properties(device, *args):
 
 db = tango.Database()
 
-# 'server', device type/hosting computer? _class, class name in the code? 'name', domain/family/member?
+# 'server', ServerName/Instance _class, class name in the code? 'name', domain/family/member?
 reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSupply', 'name': 'test/power_supply/1'},
             "power_supply_1": {'server': 'PowerSupply/testsr', '_class': 'PowerSupply', 'name': 'test/power_supply/2'},
             "basler": {'server': 'Basler/testsr', '_class': 'Basler', 'name': 'test/basler/1'},

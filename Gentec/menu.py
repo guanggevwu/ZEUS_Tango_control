@@ -7,11 +7,13 @@ import subprocess
 from functools import partial
 import atexit
 import signal
+import tango
 
 
-class GentecMenu:
+class GentecEOMenu:
     def __init__(self, root):
-        root.title("Gentec menu")
+        class_name = type(self).__name__.replace('Menu', '')
+        root.title(f"{class_name} menu")
         frame1 = ttk.Frame(root, padding="3 3 12 12")
         frame1.grid(column=0, row=0, sticky=(N, W, E, S))
         root.columnconfigure(0, weight=1)
@@ -35,9 +37,13 @@ class GentecMenu:
         elif platform.system() == 'Windows':
             self.python_path = os.path.join(
                 venv_path, 'venv', 'Scripts', 'python.exe')
-
-        self.menu_dict = {'start server': ['gentec_server.py', ('testsr', 'MA1', 'MA2', 'MA3')],
-                          'start Taurus GUI': ['gentec_GUI.py', ('test/gentec/1', 'laser/gentec/MA1', 'laser/gentec/MA2', 'laser/gentec/MA3')], 'start Tkinter GUI': ['tkinter_GUI.py', ('all', 'test/gentec/1', 'laser/gentec/MA1', 'laser/gentec/MA2', 'laser/gentec/MA3')]}
+        db = tango.Database()
+        device_names = db.get_device_name('*', class_name)
+        servers = db.get_server_list()
+        instances = [e.split('/')[-1]
+                     for e in servers if e.split('/')[0] == class_name]
+        self.menu_dict = {'start server': ['server.py', instances],
+                          'start Taurus GUI': ['Taurus_GUI.py', tuple(device_names.value_string)], 'start Tkinter GUI': ['tkinter_GUI.py', ('all', *device_names.value_string)]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             # value[0][:-3], i.e., 'gentec_server' is the attribute name
             setattr(self, value[0][:-3], StringVar())
@@ -79,6 +85,6 @@ class GentecMenu:
 
 if __name__ == '__main__':
     root = Tk()
-    dummy = GentecMenu(root)
+    dummy = GentecEOMenu(root)
     atexit.register(dummy.terminate_all)
     root.mainloop()
