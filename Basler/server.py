@@ -58,7 +58,7 @@ class Basler(Device):
     user_defined_name = attribute(
         label="name",
         dtype=str,
-        access=AttrWriteType.READ_WRITE,
+        access=AttrWriteType.READ,
     )
 
     def read_user_defined_name(self):
