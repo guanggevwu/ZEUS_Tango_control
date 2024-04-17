@@ -71,7 +71,7 @@ dp.save_data = True
 dp.trigger_selector = 'FrameStart'
 dp.trigger_source = 'Software'
 dp.send_software_trigger()
-while True
+while True:
     if dp.is_new_image:
         print(f'Mean intensity of the image is: {np.mean(dp.image)}.')
         break
@@ -102,7 +102,7 @@ dp.frames_per_trigger = 3
 dp.trigger_source = 'External'
 img_num_to_acquire = dp.repetition * dp.frames_per_trigger
 acquired = 0
-while True
+while True:
     if dp.is_new_image:
         print(f'Mean intensity of the image is: {np.mean(dp.image)}.')
         acquired += 1
@@ -117,8 +117,7 @@ To acquire the current reading from the device:
 ```python
 import tango
 
-device_name = 'test/gentec/1'
-dp = tango.DeviceProxy(device_name)
+dp = tango.DeviceProxy('test/gentec/1')
 print(dp.main_value)
 print(dp.wavelength)
 ```
@@ -130,7 +129,6 @@ To acquire the status of the laser warning signs:
 ```python
 import tango
 
-device_name = 'facility/laser_warning_sign/1'
-dp = tango.DeviceProxy(device_name)
+dp = tango.DeviceProxy('facility/laser_warning_sign/1')
 print(dp.ta1)
 ```
