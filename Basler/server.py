@@ -207,6 +207,24 @@ class Basler(Device):
     def write_is_debug_mode(self, value):
         self._debug = value
 
+    polling_period = attribute(
+        label='image polling',
+        dtype=int,
+        unit='ms',
+        memorized=is_memorized,
+        access=AttrWriteType.READ_WRITE,
+    )
+
+    def read_polling_period(self):
+        return self.get_attribute_poll_period('is_new_image')
+
+    def write_polling_period(self, value):
+        if self.camera.ExposureTimeAbs.Value/1000 > 0.9 * value * self._timeout_polling_ratio:
+            logging.info(
+                f'{value} ms is too short compared to the exposure time {self.camera.ExposureTimeAbs.Value/1000} ms. Minimum value is {self.camera.ExposureTimeAbs.Value/1000/0.9/self._timeout_polling_ratio}. Discard!')
+        else:
+            self.poll_attribute('is_new_image', value)
+
     def initialize_dynamic_attributes(self):
         '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
         exposure = attribute(
@@ -266,6 +284,11 @@ class Basler(Device):
         return self.camera.ExposureTimeAbs.Value
 
     def write_exposure(self, attr):
+        if attr.get_write_value()/1000 > 0.9 * self._polling * self._timeout_polling_ratio:
+            self._polling = attr.get_write_value()/1000/0.9/self._timeout_polling_ratio
+            self.poll_attribute('is_new_image', int(self._polling))
+            logging.info(
+                f'Changed the image retrieve timeout to {self._polling} to match the long exposure time')
         self.camera.ExposureTimeAbs.Value = attr.get_write_value()
 
     def read_gain(self, attr):
@@ -301,7 +324,8 @@ class Basler(Device):
                 self.camera = pylon.InstantCamera(
                     instance.CreateDevice(self.device))
                 self.camera.Open()
-                self._polling = 200
+                self._polling = self.get_attribute_poll_period('is_new_image')
+                self._timeout_polling_ratio = 0.75
                 self._is_new_image = False
                 self._image = np.zeros(
                     (self.camera.Height.Value, self.camera.Width.Value))
@@ -322,7 +346,6 @@ class Basler(Device):
             self.set_state(DevState.OFF)
 
     def get_camera_device(self):
-        print("we get camera device")
         for device in pylon.TlFactory.GetInstance().EnumerateDevices():
             if device.GetSerialNumber() == self.serial_number or device.GetUserDefinedName() == self.friendly_name:
                 return device
@@ -450,15 +473,23 @@ class Basler(Device):
         return self.camera.AcquisitionFrameCount.Value
 
     def write_frames_per_trigger(self, value):
-        self.camera.StopGrabbing()
+        is_grabbing = self.camera.IsGrabbing()
+        if is_grabbing:
+            self.camera.StopGrabbing()
         self.camera.AcquisitionFrameCount.SetValue(value)
+        if is_grabbing:
+            self.get_ready()
 
     def read_repetition(self):
         return self._repetition
 
     def write_repetition(self, value):
-        self.camera.StopGrabbing()
+        is_grabbing = self.camera.IsGrabbing()
+        if is_grabbing:
+            self.camera.StopGrabbing()
         self._repetition = value
+        if is_grabbing:
+            self.get_ready()
 
     def read_fps(self):
         if self.camera.AcquisitionFrameRateEnable.Value:
@@ -478,8 +509,8 @@ class Basler(Device):
         self._is_new_image = False
         while self.camera.IsGrabbing():
             grabResult = self.camera.RetrieveResult(
-                int(self._polling/2), pylon.TimeoutHandling_Return)
-            if grabResult.GrabSucceeded():
+                int(self._polling*self._timeout_polling_ratio), pylon.TimeoutHandling_Return)
+            if grabResult and grabResult.GrabSucceeded():
                 self._image = grabResult.Array
                 grabResult.Release()
                 if self._debug:
