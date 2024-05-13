@@ -62,6 +62,16 @@ class GentecEO(Device):
     def read_name_attr(self):
         return self.friendly_name
 
+    read_time = attribute(
+        label="read time",
+        dtype="str",
+        polling_period=polling,
+        access=AttrWriteType.READ,
+    )
+
+    def read_read_time(self):
+        return self._read_time
+
     wavelength = attribute(
         label="wavelength",
         dtype=int,
@@ -223,7 +233,7 @@ class GentecEO(Device):
                 return self._save_data
             file_exists = os.path.isfile(self._save_path)
             with open(self._save_path, 'a', newline='') as csvfile:
-                fieldnames = ['time', 'main_value', 'wavelength', 'display_range', 'auto_range',
+                fieldnames = ['read_time', 'main_value', 'wavelength', 'display_range', 'auto_range',
                               'measure_mode', 'attenuator', 'multiplier', 'offset']
                 if self._model != "PH100-Si-HA-OD1":
                     fieldnames.append('trigger_level')
@@ -235,10 +245,7 @@ class GentecEO(Device):
                 if self._model == "PH100-Si-HA-OD1" or self._new:
                     row_dict = {}
                     for key in fieldnames:
-                        if key == "time":
-                            row_dict[key] = str(datetime.datetime.now())
-                        else:
-                            row_dict[key] = getattr(self, f'_{key}')
+                        row_dict[key] = getattr(self, f'_{key}')
                     writer.writerow(row_dict)
         return self._save_data
 
@@ -356,6 +363,7 @@ class GentecEO(Device):
             reply = self.device.readline().strip().decode()
             if 'not' not in reply:
                 self._new = True
+                self._read_time = datetime.datetime.now().strftime("%H:%m:%S %M/%d")
             else:
                 self._new = False
         # New data available or New data not available
@@ -453,6 +461,7 @@ class GentecEO(Device):
                 port=com_number, baudrate=9600, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
             self.set_state(DevState.ON)
             self._save_data = False
+            self._read_time = "N/A"
             self.device.write(b'*STS')
             res = self.device.readlines()
             res_decode = [e.strip().decode() for e in res]
