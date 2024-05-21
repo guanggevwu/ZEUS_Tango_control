@@ -57,7 +57,7 @@ model = [device_name] + [device_name + '/' +
 #     modification = json.load(outfile)
 
 
-app = TaurusApplication(cmd_line_parser=None, app_name='MyGui')
+app = TaurusApplication(cmd_line_parser=None, app_name=sys.argv[1])
 gui = TaurusGui()
 
 panel1 = Qt.QWidget()

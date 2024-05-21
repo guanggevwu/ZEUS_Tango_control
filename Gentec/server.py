@@ -232,7 +232,7 @@ class GentecEO(Device):
                 self._save_data = False
                 return self._save_data
             file_exists = os.path.isfile(self._save_path)
-            with open(self._save_path, 'a', newline='') as csvfile:
+            with open(self._save_path, 'a+', newline='') as csvfile:
                 fieldnames = ['read_time', 'main_value', 'wavelength', 'display_range', 'auto_range',
                               'measure_mode', 'attenuator', 'multiplier', 'offset']
                 if self._model != "PH100-Si-HA-OD1":
@@ -291,7 +291,8 @@ class GentecEO(Device):
             # for 'QE65LP-S-MB-QED-IN', the range is 3 mj to 300j
             if self._model == 'QE65LP-S-MB-QED-IN':
                 self.display_range_steps = range(19, 30)
-            elif self._model == 'QE12LP-S-MB-INTII':
+            # somehow the last two I are in a special format
+            elif 'QE12LP-S-MB-INT' in self._model:
                 self.display_range_steps = range(17, 27)
             # 30mj to 300j
             else:
@@ -363,9 +364,11 @@ class GentecEO(Device):
         if self._model != "PH100-Si-HA-OD1":
             self.device.write(b'*NVU')
             reply = self.device.readline().strip().decode()
-            if 'not' not in reply:
+            print(reply)
+            # no new data message is "New Data Not Available"
+            if 'NOT' not in reply:
                 self._new = True
-                self._read_time = datetime.datetime.now().strftime("%H:%m:%S %M/%d")
+                self._read_time = datetime.datetime.now().strftime("%H:%M:%S %m/%d")
             else:
                 self._new = False
         # New data available or New data not available

@@ -43,13 +43,14 @@ db = tango.Database()
 reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSupply', 'name': 'test/power_supply/1'},
             "power_supply_1": {'server': 'PowerSupply/testsr', '_class': 'PowerSupply', 'name': 'test/power_supply/2'},
             "basler": {'server': 'Basler/testsr', '_class': 'Basler', 'name': 'test/basler/1'},
-            "basler_MA2": {'server': 'Basler/MA2', '_class': 'Basler', 'name': 'laser/basler/SF2'},
+            "basler_SF2": {'server': 'Basler/MA2', '_class': 'Basler', 'name': 'laser/basler/SF2'},
+            "basler_MA2-Input": {'server': 'Basler/MA2', '_class': 'Basler', 'name': 'laser/basler/MA2-Input'},
             "camera": {'server': 'Camera/test', '_class': 'Camera', 'name': 'test/camera/1'},
             "gentec": {'server': 'GentecEO/testsr', '_class': 'GentecEO', 'name': 'test/gentec/1'},
             "gentec_MA1": {'server': 'GentecEO/MA1', '_class': 'GentecEO', 'name': 'laser/gentec/MA1'},
             "gentec_MA2": {'server': 'GentecEO/MA2', '_class': 'GentecEO', 'name': 'laser/gentec/MA2'},
             "gentec_MA3": {'server': 'GentecEO/MA3', '_class': 'GentecEO', 'name': 'laser/gentec/MA3'},
-            "gentec_on_shoot": {'server': 'GentecEO/Onshort', '_class': 'GentecEO', 'name': 'laser/gentec/Onshort'},
+            "gentec_on_shoot": {'server': 'GentecEO/Onshoot', '_class': 'GentecEO', 'name': 'laser/gentec/Onshoot'},
             "laser_warning_sign": {'server': 'LaserWarningSign/laser_warning_sign_sr', '_class': 'LaserWarningSign', 'name': 'facility/laser_warning_sign/1'},
             }
 
