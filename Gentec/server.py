@@ -380,7 +380,7 @@ class GentecEO(Device):
             self.device.write(b'*NVU')
             reply = self.device.readline().strip().decode()
             # no new data message is "New Data Not Available"
-            if 'NOT' not in reply:
+            if 'not' not in reply.lower():
                 self._new = True
                 self._read_time = datetime.datetime.now().strftime("%H:%M:%S %m/%d")
                 print(
