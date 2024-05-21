@@ -361,17 +361,6 @@ class GentecEO(Device):
             self.add_attribute(set_zero)
 
     def read_main_value(self, attr):
-        if self._model != "PH100-Si-HA-OD1":
-            self.device.write(b'*NVU')
-            reply = self.device.readline().strip().decode()
-            print(reply)
-            # no new data message is "New Data Not Available"
-            if 'NOT' not in reply:
-                self._new = True
-                self._read_time = datetime.datetime.now().strftime("%H:%M:%S %m/%d")
-            else:
-                self._new = False
-        # New data available or New data not available
         self.device.write(b'*CVU')
         self._main_value = self.device.readline().strip().decode()
         if float(self._main_value) < 1000 and float(self._main_value) >= 1:
@@ -386,6 +375,18 @@ class GentecEO(Device):
             self._main_value = f'{float(self._main_value)*1e12:#.7g} p{self.main_value_unit}'
         elif float(self._main_value) < 0:
             self._main_value = f'{self._main_value} (negative value, try set scale down)'
+        # check if it is new data
+        if self._model != "PH100-Si-HA-OD1":
+            self.device.write(b'*NVU')
+            reply = self.device.readline().strip().decode()
+            # no new data message is "New Data Not Available"
+            if 'NOT' not in reply:
+                self._new = True
+                self._read_time = datetime.datetime.now().strftime("%H:%M:%S %m/%d")
+                print(
+                    f'New data is acquired. {self._main_value} at {self._read_time}')
+            else:
+                self._new = False
         return self._main_value
 
     def read_hide_display_range_dropdown_text_list(self, attr):
