@@ -60,9 +60,11 @@ panel2_w1 = TaurusForm()
 
 form_model = model
 form_model.remove(f'{device_name}/main_value')
+form_model.remove(f'{device_name}/read_time')
 form_model.remove(f'{device_name}/display_range')
 form_model.insert(2, f'{device_name}/main_value')
-form_model.insert(3, f'{device_name}/display_range')
+form_model.insert(3, f'{device_name}/read_time')
+form_model.insert(4, f'{device_name}/display_range')
 panel2_w1.model = form_model
 panel2_layout.addWidget(panel2_w1)
 

@@ -229,29 +229,31 @@ class GentecEO(Device):
             if not self._save_path:
                 self.read_save_path()
             if not os.path.isdir(os.path.dirname(self._save_path)):
+                print("Not a correct file path")
                 self._save_data = False
                 return self._save_data
-            file_exists = os.path.isfile(self._save_path)
-            with open(self._save_path, 'a+', newline='') as csvfile:
-                fieldnames = ['read_time', 'main_value', 'wavelength', 'display_range', 'auto_range',
-                              'measure_mode', 'attenuator', 'multiplier', 'offset']
-                if self._model != "PH100-Si-HA-OD1":
-                    fieldnames.append('trigger_level')
-                else:
-                    fieldnames.append('set_zero')
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                if not file_exists:
-                    writer.writeheader()
-                if self._model == "PH100-Si-HA-OD1" or self._new:
-                    row_dict = {}
-                    for key in fieldnames:
-                        row_dict[key] = getattr(self, f'_{key}')
-                    writer.writerow(row_dict)
         return self._save_data
 
     def write_save_data(self, value):
         if self._save_data != value:
             self._save_data = value
+
+    def save_data_to_file(self):
+        file_exists = os.path.isfile(self._save_path)
+        with open(self._save_path, 'a+', newline='') as csvfile:
+            fieldnames = ['read_time', 'main_value', 'wavelength', 'display_range', 'auto_range',
+                          'measure_mode', 'attenuator', 'multiplier', 'offset']
+            if self._model != "PH100-Si-HA-OD1":
+                fieldnames.append('trigger_level')
+            else:
+                fieldnames.append('set_zero')
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            if not file_exists:
+                writer.writeheader()
+            row_dict = {}
+            for key in fieldnames:
+                row_dict[key] = getattr(self, f'_{key}')
+            writer.writerow(row_dict)
 
     save_path = attribute(
         label='save path',
@@ -279,6 +281,34 @@ class GentecEO(Device):
         self._save_path = value
         self._save_folder = os.path.dirname(self._save_path)
         os.makedirs(self._save_folder, exist_ok=True)
+
+    start_statistics = attribute(
+        label="start statistics",
+        dtype=bool,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        doc='save the data'
+    )
+
+    def read_start_statistics(self):
+        return self._start_statistics
+
+    def write_start_statistics(self, value):
+        if not self._start_statistics and value:
+            self._historical_data = [['time', 'value']]
+        self._start_statistics = value
+
+    historical_data = attribute(
+        label="Historical data",
+        dtype=((str,),),
+        max_dim_x=100,
+        max_dim_y=10000,
+        polling_period=polling,
+        access=AttrWriteType.READ,
+    )
+
+    def read_historical_data(self):
+        return self._historical_data
 
     def initialize_dynamic_attributes(self):
         #     '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
@@ -361,6 +391,18 @@ class GentecEO(Device):
             self.add_attribute(set_zero)
 
     def read_main_value(self, attr):
+        # check if it is new data
+        if self._model != "PH100-Si-HA-OD1":
+            self.device.write(b'*NVU')
+            reply = self.device.readline().strip().decode()
+            # no new data message is "New Data Not Available"
+            if 'not' not in reply.lower():
+                self._new = True
+                self._read_time = datetime.datetime.now().strftime("%H:%M:%S %m/%d")
+            else:
+                self._new = False
+        else:
+            self._read_time = datetime.datetime.now().strftime("%H:%M:%S %m/%d")
         self.device.write(b'*CVU')
         self._main_value = self.device.readline().strip().decode()
         if float(self._main_value) < 1000 and float(self._main_value) >= 1:
@@ -375,18 +417,14 @@ class GentecEO(Device):
             self._main_value = f'{float(self._main_value)*1e12:#.7g} p{self.main_value_unit}'
         elif float(self._main_value) < 0:
             self._main_value = f'{self._main_value} (negative value, try set scale down)'
-        # check if it is new data
-        if self._model != "PH100-Si-HA-OD1":
-            self.device.write(b'*NVU')
-            reply = self.device.readline().strip().decode()
-            # no new data message is "New Data Not Available"
-            if 'not' not in reply.lower():
-                self._new = True
-                self._read_time = datetime.datetime.now().strftime("%H:%M:%S %m/%d")
-                print(
-                    f'New data is acquired. {self._main_value} at {self._read_time}')
-            else:
-                self._new = False
+        if self._new:
+            print(
+                f'New data is acquired. {self._main_value} at {self._read_time}')
+            if self._save_data:
+                self.save_data_to_file()
+            if self._start_statistics:
+                self._historical_data.append(
+                    [self._read_time, self._main_value])
         return self._main_value
 
     def read_hide_display_range_dropdown_text_list(self, attr):
@@ -478,6 +516,12 @@ class GentecEO(Device):
             self._serial_number = decoded[42*2:45*2]
             self._model = decoded[26*2:35*2]
             self._model = self._model.replace('\x00', '')
+            if self._model == "PH100-Si-HA-OD1":
+                self._new = True
+            else:
+                self._new = False
+            self._historical_data = [['time', 'value']]
+            self._start_statistics = False
             print(
                 f'Genotec-eo device is connected. Model: {self._model}. Serial number: {self._serial_number}')
             self.set_state(DevState.ON)
