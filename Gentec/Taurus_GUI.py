@@ -1,3 +1,4 @@
+from taurus_pyqtgraph import TaurusPlot
 from taurus.qt.qtgui.application import TaurusApplication
 from taurus.qt.qtgui.taurusgui import TaurusGui
 from taurus.external.qt import Qt
@@ -51,12 +52,12 @@ model = [device_name + '/' +
 app = TaurusApplication(cmd_line_parser=None, app_name='gentec')
 gui = TaurusGui()
 
-panel2 = Qt.QWidget()
-panel2_layout = Qt.QVBoxLayout()
-panel2.setLayout(panel2_layout)
+panel1 = Qt.QWidget()
+panel1_layout = Qt.QVBoxLayout()
+panel1.setLayout(panel1_layout)
 
 
-panel2_w1 = TaurusForm()
+panel1_w1 = TaurusForm()
 
 form_model = model
 form_model.remove(f'{device_name}/main_value')
@@ -65,14 +66,14 @@ form_model.remove(f'{device_name}/display_range')
 form_model.insert(2, f'{device_name}/main_value')
 form_model.insert(3, f'{device_name}/read_time')
 form_model.insert(4, f'{device_name}/display_range')
-panel2_w1.model = form_model
-panel2_layout.addWidget(panel2_w1)
+panel1_w1.model = form_model
+panel1_layout.addWidget(panel1_w1)
 
 # change the bool write to auto apply.
 for i in form_model:
     if i.split('/')[-1] in attrs and dp.attribute_query(i.split('/')[-1]).data_type == 1:
         idx = form_model.index(i)
-        panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
+        panel1_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
 
 # TaurusLabel auto trim function not work in TaurusForm
 # change the text write widget to dropdown list and set auto apply
@@ -85,11 +86,18 @@ else:
     dropdown['measure_mode'] = (('Energy', '1'), ('SSE', '2'))
 for key, value in dropdown.items():
     idx = form_model.index(f'{device_name}/{key}')
-    panel2_w1[idx].writeWidgetClass = type(key, (TaurusValueComboBox,), {
+    panel1_w1[idx].writeWidgetClass = type(key, (TaurusValueComboBox,), {
         '__init__': add_value_pairs(value)})
 
-gui.createPanel(panel2, 'parameters')
+gui.createPanel(panel1, 'parameters')
 gui.removePanel('Manual')
+
+
+panel2 = TaurusPlot()
+model2 = [f'{sys.argv[1]}/historical_data_number']
+panel2.setModel(model2)
+gui.createPanel(panel2, 'plot')
+
 
 gui.show()
 app.exec_()

@@ -296,6 +296,7 @@ class GentecEO(Device):
     def write_start_statistics(self, value):
         if not self._start_statistics and value:
             self._historical_data = [['time', 'value']]
+            self._historical_data_number = []
         self._start_statistics = value
 
     historical_data = attribute(
@@ -309,6 +310,17 @@ class GentecEO(Device):
 
     def read_historical_data(self):
         return self._historical_data
+
+    historical_data_number = attribute(
+        label="Historical data plot",
+        dtype=(float,),
+        max_dim_x=10000,
+        polling_period=polling,
+        access=AttrWriteType.READ,
+    )
+
+    def read_historical_data_number(self):
+        return self._historical_data_number
 
     def initialize_dynamic_attributes(self):
         #     '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
@@ -405,6 +417,7 @@ class GentecEO(Device):
             self._read_time = datetime.datetime.now().strftime("%H:%M:%S %m/%d")
         self.device.write(b'*CVU')
         self._main_value = self.device.readline().strip().decode()
+        self._main_value_number = float(self._main_value)
         if float(self._main_value) < 1000 and float(self._main_value) >= 1:
             self._main_value = f'{float(self._main_value):#.7g} {self.main_value_unit}'
         elif float(self._main_value) < 1 and float(self._main_value) >= 1e-3:
@@ -425,6 +438,8 @@ class GentecEO(Device):
             if self._start_statistics:
                 self._historical_data.append(
                     [self._read_time, self._main_value])
+                self._historical_data_number.append(
+                    self._main_value_number)
         return self._main_value
 
     def read_hide_display_range_dropdown_text_list(self, attr):
@@ -521,6 +536,7 @@ class GentecEO(Device):
             else:
                 self._new = False
             self._historical_data = [['time', 'value']]
+            self._historical_data_number = []
             self._start_statistics = False
             print(
                 f'Genotec-eo device is connected. Model: {self._model}. Serial number: {self._serial_number}')
