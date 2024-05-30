@@ -295,7 +295,7 @@ class GentecEO(Device):
 
     def write_start_statistics(self, value):
         if not self._start_statistics and value:
-            self._historical_data = [['time', 'value']]
+            self._historical_data = [['pulse #', 'time', 'value']]
             self._historical_data_number = []
         self._start_statistics = value
 
@@ -436,8 +436,9 @@ class GentecEO(Device):
             if self._save_data:
                 self.save_data_to_file()
             if self._start_statistics:
+                index = len(self._historical_data)
                 self._historical_data.append(
-                    [self._read_time, self._main_value])
+                    [index, self._read_time, self._main_value])
                 self._historical_data_number.append(
                     self._main_value_number)
         return self._main_value
