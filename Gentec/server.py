@@ -438,7 +438,7 @@ class GentecEO(Device):
             if self._start_statistics:
                 index = len(self._historical_data)
                 self._historical_data.append(
-                    [index, self._read_time, self._main_value])
+                    [str(index), self._read_time, self._main_value])
                 self._historical_data_number.append(
                     self._main_value_number)
         return self._main_value
