@@ -20,6 +20,9 @@ logging.basicConfig(handlers=handlers,
 
 
 class Basler(Device):
+    '''
+    save_data attribute. If save_data is True, the polling is manually controlled by the acquisition script, else the polling is made by the polling period "polling".
+    '''
     polling = 200
     polling_infinite = -1
     # is_memorized = True means the previous entered set value is remembered and is only for Read_WRITE access. For example in GUI, the previous set value,instead of 0, will be shown at the set value field.
@@ -31,7 +34,7 @@ class Basler(Device):
         label="image",
         max_dim_x=4096,
         max_dim_y=4096,
-        dtype=((DevFloat,),),
+        dtype=((int,),),
         access=AttrWriteType.READ,
     )
 
@@ -46,7 +49,6 @@ class Basler(Device):
     #     label="serial number",
     #     dtype="str",
     #     access=AttrWriteType.READ,
-    #     polling_period=polling_infinite,
     # )
 
     model = attribute(
@@ -64,23 +66,30 @@ class Basler(Device):
     def read_user_defined_name(self):
         return self.camera.GetDeviceInfo().GetUserDefinedName()
 
+    is_polling_periodically = attribute(
+        label="polling periodically",
+        dtype=bool,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        hw_memorized=True,
+        doc='polling the image periodically or by external acquisition code'
+    )
+
     save_data = attribute(
         label="save data",
         dtype=bool,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        # polling_period=polling,
         doc='save the images or not'
     )
 
     save_path = attribute(
-        label='save path',
+        label='save path (folder)',
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        # polling_period=polling,
         doc='save data path, use ";" to seperate multiple paths'
     )
 
@@ -90,7 +99,6 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         # hw_memorized=True,
-        # polling_period=polling,
         doc='off or software or external'
     )
 
@@ -99,7 +107,6 @@ class Basler(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        # polling_period=polling,
         doc='usually use acquisition start'
     )
 
@@ -108,7 +115,6 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        # polling_period=polling,
         doc='frames generated per trigger'
     )
 
@@ -118,7 +124,6 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        # polling_period=polling,
         doc='triggers to be received before transferring the data'
     )
 
@@ -127,7 +132,6 @@ class Basler(Device):
         dtype=float,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        # polling_period=polling,
         doc='frame rate (only applicable when frames per trigger is large than 1)'
     )
 
@@ -137,7 +141,6 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        # polling_period=polling,
     )
 
     offsetY = attribute(
@@ -146,7 +149,6 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        # polling_period=polling,
     )
 
     format_pixel = attribute(
@@ -154,14 +156,12 @@ class Basler(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        # polling_period=polling,
     )
 
     # framerate = attribute(
     #     label="max framerate",
     #     dtype=float,
     #     access=AttrWriteType.READ,
-    #     polling_period=polling_infinite,
     # )
 
     binning_horizontal = attribute(
@@ -170,7 +170,6 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        # polling_period=polling,
     )
 
     binning_vertical = attribute(
@@ -179,14 +178,12 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        # polling_period=polling,
     )
 
     sensor_readout_mode = attribute(
         label="sensor readout mode",
         dtype=str,
         access=AttrWriteType.READ,
-        # polling_period=polling_infinite,
     )
 
     is_new_image = attribute(
@@ -198,6 +195,7 @@ class Basler(Device):
     is_debug_mode = attribute(
         label='debug',
         dtype=bool,
+        hw_memorized=True,
         access=AttrWriteType.READ_WRITE,
     )
 
@@ -233,8 +231,6 @@ class Basler(Device):
             dtype=float,
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
-
-            # polling_period=self.polling,
             unit="us",
             min_value=self.camera.ExposureTimeAbs.Min,
             max_value=self.camera.ExposureTimeAbs.Max
@@ -245,8 +241,6 @@ class Basler(Device):
             dtype=int,
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
-
-            # polling_period=self.polling,
             min_value=self.camera.GainRaw.Min,
             max_value=self.camera.GainRaw.Max
         )
@@ -256,8 +250,6 @@ class Basler(Device):
             dtype=int,
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
-
-            # polling_period=self.polling,
             min_value=self.camera.Width.Min,
             max_value=self.camera.Width.Max,
         )
@@ -268,8 +260,6 @@ class Basler(Device):
             dtype=int,
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
-
-            # polling_period=self.polling,
             min_value=self.camera.Height.Min,
             max_value=self.camera.Height.Max,
         )
@@ -324,7 +314,10 @@ class Basler(Device):
                 self.camera = pylon.InstantCamera(
                     instance.CreateDevice(self.device))
                 self.camera.Open()
+                self._is_polling_periodically = False
                 self._polling = self.get_attribute_poll_period('is_new_image')
+                if self._polling == 0:
+                    self._polling = self.polling
                 self._timeout_polling_ratio = 0.75
                 self._is_new_image = False
                 self._image = np.zeros(
@@ -369,16 +362,23 @@ class Basler(Device):
         if self._save_data != value:
             self._save_data = value
             logging.info(f'save status is changed to {value}')
-        if self._save_data:
+
+    def read_is_polling_periodically(self):
+        if not self._is_polling_periodically:
             self.disable_polling('is_new_image')
         else:
             self.enable_polling('is_new_image')
+        return self._is_polling_periodically
+
+    def write_is_polling_periodically(self, value):
+        self._is_polling_periodically = value
+        self.read_is_polling_periodically()
 
     def read_save_path(self):
+        # The value of save path (short name) can be different from the self._save_path (full name).
         if not hasattr(self, '_save_path'):
             self._save_path = os.path.join(
                 os.path.dirname(__file__), 'basler_tmp_data')
-            os.makedirs(self._save_path, exist_ok=True)
         if len(self._save_path) > 20:
             if ";" in self._save_path:
                 return ";".join([f'{e[0:2]}...{e[-2:-1]}' for e in self._save_path.split(';')])
@@ -387,6 +387,10 @@ class Basler(Device):
             return self._save_path
 
     def write_save_path(self, value):
+        try:
+            os.makedirs(value, exist_ok=True)
+        except FileNotFoundError:
+            return
         self._save_path = value
 
     def read_model(self):
@@ -461,6 +465,7 @@ class Basler(Device):
         self.camera.StopGrabbing()
         if value.lower() == 'off':
             self.camera.TriggerMode.SetValue('Off')
+            self._is_polling_periodically = True
         else:
             self.camera.TriggerMode.SetValue('On')
             if value.lower() == 'external':

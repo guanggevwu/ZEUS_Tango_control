@@ -256,7 +256,7 @@ class GentecEO(Device):
             writer.writerow(row_dict)
 
     save_path = attribute(
-        label='save path',
+        label='save path (file)',
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
@@ -278,9 +278,9 @@ class GentecEO(Device):
             return self._save_path
 
     def write_save_path(self, value):
-        self._save_path = value
-        self._save_folder = os.path.dirname(self._save_path)
+        self._save_folder = os.path.dirname(value)
         os.makedirs(self._save_folder, exist_ok=True)
+        self._save_path = value
 
     start_statistics = attribute(
         label="start statistics",
