@@ -22,12 +22,16 @@ while True:
         data = Image.fromarray(current_image)
         data.save(os.path.join(save_path, f'run{run}shot{shot}_image.tiff'))
         # save energy meter reading
-        with open(os.path.join(save_path, f'run{run}shot{shot}_energy.csv'), 'w+', newline='') as csvfile:
-            fieldnames = ['read_time', 'main_value']
+        with open(os.path.join(save_path, f'run{run}_energy.csv'), 'a+', newline='') as csvfile:
+            fieldnames = ['run_shot', 'read_time', 'main_value']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+            if not csvfile.tell():
+                writer.writeheader()
             row_dict = {}
             for key in fieldnames:
-                row_dict[key] = getattr(em, f'{key}')
+                if key == 'run_shot':
+                    row_dict[key] = f'run{run}_shot{shot}'
+                else:
+                    row_dict[key] = getattr(em, f'{key}')
             writer.writerow(row_dict)
         shot += 1
