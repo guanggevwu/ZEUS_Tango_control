@@ -21,9 +21,16 @@ while True:
             current_image = bs.image.astype('uint8')
         data = Image.fromarray(current_image)
         data.save(os.path.join(save_path, f'run{run}shot{shot}_image.tiff'))
+
         # save energy meter reading
         with open(os.path.join(save_path, f'run{run}_energy.csv'), 'a+', newline='') as csvfile:
-            fieldnames = ['run_shot', 'read_time', 'main_value']
+            fieldnames = ['shot', 'run_shot', 'read_time', 'main_value']
+            reader = csv.DictReader(csvfile)
+            row = None
+            for row in reader:
+                pass
+            if row is not None:
+                previous_value = row['main_value']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             if not csvfile.tell():
                 writer.writeheader()
@@ -33,5 +40,8 @@ while True:
                     row_dict[key] = f'run{run}_shot{shot}'
                 else:
                     row_dict[key] = getattr(em, f'{key}')
+                # validate
+                if row is not None and previous_value == row_dict['main_value']:
+                    print("Miss Fire!")
             writer.writerow(row_dict)
         shot += 1

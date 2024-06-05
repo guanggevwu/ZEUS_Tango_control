@@ -127,7 +127,6 @@ class GentecEO(Device):
         label="measure mode",
         dtype=str,
         access=AttrWriteType.READ_WRITE,
-        polling_period=polling,
         memorized=is_memorized,
         doc='power, energy or single shot energy'
     )
@@ -225,35 +224,62 @@ class GentecEO(Device):
     )
 
     def read_save_data(self):
-        if self._save_data:
-            if not self._save_path:
-                self.read_save_path()
-            if not os.path.isdir(os.path.dirname(self._save_path)):
-                print("Not a correct file path")
-                self._save_data = False
-                return self._save_data
+        # if self._save_data:
+        #     if not self._save_path:
+        #         self.read_save_path()
+        #     if not os.path.isdir(os.path.dirname(self._save_path)):
+        #         print("Not a correct file path")
+        #         self._save_data = False
+        #         return self._save_data
         return self._save_data
 
     def write_save_data(self, value):
         if self._save_data != value:
             self._save_data = value
+            if value:
+                self.write_save_path(self._save_path)
 
     def save_data_to_file(self):
-        file_exists = os.path.isfile(self._save_path)
+        with open(self._save_path) as csvfile:
+            should_write_header = False
+            reader = csv.reader(csvfile)
+            idx = -1
+            for idx, row in enumerate(reader):
+                pass
+            if idx > 0:
+                self._shot = int(row[0]) + 1
+            if idx == -1:
+                should_write_header = True
+
         with open(self._save_path, 'a+', newline='') as csvfile:
-            fieldnames = ['read_time', 'main_value', 'wavelength', 'display_range', 'auto_range',
+            fieldnames = ['shot', 'read_time', 'main_value', 'wavelength', 'display_range', 'auto_range',
                           'measure_mode', 'attenuator', 'multiplier', 'offset']
             if self._model != "PH100-Si-HA-OD1":
                 fieldnames.append('trigger_level')
             else:
                 fieldnames.append('set_zero')
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            if not file_exists:
+
+            if should_write_header:
                 writer.writeheader()
+            # if not csvfile.tell():
+            #     writer.writeheader()
             row_dict = {}
             for key in fieldnames:
                 row_dict[key] = getattr(self, f'_{key}')
             writer.writerow(row_dict)
+
+    shot = attribute(
+        label="shot #",
+        dtype=int,
+        access=AttrWriteType.READ,
+        polling_period=polling,
+        doc='save the data'
+    )
+
+    def read_shot(self):
+        print(self._shot)
+        return self._shot
 
     save_path = attribute(
         label='save path (file)',
@@ -261,26 +287,32 @@ class GentecEO(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        doc='save data path, use ";" to seperate multiple paths'
+        doc='save data path, use ";" to separate multiple paths'
     )
 
     def read_save_path(self):
-        if not hasattr(self, '_save_path'):
-            self._save_path = os.path.join(
-                os.path.dirname(__file__), 'gentec_tmp_data')
-            try:
-                os.makedirs(self._save_path, exist_ok=True)
-            except:
-                pass
         if len(self._save_path) > 20:
             return f'{self._save_path[0:10]}...{self._save_path[-10:-1]}'
         else:
             return self._save_path
 
     def write_save_path(self, value):
-        self._save_folder = os.path.dirname(value)
-        os.makedirs(self._save_folder, exist_ok=True)
-        self._save_path = value
+        if self.create_save_file(value):
+            self._save_path = value
+
+    def create_save_file(self, path):
+        if os.path.isfile(path):
+            print(f'{path} exists!')
+            return True
+        else:
+            try:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w") as my_empty_csv:
+                    print(f'{path} created!')
+                    return True
+            except:
+                print('create failed')
+                return False
 
     start_statistics = attribute(
         label="start statistics",
@@ -511,6 +543,12 @@ class GentecEO(Device):
         self._set_zero = value
 
     def init_device(self):
+        self._historical_data = [['time', 'value']]
+        self._historical_data_number = []
+        self._start_statistics = False
+        self._save_path = ''
+        self._save_data = False
+        self._shot = 1
         Device.init_device(self)
         self.set_state(DevState.INIT)
         com_obj = self.find_com_number()
@@ -520,7 +558,6 @@ class GentecEO(Device):
             self.device = serial.Serial(
                 port=com_number, baudrate=9600, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
             self.set_state(DevState.ON)
-            self._save_data = False
             self._read_time = "N/A"
             self.device.write(b'*STS')
             res = self.device.readlines()
@@ -534,11 +571,12 @@ class GentecEO(Device):
             self._model = self._model.replace('\x00', '')
             if self._model == "PH100-Si-HA-OD1":
                 self._new = True
+                self.read_set_zero('any')
             else:
                 self._new = False
-            self._historical_data = [['time', 'value']]
-            self._historical_data_number = []
-            self._start_statistics = False
+                self.read_trigger_level('any')
+            self.read_auto_range()
+            self.read_offset()
             print(
                 f'Genotec-eo device is connected. Model: {self._model}. Serial number: {self._serial_number}')
             self.set_state(DevState.ON)

@@ -41,6 +41,7 @@ def add_value_pairs(values):
 # if the polling periods in Taurus is longer than these in Tango, it only retrives part of information from the server.
 # changeDefaultPollingPeriod(500)
 device_name = sys.argv[1] if len(sys.argv) > 1 else 'test/gentec/1'
+changeDefaultPollingPeriod(500)
 changeDefaultPollingPeriod(sys.argv[2]) if len(sys.argv) > 2 else None
 dp = Device(device_name)
 
