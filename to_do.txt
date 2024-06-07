@@ -1,0 +1,1 @@
+1 pip install taurus-pyqtgraph == 0.9.0 to have set range feature

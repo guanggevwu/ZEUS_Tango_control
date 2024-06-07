@@ -50,7 +50,7 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "gentec_MA1": {'server': 'GentecEO/MA1', '_class': 'GentecEO', 'name': 'laser/gentec/MA1'},
             "gentec_MA2": {'server': 'GentecEO/MA2', '_class': 'GentecEO', 'name': 'laser/gentec/MA2'},
             "gentec_MA3": {'server': 'GentecEO/MA3', '_class': 'GentecEO', 'name': 'laser/gentec/MA3'},
-            "gentec_on_shoot": {'server': 'GentecEO/Onshoot', '_class': 'GentecEO', 'name': 'laser/gentec/Onshoot'},
+            "gentec_on_shot": {'server': 'GentecEO/Onshot', '_class': 'GentecEO', 'name': 'laser/gentec/Onshot'},
             "laser_warning_sign": {'server': 'LaserWarningSign/laser_warning_sign_sr', '_class': 'LaserWarningSign', 'name': 'facility/laser_warning_sign/1'},
             }
 

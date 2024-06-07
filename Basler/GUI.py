@@ -9,28 +9,10 @@ from taurus.qt.qtgui.button import TaurusCommandButton
 from taurus.qt.qtgui.display import TaurusLabel
 import sys
 import json
-
-
-# class MyComboBox(TaurusValueComboBox):
-#     def __init__(self):
-#         super().__init__()
-#         self.addValueNames((('Off', 'Off'), ('Software', 'Software')))
-
-
-class MyTaurusValueCheckBox(TaurusValueCheckBox):
-    def __init__(self):
-        super().__init__()
-        self.autoApply = True
-        self.showText = False
-
-
-def add_value_pairs(values):
-    def constructor(self):
-        TaurusValueComboBox.__init__(self)
-        self.addValueNames(values)
-        self.autoApply = True
-    return constructor
-
+import os
+if True:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
 
 # TriggerSource = type('TriggerSource', (TaurusValueComboBox,), {
 #                      '__init__': add_value_pairs((('Off', 'Off'), ('Software', 'Software')))})
@@ -111,8 +93,7 @@ dropdown = {'trigger_source': (('Off', 'Off'), ('Software', 'Software'), ('Exter
     ('AcquisitionStart', 'AcquisitionStart'), ('FrameStart', 'FrameStart')), }
 for key, value in dropdown.items():
     idx = form_model.index(f'{device_name}/{key}')
-    panel2_w1[idx].writeWidgetClass = type(key, (TaurusValueComboBox,), {
-        '__init__': add_value_pairs(value)})
+    panel2_w1[idx].writeWidgetClass = create_my_dropdown_list_class(key, value)
 
 gui.createPanel(panel2, 'parameters')
 gui.removePanel('Manual')

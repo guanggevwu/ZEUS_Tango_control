@@ -10,7 +10,7 @@ class Gentec:
         if len(sys.argv) > 1:
             if sys.argv[1] == 'all':
                 device_name = ['laser/gentec/MA1',
-                               'laser/gentec/MA2', 'laser/gentec/MA3']
+                               'laser/gentec/MA2', 'laser/gentec/MA3', 'laser/gentec/Onshot']
             else:
                 device_name = [sys.argv[1]]
             if len(sys.argv) > 2:
@@ -19,8 +19,9 @@ class Gentec:
         for dn in device_name:
             self.dp.append(tango.DeviceProxy(dn))
         # attrs = self.dp.get_attribute_list()
+        # self.required_list. keys are the attributes of tango device and values are the label names.
         self.required_list = {
-            'name_attr': 'name', 'main_value': 'main value'}
+            'name_attr': 'name', 'main_value': 'main value', 'shot': 'shot # (total)', 'statistics_shots': 'shot (statistics)', 'average': "average", 'std': 'std'}
         root.title("Simplified Gentec")
         frame1 = ttk.Frame(root, padding="3 3 12 12")
         frame1.grid(column=0, row=0, sticky=(N, W, E, S))
@@ -48,7 +49,7 @@ class Gentec:
             for device_idx, dp in enumerate(self.dp):
                 try:
                     getattr(self, f'{key}_{device_idx}').set(
-                        getattr(self.dp[device_idx], key))
+                        getattr(dp, key))
                 except:
                     pass
         root.after(100, self.update)

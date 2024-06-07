@@ -1,17 +1,18 @@
-from tkinter import *
-from tkinter import ttk
-import sys
-import os
-import platform
-import subprocess
-from functools import partial
 import atexit
-import signal
-import tango
+from functools import partial
+import os
+from tkinter import ttk
+from tkinter import *
+import sys
+
+if True:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from common.start_menu import Menu
 
 
-class GentecEOMenu:
+class GentecEOMenu(Menu):
     def __init__(self, root):
+        super().__init__()
         class_name = type(self).__name__.replace('Menu', '')
         root.title(f"{class_name} menu")
         frame1 = ttk.Frame(root, padding="3 3 12 12")
@@ -31,19 +32,11 @@ class GentecEOMenu:
         s.configure('Sty1.TCombobox',
                     font=('Helvetica', self.fontsize))
 
-        venv_path = os.path.dirname(os.path.dirname(__file__))
-        if platform.system() == 'Linux':
-            self.python_path = os.path.join(venv_path, 'venv', 'bin', 'python')
-        elif platform.system() == 'Windows':
-            self.python_path = os.path.join(
-                venv_path, 'venv', 'Scripts', 'python.exe')
-        db = tango.Database()
-        device_names = db.get_device_name('*', class_name)
-        servers = db.get_server_list()
+        device_names = self.db.get_device_name('*', class_name)
         instances = [e.split('/')[-1]
-                     for e in servers if e.split('/')[0] == class_name]
-        self.menu_dict = {'start server': ['server.py', instances],
-                          'start Taurus GUI': ['Taurus_GUI.py', tuple(device_names.value_string)], 'start Tkinter GUI': ['tkinter_GUI.py', ('all', *device_names.value_string)]}
+                     for e in self.servers if e.split('/')[0] == class_name]
+        self.menu_dict = {'start server': ['server.py', instances, []],
+                          'start Taurus GUI': ['Taurus_GUI.py', tuple(device_names.value_string), []], 'start Tkinter GUI': ['tkinter_GUI.py', ('all', *device_names.value_string), []]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             # value[0][:-3], i.e., 'gentec_server' is the attribute name
             setattr(self, value[0][:-3], StringVar())
@@ -51,36 +44,13 @@ class GentecEOMenu:
                 self, value[0][:-3]),  font=('Helvetica', self.fontsize), width=15))
             getattr(self, f'{value[0][:-3]}_combobox').grid(
                 column=0, row=idx, columnspan=1, sticky=[N, E, S])
-            ttk.Button(frame1, text=f"{key}", command=partial(self.start_window, f'{key}'), style='Sty1.TButton').grid(
+            ttk.Button(frame1, text=f"{key}", command=partial(self.start_window, __file__, f'{key}'), style='Sty1.TButton').grid(
                 column=1, row=idx, columnspan=1, sticky=[W, E])
             getattr(self, f'{value[0][:-3]}_combobox')['value'] = value[1]
             ttk.Button(frame1, text=f"X", command=partial(self.terminate, f'{key}'), style='Sty1.TButton', width=5).grid(
                 column=2, row=idx, columnspan=1, sticky=[W])
         for child in frame1.winfo_children():
             child.grid_configure(padx=[self.fontsize, 0], pady=3)
-
-    def start_window(self, key):
-        script_path = os.path.join(
-            os.path.dirname(__file__), self.menu_dict[key][0])
-        input_txt = getattr(self, self.menu_dict[key][0][:-3]).get()
-        # using os.system cause hang up in server code
-        # os.system(
-        #     f'{self.python_path} {script_path} {input_txt}')
-        p = subprocess.Popen(
-            f'{self.python_path} {script_path} {input_txt}')
-        setattr(self, f'{self.menu_dict[key][0][:-3]}_subprocess', p.pid)
-        print(f'{p.pid} is started')
-
-    def terminate_all(self):
-        for key, value in self.__dict__.items():
-            if '_subprocess' in key:
-                print(f'trying to kill {key} {value}')
-                os.kill(value, signal.SIGTERM)
-
-    def terminate(self, key):
-        pid = getattr(self, f'{self.menu_dict[key][0][:-3]}_subprocess')
-        print(f'try to kill {key} {pid}')
-        os.kill(pid, signal.SIGTERM)
 
 
 if __name__ == '__main__':

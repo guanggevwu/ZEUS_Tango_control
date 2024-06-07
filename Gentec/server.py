@@ -11,7 +11,7 @@ import csv
 import serial
 import time
 import serial.tools.list_ports
-
+import numpy as np
 # -----------------------------
 
 handlers = [logging.StreamHandler()]
@@ -238,10 +238,11 @@ class GentecEO(Device):
             self._save_data = value
             if value:
                 self.write_save_path(self._save_path)
+                self.get_existing_rows()
 
-    def save_data_to_file(self):
+    def get_existing_rows(self):
         with open(self._save_path) as csvfile:
-            should_write_header = False
+            self.should_write_header = False
             reader = csv.reader(csvfile)
             idx = -1
             for idx, row in enumerate(reader):
@@ -249,8 +250,10 @@ class GentecEO(Device):
             if idx > 0:
                 self._shot = int(row[0]) + 1
             if idx == -1:
-                should_write_header = True
+                self.should_write_header = True
 
+    def save_data_to_file(self):
+        self.get_existing_rows()
         with open(self._save_path, 'a+', newline='') as csvfile:
             fieldnames = ['shot', 'read_time', 'main_value', 'wavelength', 'display_range', 'auto_range',
                           'measure_mode', 'attenuator', 'multiplier', 'offset']
@@ -260,7 +263,7 @@ class GentecEO(Device):
                 fieldnames.append('set_zero')
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
-            if should_write_header:
+            if self.should_write_header:
                 writer.writeheader()
             # if not csvfile.tell():
             #     writer.writeheader()
@@ -270,16 +273,50 @@ class GentecEO(Device):
             writer.writerow(row_dict)
 
     shot = attribute(
-        label="shot #",
+        label="shot # (saved)",
         dtype=int,
         access=AttrWriteType.READ,
         polling_period=polling,
-        doc='save the data'
+        doc='shot number'
     )
 
     def read_shot(self):
-        print(self._shot)
         return self._shot
+
+    statistics_shots = attribute(
+        label="shot # (statistics)",
+        dtype=int,
+        access=AttrWriteType.READ,
+        polling_period=polling,
+        doc='shot number'
+    )
+
+    def read_statistics_shots(self):
+        return self._statistics_shots
+
+    average = attribute(
+        label="average",
+        dtype=str,
+        access=AttrWriteType.READ,
+        polling_period=polling,
+        doc='average since starting statistics'
+    )
+
+    def read_average(self):
+        value, unit = self.format_unit(self._average, self.base_unit)
+        return f'{value:.6f} {unit}'
+
+    std = attribute(
+        label="std",
+        dtype=str,
+        access=AttrWriteType.READ,
+        polling_period=polling,
+        doc='standard deviation since starting statistics'
+    )
+
+    def read_std(self):
+        value, unit = self.format_unit(self._std, self.base_unit)
+        return f'{value:.6f} {unit}'
 
     save_path = attribute(
         label='save path (file)',
@@ -357,11 +394,11 @@ class GentecEO(Device):
     def initialize_dynamic_attributes(self):
         #     '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
         if self._model == "PH100-Si-HA-OD1":
-            self.main_value_unit = 'w'
+            self.base_unit = 'W'
             # 3nw to 1 w
             self.display_range_steps = range(8, 25)
         else:
-            self.main_value_unit = 'J'
+            self.base_unit = 'J'
             # for 'QE65LP-S-MB-QED-IN', the range is 3 mj to 300j
             if self._model == 'QE65LP-S-MB-QED-IN':
                 self.display_range_steps = range(19, 30)
@@ -375,7 +412,7 @@ class GentecEO(Device):
         self.range_dict = {}
         res_table = [1, 3, 10, 30, 100, 300]
         unit_table = ['p', 'n', 'u', 'm', '', 'k', 'M']
-        unit_table = [u + self.main_value_unit for u in unit_table]
+        unit_table = [u + self.base_unit for u in unit_table]
         for idx in self.display_range_steps:
             u, res = divmod(idx, 6)
             self.range_dict[f'{idx:02}'] = [res_table[res]*1000**u/1e12,
@@ -403,9 +440,22 @@ class GentecEO(Device):
             name="main_value",
             label="reading",
             dtype=str,
+            # unit=self.base_unit,
+            # format='9.6f',
             access=AttrWriteType.READ,
             polling_period=self.polling,
             doc='reading value (energy or power)'
+        )
+
+        main_value_float = attribute(
+            name="main_value_float",
+            label="reading float",
+            dtype=float,
+            format='.12e',
+            unit=self.base_unit,
+            access=AttrWriteType.READ,
+            polling_period=self.polling,
+            doc='reading in float format'
         )
 
         trigger_level = attribute(
@@ -426,6 +476,7 @@ class GentecEO(Device):
         )
 
         self.add_attribute(main_value)
+        self.add_attribute(main_value_float)
         self.add_attribute(hide_display_range_dropdown_text_list)
         self.add_attribute(hide_display_range_dropdown_text_value)
         # self.add_attribute(display_range)
@@ -449,31 +500,55 @@ class GentecEO(Device):
             self._read_time = datetime.datetime.now().strftime("%H:%M:%S %m/%d")
         self.device.write(b'*CVU')
         self._main_value = self.device.readline().strip().decode()
-        self._main_value_number = float(self._main_value)
-        if float(self._main_value) < 1000 and float(self._main_value) >= 1:
-            self._main_value = f'{float(self._main_value):#.7g} {self.main_value_unit}'
-        elif float(self._main_value) < 1 and float(self._main_value) >= 1e-3:
-            self._main_value = f'{float(self._main_value)*1e3:#.7g} m{self.main_value_unit}'
-        elif float(self._main_value) < 1e-3 and float(self._main_value) >= 1e-6:
-            self._main_value = f'{float(self._main_value)*1e6:#.7g} u{self.main_value_unit}'
-        elif float(self._main_value) < 1e-6 and float(self._main_value) >= 1e-9:
-            self._main_value = f'{float(self._main_value)*1e9:#.7g} n{self.main_value_unit}'
-        elif float(self._main_value) < 1e-9 and float(self._main_value) >= 1e-12:
-            self._main_value = f'{float(self._main_value)*1e12:#.7g} p{self.main_value_unit}'
-        elif float(self._main_value) < 0:
-            self._main_value = f'{self._main_value} (negative value, try set scale down)'
+        self._main_value = float(self._main_value)
+        self._main_value_adjust, self._main_value_adjust_unit = self.format_unit(
+            self._main_value, self.base_unit)
         if self._new:
-            print(
-                f'New data is acquired. {self._main_value} at {self._read_time}')
+            if self._debug:
+                print(
+                    f'New data is acquired. {self._main_value_adjust} {self._main_value_adjust_unit} at {self._read_time}')
             if self._save_data:
                 self.save_data_to_file()
             if self._start_statistics:
-                index = len(self._historical_data)
+                self._statistics_shots = len(self._historical_data)-1
                 self._historical_data.append(
-                    [str(index), self._read_time, self._main_value])
+                    [str(self._statistics_shots), self._read_time, f'{self._main_value_adjust} {self._main_value_adjust_unit}'])
                 self._historical_data_number.append(
-                    self._main_value_number)
+                    self._main_value)
+                self._average = np.mean(self._historical_data_number)
+                self._std = np.std(self._historical_data_number)
+        # self.get_attribute_config('main_value')[
+        #     0].unit = self._main_value_adjust_unit
+        return f'{self._main_value_adjust:.6f} {self._main_value_adjust_unit}'
+
+    def read_main_value_float(self, attr):
         return self._main_value
+
+    def format_unit(self, value, base_unit):
+        magnitude_ranges = [[float("-inf"), 0], [0, 1e-12], [1e-12, 1e-9],
+                            [1e-9, 1e-6], [1e-6, 1e-3], [1e-3, 1], [1, 1000]]
+        unit_prefix = ['', '', 'p', 'n', 'u', 'm', '']
+        scale_list = [1, 1, 1e12, 1e9, 1e6, 1e3, 1]
+        for idx, m in enumerate(magnitude_ranges):
+            if value >= m[0] and value <= m[1]:
+                unit = unit_prefix[idx] + base_unit
+                value = scale_list[idx] * value
+                break
+        # if float(value) < 1000 and float(value) >= 1:
+        #     value = f'{float(value):#.7g} {base_unit}'
+        # elif float(value) < 1 and float(value) >= 1e-3:
+        #     value = f'{float(value)*1e3:#.7g} m{base_unit}'
+        # elif float(value) < 1e-3 and float(value) >= 1e-6:
+        #     value = f'{float(value)*1e6:#.7g} u{base_unit}'
+        # elif float(value) < 1e-6 and float(value) >= 1e-9:
+        #     value = f'{float(value)*1e9:#.7g} n{base_unit}'
+        # elif float(value) < 1e-9 and float(value) >= 1e-12:
+        #     value = f'{float(value)*1e12:#.7g} p{base_unit}'
+        # elif float(value) < 1e-12:
+        #     value = f'{value}'
+        # elif float(value) < 0:
+        #     value = f'{value} (negative value, try setting scale down)'
+        return value, unit
 
     def read_hide_display_range_dropdown_text_list(self, attr):
         return [e[1] for e in self.range_dict.values()]
@@ -543,12 +618,16 @@ class GentecEO(Device):
         self._set_zero = value
 
     def init_device(self):
+        self._debug = 0
         self._historical_data = [['time', 'value']]
         self._historical_data_number = []
         self._start_statistics = False
         self._save_path = ''
         self._save_data = False
-        self._shot = 1
+        self._shot = 0
+        self._statistics_shots = 0
+        self._average = 0
+        self._std = 0
         Device.init_device(self)
         self.set_state(DevState.INIT)
         com_obj = self.find_com_number()

@@ -1,37 +1,15 @@
-from taurus_pyqtgraph import TaurusPlot
+from taurus_pyqtgraph import TaurusTrend
 from taurus.qt.qtgui.application import TaurusApplication
 from taurus.qt.qtgui.taurusgui import TaurusGui
 from taurus.external.qt import Qt
 from taurus import Device, changeDefaultPollingPeriod
-from taurus.qt.qtgui.extra_guiqwt import TaurusImageDialog
 from taurus.qt.qtgui.panel import TaurusForm
-from taurus.qt.qtgui.input import TaurusValueComboBox, TaurusValueCheckBox
-from taurus.qt.qtgui.button import TaurusCommandButton
-from taurus.qt.qtgui.display import TaurusLabel
+from taurus.qt.qtgui.input import TaurusValueComboBox
 import sys
-import json
-
-
-# class MyComboBox(TaurusValueComboBox):
-#     def __init__(self):
-#         super().__init__()
-#         self.addValueNames((('Off', 'Off'), ('Software', 'Software')))
-
-
-class MyTaurusValueCheckBox(TaurusValueCheckBox):
-    def __init__(self):
-        super().__init__()
-        self.autoApply = True
-        self.showText = False
-
-
-def add_value_pairs(values):
-    def constructor(self):
-        TaurusValueComboBox.__init__(self)
-        self.addValueNames(values)
-        self.autoApply = True
-    return constructor
-
+import os
+if True:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
 
 # TriggerSource = type('TriggerSource', (TaurusValueComboBox,), {
 #                      '__init__': add_value_pairs((('Off', 'Off'), ('Software', 'Software')))})
@@ -49,7 +27,8 @@ attrs = dp.get_attribute_list()
 commands = dp.get_command_list()
 model = [device_name + '/' +
          attr for attr in attrs if not attr.startswith('hide_')]
-
+statistic_panel = ['start_statistics', 'shot',
+                   'statistics_shots', 'average', 'std']
 app = TaurusApplication(cmd_line_parser=None, app_name='gentec')
 gui = TaurusGui()
 
@@ -60,13 +39,14 @@ panel1.setLayout(panel1_layout)
 
 panel1_w1 = TaurusForm()
 
-form_model = model
-form_model.remove(f'{device_name}/main_value')
-form_model.remove(f'{device_name}/read_time')
-form_model.remove(f'{device_name}/display_range')
-form_model.insert(2, f'{device_name}/main_value')
-form_model.insert(3, f'{device_name}/read_time')
-form_model.insert(4, f'{device_name}/display_range')
+
+form_model = [i for i in model if i.split('/')[-1] not in statistic_panel]
+order_list = ['model', 'main_value', 'read_time', 'save_data',
+              'save_path', 'display_range', 'auto_range', 'wavelength']
+for idx, attr in enumerate(order_list):
+    form_model.remove(f'{device_name}/{attr}')
+    form_model.insert(idx, f'{device_name}/{attr}')
+
 panel1_w1.model = form_model
 panel1_layout.addWidget(panel1_w1)
 
@@ -87,17 +67,28 @@ else:
     dropdown['measure_mode'] = (('Energy', '1'), ('SSE', '2'))
 for key, value in dropdown.items():
     idx = form_model.index(f'{device_name}/{key}')
-    panel1_w1[idx].writeWidgetClass = type(key, (TaurusValueComboBox,), {
-        '__init__': add_value_pairs(value)})
+    panel1_w1[idx].writeWidgetClass = create_my_dropdown_list_class(key, value)
 
-gui.createPanel(panel1, 'parameters')
 gui.removePanel('Manual')
 
-
-panel2 = TaurusPlot()
-model2 = [f'{sys.argv[1]}/historical_data_number']
+# panel for trend
+panel2 = TaurusTrend()
+model2 = [f'{sys.argv[1]}/main_value_float']
 panel2.setModel(model2)
-gui.createPanel(panel2, 'plot')
+
+# panel for statistics
+panel3 = TaurusForm()
+form_model_3 = [i for i in model if i.split('/')[-1] in statistic_panel]
+panel3.model = form_model_3
+# change the bool write to auto apply.
+for i in form_model_3:
+    if i.split('/')[-1] in attrs and dp.attribute_query(i.split('/')[-1]).data_type == 1:
+        idx = form_model_3.index(i)
+        panel3[idx].writeWidgetClass = MyTaurusValueCheckBox
+
+gui.createPanel(panel1, 'parameters')
+gui.createPanel(panel3, 'statistics_numbers')
+gui.createPanel(panel2, 'statistics_trend')
 
 
 gui.show()
