@@ -57,15 +57,9 @@ python path/to/menu.py
 - To use a computer as a client, select the name of the device and "start Taurus GUI".
 - To shut down the device server or the client, click the 'X' button.
 
-## Taurus GUI (codeless)
-
-### Plot and Trend
-
-[Example and training](https://gitlab.com/taurus-org/taurus-training/-/blob/main/TaurusPlottingTools.md?ref_type=heads)
-
 ## Basler camera
 
-The example code shows how to obtain one image by triggering a Basler camera with a software trigger.
+The example code shows how to obtain one image by triggerring a Basler camera with a software trigger.
 
 ```python
 import tango
@@ -126,6 +120,19 @@ import tango
 dp = tango.DeviceProxy('test/gentec/1')
 print(dp.main_value)
 print(dp.wavelength)
+```
+
+## LeCroy scopes
+
+Requires Pywin32 and "activedsoinstaller2.39.exe"
+To acquire the waveform:
+
+```python
+import tango
+
+scope = tango.DeviceProxy('facility/lecroy/wavesurfer_3034z_1')
+print(scope.waveform_c1_x)
+print(scope.waveform_c1_y)
 ```
 
 ## Laser warning sign
