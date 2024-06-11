@@ -27,9 +27,9 @@ attrs = dp.get_attribute_list()
 commands = dp.get_command_list()
 model = [device_name + '/' +
          attr for attr in attrs if not attr.startswith('hide_')]
-statistic_panel = ['start_statistics', 'shot',
-                   'statistics_shots', 'average', 'std']
-app = TaurusApplication(cmd_line_parser=None, app_name='gentec')
+statistic_panel = ['shot', 'statistics_shots',
+                   'average', 'std', 'start_statistics', ]
+app = TaurusApplication(cmd_line_parser=None, app_name=device_name)
 gui = TaurusGui()
 
 panel1 = Qt.QWidget()
@@ -73,18 +73,29 @@ gui.removePanel('Manual')
 
 # panel for trend
 panel2 = TaurusTrend()
-model2 = [f'{sys.argv[1]}/main_value_float']
+model2 = [f'{device_name}/main_value_float']
 panel2.setModel(model2)
 
 # panel for statistics
 panel3 = TaurusForm()
-form_model_3 = [i for i in model if i.split('/')[-1] in statistic_panel]
+statistic_panel.insert(0, 'main_value')
+form_model_3 = [device_name + '/' +
+                attr for attr in statistic_panel if not attr.startswith('hide_')]
+
 panel3.model = form_model_3
 # change the bool write to auto apply.
 for i in form_model_3:
     if i.split('/')[-1] in attrs and dp.attribute_query(i.split('/')[-1]).data_type == 1:
         idx = form_model_3.index(i)
         panel3[idx].writeWidgetClass = MyTaurusValueCheckBox
+
+# change font size
+for row in panel3:
+    for method_attr in ['readWidget', 'writeWidget', 'unitsWidget', 'labelWidget']:
+        col_widget = getattr(row, method_attr)()
+        if col_widget:
+            col_widget.setStyleSheet("font-size: 20px")
+
 
 gui.createPanel(panel1, 'parameters')
 gui.createPanel(panel3, 'statistics_numbers')
