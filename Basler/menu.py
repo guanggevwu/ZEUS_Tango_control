@@ -12,6 +12,7 @@ if True:
 
 class BaslerMenu(Menu):
     def __init__(self, root):
+        super().__init__()
         class_name = type(self).__name__.replace('Menu', '')
         root.title(f"{class_name} menu")
         frame1 = ttk.Frame(root, padding="3 3 12 12")
@@ -34,8 +35,8 @@ class BaslerMenu(Menu):
         device_names = self.db.get_device_name('*', class_name)
         instances = [e.split('/')[-1]
                      for e in self.servers if e.split('/')[0] == class_name]
-        self.menu_dict = {'start server': ['server.py', instances],
-                          'start Taurus GUI': ['GUI.py', tuple(device_names.value_string)]}
+        self.menu_dict = {'start server': ['server.py', instances, []],
+                          'start Taurus GUI': ['GUI.py', tuple(device_names.value_string), []]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             # value[0][:-3], i.e., 'gentec_server' is the attribute name
             setattr(self, value[0][:-3], StringVar())

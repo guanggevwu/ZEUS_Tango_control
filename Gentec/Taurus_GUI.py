@@ -28,7 +28,7 @@ commands = dp.get_command_list()
 model = [device_name + '/' +
          attr for attr in attrs if not attr.startswith('hide_')]
 statistic_panel = ['shot', 'statistics_shots',
-                   'average', 'std', 'start_statistics', ]
+                   'average', 'max', 'min', 'std',  'start_statistics', ]
 app = TaurusApplication(cmd_line_parser=None, app_name=device_name)
 gui = TaurusGui()
 

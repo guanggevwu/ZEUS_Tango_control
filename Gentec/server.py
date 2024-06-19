@@ -320,6 +320,30 @@ class GentecEO(Device):
         value, unit = self.format_unit(self._std, self._base_unit)
         return f'{value:.6f} {unit}'
 
+    max = attribute(
+        label="max",
+        dtype=str,
+        access=AttrWriteType.READ,
+        polling_period=polling,
+        doc='standard deviation since starting statistics'
+    )
+
+    def read_max(self):
+        value, unit = self.format_unit(self._max, self._base_unit)
+        return f'{value:.6f} {unit}'
+
+    min = attribute(
+        label="min",
+        dtype=str,
+        access=AttrWriteType.READ,
+        polling_period=polling,
+        doc='standard deviation since starting statistics'
+    )
+
+    def read_min(self):
+        value, unit = self.format_unit(self._min, self._base_unit)
+        return f'{value:.6f} {unit}'
+
     save_path = attribute(
         label='save path (file)',
         dtype=str,
@@ -520,6 +544,8 @@ class GentecEO(Device):
                     self._main_value)
                 self._average = np.mean(self._historical_data_number)
                 self._std = np.std(self._historical_data_number)
+                self._max = np.max(self._historical_data_number)
+                self._min = np.min(self._historical_data_number)
         # self.get_attribute_config('main_value')[
         #     0].unit = self._main_value_adjust_unit
         return f'{self._main_value_adjust:.6f} {self._main_value_adjust_unit}'
@@ -631,6 +657,8 @@ class GentecEO(Device):
         self._statistics_shots = 0
         self._average = 0
         self._std = 0
+        self._max = 0
+        self._min = 0
         Device.init_device(self)
         self.set_state(DevState.INIT)
         com_obj = self.find_com_number()
