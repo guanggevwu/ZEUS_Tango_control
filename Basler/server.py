@@ -21,7 +21,7 @@ logging.basicConfig(handlers=handlers,
 
 class Basler(Device):
     '''
-    save_data attribute. If save_data is True, the polling is manually controlled by the acquisition script, else the polling is made by the polling period "polling".
+    is_polling_periodically attribute. If is_polling_periodically is False, the polling is manually controlled by the acquisition script, else the polling is made by the polling period "polling".
     '''
     polling = 200
     polling_infinite = -1
@@ -140,7 +140,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized=True,
+        # hw_memorized=True,
     )
 
     offsetY = attribute(
@@ -148,7 +148,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized=True,
+        # hw_memorized=True,
     )
 
     format_pixel = attribute(
@@ -169,7 +169,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized=True,
+        # hw_memorized=True,
     )
 
     binning_vertical = attribute(
@@ -177,7 +177,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized=True,
+        # hw_memorized=True,
     )
 
     sensor_readout_mode = attribute(
@@ -217,9 +217,9 @@ class Basler(Device):
         return self.get_attribute_poll_period('is_new_image')
 
     def write_polling_period(self, value):
-        if self.camera.ExposureTimeAbs.Value/1000 > 0.9 * value * self._timeout_polling_ratio:
+        if self._exposure/1000 > 0.9 * value * self._timeout_polling_ratio:
             logging.info(
-                f'{value} ms is too short compared to the exposure time {self.camera.ExposureTimeAbs.Value/1000} ms. Minimum value is {self.camera.ExposureTimeAbs.Value/1000/0.9/self._timeout_polling_ratio}. Discard!')
+                f'{value} ms is too short compared to the exposure time {self._exposure/1000} ms. Minimum value is {self._exposure/1000/0.9/self._timeout_polling_ratio}. Discard!')
         else:
             self.poll_attribute('is_new_image', value)
 
@@ -232,17 +232,17 @@ class Basler(Device):
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
             unit="us",
-            min_value=self.camera.ExposureTimeAbs.Min,
-            max_value=self.camera.ExposureTimeAbs.Max
+            # min_value=self.camera.ExposureTimeAbs.Min,
+            # max_value=self.camera.ExposureTimeAbs.Max
         )
         gain = attribute(
             name="gain",
             label="gain",
-            dtype=int,
+            dtype=float,
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
-            min_value=self.camera.GainRaw.Min,
-            max_value=self.camera.GainRaw.Max
+            # min_value=self.camera.GainRaw.Min,
+            # max_value=self.camera.GainRaw.Max
         )
         width = attribute(
             name="width",
@@ -271,7 +271,11 @@ class Basler(Device):
         self.remove_attribute('sensor_readout_mode')
 
     def read_exposure(self, attr):
-        return self.camera.ExposureTimeAbs.Value
+        if self._model == "a2A1920-51gmBAS":
+            self._exposure = self.camera.ExposureTime.Value
+        else:
+            self._exposure = self.camera.ExposureTimeAbs.Value
+        return self._exposure
 
     def write_exposure(self, attr):
         if attr.get_write_value()/1000 > 0.9 * self._polling * self._timeout_polling_ratio:
@@ -279,13 +283,26 @@ class Basler(Device):
             self.poll_attribute('is_new_image', int(self._polling))
             logging.info(
                 f'Changed the image retrieve timeout to {self._polling} to match the long exposure time')
-        self.camera.ExposureTimeAbs.Value = attr.get_write_value()
+        # "a2A1920-51gmBAS" is the farfield camera
+        if self._model == "a2A1920-51gmBAS":
+            self.camera.ExposureTime.Value = attr.get_write_value()
+        else:
+            self.camera.ExposureTimeAbs.Value = attr.get_write_value()
+        self._exposure = attr.get_write_value()
 
     def read_gain(self, attr):
-        return self.camera.GainRaw()
+        if self._model == "a2A1920-51gmBAS":
+            self._gain = self.camera.Gain.Value
+        else:
+            self._gain = self.camera.GainRaw()
+        return float(self._gain)
 
     def write_gain(self, attr):
-        self.camera.GainRaw.Value = attr.get_write_value()
+        if self._model == "a2A1920-51gmBAS":
+            self.camera.Gain.Value = float(attr.get_write_value())
+        else:
+            self.camera.GainRaw.Value = int(attr.get_write_value())
+        self._gain = attr.get_write_value()
 
     def read_width(self, attr):
         return self.camera.Width()
@@ -302,19 +319,22 @@ class Basler(Device):
         self.camera.Height.Value = attr.get_write_value()
 
     def init_device(self):
-        super().init_device()
+        self._is_polling_periodically = False
         self._debug = False
+        self._save_data = False
+        super().init_device()
         self.set_state(DevState.INIT)
         self.idx = 0
         try:
             self.device = self.get_camera_device()
             if self.device is not None:
                 instance = pylon.TlFactory.GetInstance()
-
                 self.camera = pylon.InstantCamera(
                     instance.CreateDevice(self.device))
                 self.camera.Open()
-                self._is_polling_periodically = False
+                self.read_model()
+                self.read_exposure('')
+                self.read_frames_per_trigger()
                 self._polling = self.get_attribute_poll_period('is_new_image')
                 if self._polling == 0:
                     self._polling = self.polling
@@ -394,16 +414,17 @@ class Basler(Device):
         self._save_path = value
 
     def read_model(self):
-        return self.camera.GetDeviceInfo().GetModelName()
+        self._model = self.camera.GetDeviceInfo().GetModelName()
+        return self._model
 
     def read_format_pixel(self):
-        return self.camera.PixelFormat()
+        return self.camera.PixelFormat.Value
 
     def write_format_pixel(self, value):
         if type(value) == str:
-            self.camera.PixelFormat = value
+            self.camera.PixelFormat.Value = value
         else:
-            self.camera.PixelFormat = self.camera.PixelFormat()
+            self.camera.PixelFormat.Value = self.camera.PixelFormat()
 
     def read_offsetX(self):
         return self.camera.OffsetX()
@@ -475,13 +496,21 @@ class Basler(Device):
         self.get_ready()
 
     def read_frames_per_trigger(self):
-        return self.camera.AcquisitionFrameCount.Value
+        if self._model == "a2A1920-51gmBAS":
+            self._frames_per_trigger = self.camera.AcquisitionBurstFrameCount.Value
+        else:
+            self._frames_per_trigger = self.camera.AcquisitionFrameCount.Value
+        return self._frames_per_trigger
 
     def write_frames_per_trigger(self, value):
         is_grabbing = self.camera.IsGrabbing()
         if is_grabbing:
             self.camera.StopGrabbing()
-        self.camera.AcquisitionFrameCount.SetValue(value)
+        if self._model == "a2A1920-51gmBAS":
+            self.camera.AcquisitionBurstFrameCount.SetValue(value)
+        else:
+            self.camera.AcquisitionFrameCount.SetValue(value)
+        self._frames_per_trigger = value
         if is_grabbing:
             self.get_ready()
 
@@ -498,23 +527,33 @@ class Basler(Device):
 
     def read_fps(self):
         if self.camera.AcquisitionFrameRateEnable.Value:
-            return self.camera.AcquisitionFrameRateAbs.Value
+            if self._model == "a2A1920-51gmBAS":
+                self._fps = self.camera.AcquisitionFrameRate.Value
+            else:
+                self._fps = self.camera.AcquisitionFrameRateAbs.Value
+            return self._fps
         else:
             return 0
 
     def write_fps(self, value):
         if value:
             self.camera.AcquisitionFrameRateEnable.SetValue(True)
-            self.camera.AcquisitionFrameRateAbs.SetValue(value)
+            if self._model == "a2A1920-51gmBAS":
+                self.camera.AcquisitionFrameRate.SetValue(value)
+            else:
+                self.camera.AcquisitionFrameRateAbs.SetValue(value)
+            self._fps = value
         else:
             self.camera.AcquisitionFrameRateEnable.SetValue(False)
+            self._fps = 0
 
     def read_is_new_image(self):
         self.idx += 1
         self._is_new_image = False
         while self.camera.IsGrabbing():
+            # the retrieve time out may need to be reconsidered.
             grabResult = self.camera.RetrieveResult(
-                int(self._polling*self._timeout_polling_ratio), pylon.TimeoutHandling_Return)
+                int(100), pylon.TimeoutHandling_Return)
             if grabResult and grabResult.GrabSucceeded():
                 self._image = grabResult.Array
                 grabResult.Release()
@@ -542,7 +581,6 @@ class Basler(Device):
                     if self.i == self._grab_number:
                         self.get_ready()
                 return self._is_new_image
-            # the else statement may never be triggered. may delete later.
             else:
                 logging.info("Started grabbing but no images retrieved yet!")
                 return self._is_new_image
@@ -597,10 +635,11 @@ class Basler(Device):
             self.set_state(DevState.ON)
         else:
             self.i = 0
-            if self.camera.TriggerSelector.Value == 'FrameStart':
-                self._grab_number = 1
-            else:
-                self._grab_number = self.camera.AcquisitionFrameCount.Value * self._repetition
+            # if self.camera.TriggerSelector.Value == 'FrameStart':
+            #     self._grab_number = 20
+            # else:
+            #     self._grab_number = self._frames_per_trigger * self._repetition
+            self._grab_number = 9999
             # self.disable_polling('is_new_image')
             self.camera.StartGrabbingMax(
                 self._grab_number, pylon.GrabStrategy_OneByOne)

@@ -1,1 +1,3 @@
 scp -r qzhangqz@192.168.131.90:/home/qzhangqz/Tango/ZEUS_Tango_control/Gentec C:\Users\labuser\Desktop\zeus_code\ZEUS_Tango_control
+start Mariadb:
+sudo mariadb -u root -pmypassword
