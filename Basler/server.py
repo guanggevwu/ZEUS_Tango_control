@@ -271,7 +271,7 @@ class Basler(Device):
         self.remove_attribute('sensor_readout_mode')
 
     def read_exposure(self, attr):
-        if self._model == "a2A1920-51gmBAS":
+        if self._model in self.model_type:
             self._exposure = self.camera.ExposureTime.Value
         else:
             self._exposure = self.camera.ExposureTimeAbs.Value
@@ -284,21 +284,21 @@ class Basler(Device):
             logging.info(
                 f'Changed the image retrieve timeout to {self._polling} to match the long exposure time')
         # "a2A1920-51gmBAS" is the farfield camera
-        if self._model == "a2A1920-51gmBAS":
+        if self._model in self.model_type:
             self.camera.ExposureTime.Value = attr.get_write_value()
         else:
             self.camera.ExposureTimeAbs.Value = attr.get_write_value()
         self._exposure = attr.get_write_value()
 
     def read_gain(self, attr):
-        if self._model == "a2A1920-51gmBAS":
+        if self._model in self.model_type:
             self._gain = self.camera.Gain.Value
         else:
             self._gain = self.camera.GainRaw()
         return float(self._gain)
 
     def write_gain(self, attr):
-        if self._model == "a2A1920-51gmBAS":
+        if self._model in self.model_type:
             self.camera.Gain.Value = float(attr.get_write_value())
         else:
             self.camera.GainRaw.Value = int(attr.get_write_value())
@@ -319,6 +319,7 @@ class Basler(Device):
         self.camera.Height.Value = attr.get_write_value()
 
     def init_device(self):
+        self.model_type = ['a2A1920-51gmBAS', 'a2A2590-22gmBAS']
         self._is_polling_periodically = False
         self._debug = False
         self._save_data = False
@@ -496,7 +497,7 @@ class Basler(Device):
         self.get_ready()
 
     def read_frames_per_trigger(self):
-        if self._model == "a2A1920-51gmBAS":
+        if self._model in self.model_type:
             self._frames_per_trigger = self.camera.AcquisitionBurstFrameCount.Value
         else:
             self._frames_per_trigger = self.camera.AcquisitionFrameCount.Value
@@ -506,7 +507,7 @@ class Basler(Device):
         is_grabbing = self.camera.IsGrabbing()
         if is_grabbing:
             self.camera.StopGrabbing()
-        if self._model == "a2A1920-51gmBAS":
+        if self._model in self.model_type:
             self.camera.AcquisitionBurstFrameCount.SetValue(value)
         else:
             self.camera.AcquisitionFrameCount.SetValue(value)
@@ -527,7 +528,7 @@ class Basler(Device):
 
     def read_fps(self):
         if self.camera.AcquisitionFrameRateEnable.Value:
-            if self._model == "a2A1920-51gmBAS":
+            if self._model in self.model_type:
                 self._fps = self.camera.AcquisitionFrameRate.Value
             else:
                 self._fps = self.camera.AcquisitionFrameRateAbs.Value
@@ -538,7 +539,7 @@ class Basler(Device):
     def write_fps(self, value):
         if value:
             self.camera.AcquisitionFrameRateEnable.SetValue(True)
-            if self._model == "a2A1920-51gmBAS":
+            if self._model in self.model_type:
                 self.camera.AcquisitionFrameRate.SetValue(value)
             else:
                 self.camera.AcquisitionFrameRateAbs.SetValue(value)
