@@ -1,1 +1,1 @@
-1 pip install taurus-pyqtgraph==0.9.1
+Added a combined image for each shot
