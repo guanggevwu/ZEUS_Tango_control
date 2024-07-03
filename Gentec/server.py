@@ -21,7 +21,7 @@ logging.basicConfig(handlers=handlers,
 
 class GentecEO(Device):
 
-    polling = 500
+    polling = 200
     waiting = 0.1
     # is_memorized = True means the previous entered set value is remembered and is only for Read_WRITE access. For example in GUI, the previous set value,instead of 0, will be shown at the set value field.
     # hw_memorized=True, means the set value is written at the initialization step. Some of the properties are remembered in the camera's memory, so no need to remember them.
@@ -65,7 +65,6 @@ class GentecEO(Device):
     read_time = attribute(
         label="read time",
         dtype="str",
-        polling_period=polling,
         access=AttrWriteType.READ,
     )
 
@@ -220,7 +219,6 @@ class GentecEO(Device):
         dtype=bool,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized=True,
         doc='save the data'
     )
 
@@ -252,7 +250,7 @@ class GentecEO(Device):
                 self._shot = int(row[0]) + 1
             if idx == -1:
                 self.should_write_header = True
-                self._shot = 0
+                self._shot = 1
 
     def save_data_to_file(self):
         self.get_existing_rows()
@@ -273,23 +271,23 @@ class GentecEO(Device):
             for key in fieldnames:
                 row_dict[key] = getattr(self, f'_{key}')
             writer.writerow(row_dict)
+            # add 1 shot after saving
+            self._shot += 1
 
     shot = attribute(
         label="shot # (saved)",
         dtype=int,
         access=AttrWriteType.READ,
-        polling_period=polling,
         doc='shot number'
     )
 
     def read_shot(self):
-        return self._shot
+        return self._shot-1
 
     statistics_shots = attribute(
         label="shot # (statistics)",
         dtype=int,
         access=AttrWriteType.READ,
-        polling_period=polling,
         doc='shot number'
     )
 
@@ -300,7 +298,6 @@ class GentecEO(Device):
         label="average",
         dtype=str,
         access=AttrWriteType.READ,
-        polling_period=polling,
         doc='average since starting statistics'
     )
 
@@ -312,7 +309,6 @@ class GentecEO(Device):
         label="std",
         dtype=str,
         access=AttrWriteType.READ,
-        polling_period=polling,
         doc='standard deviation since starting statistics'
     )
 
@@ -324,7 +320,6 @@ class GentecEO(Device):
         label="max",
         dtype=str,
         access=AttrWriteType.READ,
-        polling_period=polling,
         doc='standard deviation since starting statistics'
     )
 
@@ -336,7 +331,6 @@ class GentecEO(Device):
         label="min",
         dtype=str,
         access=AttrWriteType.READ,
-        polling_period=polling,
         doc='standard deviation since starting statistics'
     )
 
@@ -365,7 +359,7 @@ class GentecEO(Device):
 
     def create_save_file(self, path):
         if os.path.isfile(path):
-            print(f'{path} exists!')
+            print(f'{path} exists! New data will be appended to it.')
             return True
         else:
             try:
@@ -400,7 +394,6 @@ class GentecEO(Device):
         dtype=((str,),),
         max_dim_x=100,
         max_dim_y=10000,
-        polling_period=polling,
         access=AttrWriteType.READ,
     )
 
@@ -411,7 +404,6 @@ class GentecEO(Device):
         label="Historical data plot",
         dtype=(float,),
         max_dim_x=10000,
-        polling_period=polling,
         access=AttrWriteType.READ,
     )
 
@@ -481,7 +473,6 @@ class GentecEO(Device):
             format='.12e',
             unit=self._base_unit,
             access=AttrWriteType.READ,
-            polling_period=self.polling,
             doc='reading in float format'
         )
 
@@ -512,42 +503,60 @@ class GentecEO(Device):
         else:
             self.add_attribute(set_zero)
 
+    def do_things_if_new(self):
+        self._new = True
+        self._read_time = datetime.datetime.now().strftime("%H:%M:%S.%f %m/%d")
+        if self._debug:
+            print(
+                f'New data is acquired. {self._main_value_adjust} {self._main_value_adjust_unit} at {self._read_time}')
+        if self._save_data:
+            self.save_data_to_file()
+            self.push_change_event("shot", self.read_shot())
+        if self._start_statistics:
+            self._statistics_shots = len(self._historical_data)-1
+            self._historical_data.append(
+                [str(self._statistics_shots), self._read_time, f'{self._main_value_adjust} {self._main_value_adjust_unit}'])
+            self._historical_data_number.append(
+                self._main_value)
+            self._average = np.mean(self._historical_data_number)
+            self._std = np.std(self._historical_data_number)
+            self._max = np.max(self._historical_data_number)
+            self._min = np.min(self._historical_data_number)
+    # self.get_attribute_config('main_value')[
+    #     0].unit = self._main_value_adjust_unit
+            self.push_change_event(
+                "statistics_shots", self.read_statistics_shots())
+            self.push_change_event("average", self.read_average())
+            self.push_change_event("std", self.read_std())
+            self.push_change_event("max", self.read_max())
+            self.push_change_event("min", self.read_min())
+            self.push_change_event(
+                "historical_data_number", self.read_historical_data_number())
+            self.push_change_event(
+                "historical_data", self.read_historical_data())
+
     def read_main_value(self, attr):
-        # check if it is new data
+        # check if it is new data. The sequence is important. Must check if this is new first then read. If read first, then it is always old.
         if self._model != "PH100-Si-HA-OD1":
             self.device.write(b'*NVU')
             reply = self.device.readline().strip().decode()
             # no new data message is "New Data Not Available"
             if 'not' not in reply.lower():
                 self._new = True
-                self._read_time = datetime.datetime.now().strftime("%H:%M:%S %m/%d")
             else:
                 self._new = False
         else:
-            self._read_time = datetime.datetime.now().strftime("%H:%M:%S %m/%d")
+            self._new = True
+
         self.device.write(b'*CVU')
         self._main_value = self.device.readline().strip().decode()
         self._main_value = float(self._main_value)
         self._main_value_adjust, self._main_value_adjust_unit = self.format_unit(
             self._main_value, self._base_unit)
+        self.push_change_event(
+            "main_value_float", self.read_main_value_float('placeholder'))
         if self._new:
-            if self._debug:
-                print(
-                    f'New data is acquired. {self._main_value_adjust} {self._main_value_adjust_unit} at {self._read_time}')
-            if self._save_data:
-                self.save_data_to_file()
-            if self._start_statistics:
-                self._statistics_shots = len(self._historical_data)-1
-                self._historical_data.append(
-                    [str(self._statistics_shots), self._read_time, f'{self._main_value_adjust} {self._main_value_adjust_unit}'])
-                self._historical_data_number.append(
-                    self._main_value)
-                self._average = np.mean(self._historical_data_number)
-                self._std = np.std(self._historical_data_number)
-                self._max = np.max(self._historical_data_number)
-                self._min = np.min(self._historical_data_number)
-        # self.get_attribute_config('main_value')[
-        #     0].unit = self._main_value_adjust_unit
+            self.do_things_if_new()
         return f'{self._main_value_adjust:.6f} {self._main_value_adjust_unit}'
 
     def read_main_value_float(self, attr):
@@ -653,7 +662,8 @@ class GentecEO(Device):
         self._start_statistics = False
         self._save_path = ''
         self._save_data = False
-        self._shot = 0
+        # shot is next shot number which will be saved to text file. read_shot returns self._shot -1
+        self._shot = 1
         self._statistics_shots = 0
         self._average = 0
         self._std = 0
