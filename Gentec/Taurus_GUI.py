@@ -1,4 +1,4 @@
-from taurus_pyqtgraph import TaurusTrend
+from taurus_pyqtgraph import TaurusTrend, TaurusPlot
 from taurus.qt.qtgui.application import TaurusApplication
 from taurus.qt.qtgui.taurusgui import TaurusGui
 from taurus.external.qt import Qt
@@ -72,8 +72,8 @@ for key, value in dropdown.items():
 gui.removePanel('Manual')
 
 # panel for trend
-panel2 = TaurusTrend()
-model2 = [f'{device_name}/main_value_float']
+panel2 = TaurusPlot()
+model2 = [f'{device_name}/historical_data_number']
 panel2.setModel(model2)
 
 # panel for statistics
