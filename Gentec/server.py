@@ -252,7 +252,7 @@ class GentecEO(Device):
                 self._shot = int(row[0]) + 1
             if idx == -1:
                 self.should_write_header = True
-                self._shot = 1
+                self._shot = 0
 
     def save_data_to_file(self):
         self.get_existing_rows()
