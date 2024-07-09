@@ -11,16 +11,19 @@ if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
 
-# TriggerSource = type('TriggerSource', (TaurusValueComboBox,), {
-#                      '__init__': add_value_pairs((('Off', 'Off'), ('Software', 'Software')))})
+import argparse
 
+parser = argparse.ArgumentParser(description='GUI for Gentec-EO devices')
+parser.add_argument('device', default='test/gentec/1', nargs='?',
+                    help="device full name")
+parser.add_argument('-p', '--polling', type=int, default=200,
+                    help="polling period")
+parser.add_argument('-c', '--compact', action='store_true')
+args = parser.parse_args()
 
-# if the polling periods in Taurus is shorter than these in Tango, it either doesn't work or is wasted.
-# if the polling periods in Taurus is longer than these in Tango, it only retrives part of information from the server.
-# changeDefaultPollingPeriod(500)
-device_name = sys.argv[1] if len(sys.argv) > 1 else 'test/gentec/1'
-changeDefaultPollingPeriod(200)
-changeDefaultPollingPeriod(sys.argv[2]) if len(sys.argv) > 2 else None
+device_name = args.device
+changeDefaultPollingPeriod(args.polling)
+is_form_compact = args.compact
 dp = Device(device_name)
 
 attrs = dp.get_attribute_list()
@@ -39,9 +42,8 @@ panel1.setLayout(panel1_layout)
 
 panel1_w1 = TaurusForm()
 
-
 form_model = [i for i in model if i.split('/')[-1] not in statistic_panel]
-order_list = ['model', 'main_value', 'read_time', 'save_data',
+order_list = ['model', 'main_value', 'read_time', 'save_data', 'is_use_default_path',
               'save_path', 'display_range', 'auto_range', 'wavelength']
 for idx, attr in enumerate(order_list):
     form_model.remove(f'{device_name}/{attr}')
@@ -49,12 +51,7 @@ for idx, attr in enumerate(order_list):
 
 panel1_w1.model = form_model
 panel1_layout.addWidget(panel1_w1)
-
-# change the bool write to auto apply.
-for i in form_model:
-    if i.split('/')[-1] in attrs and dp.attribute_query(i.split('/')[-1]).data_type == 1:
-        idx = form_model.index(i)
-        panel1_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
+panel1_w1.compact = is_form_compact
 
 # TaurusLabel auto trim function not work in TaurusForm
 # change the text write widget to dropdown list and set auto apply
@@ -65,13 +62,17 @@ if dp.model == "PH100-Si-HA-OD1":
     dropdown['measure_mode'] = (('Power', '0'), ('SSE', '2'))
 else:
     dropdown['measure_mode'] = (('Energy', '1'), ('SSE', '2'))
-for key, value in dropdown.items():
-    idx = form_model.index(f'{device_name}/{key}')
-    panel1_w1[idx].writeWidgetClass = create_my_dropdown_list_class(key, value)
 
-gui.removePanel('Manual')
+# change the bool write to auto apply.
+for idx, full_attr in enumerate(form_model):
+    if full_attr.split('/')[-1] in attrs and dp.attribute_query(full_attr.split('/')[-1]).data_type == 1:
+        panel1_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
+    if full_attr.split('/')[-1] in dropdown:
+        panel1_w1[idx].writeWidgetClass = create_my_dropdown_list_class(
+            full_attr.split('/')[-1], dropdown[full_attr.split('/')[-1]])
+    # if full_attr.split('/')[-1] == 'save_path':
+    #     panel1_w1[idx].setCompact(True)
 
-# panel for trend
 panel2 = TaurusPlot()
 model2 = [f'{device_name}/historical_data_number']
 panel2.setModel(model2)
@@ -97,6 +98,9 @@ for row in panel3:
             col_widget.setStyleSheet("font-size: 20px")
 
 
+panel3.compact = is_form_compact
+
+gui.removePanel('Manual')
 gui.createPanel(panel1, 'parameters')
 gui.createPanel(panel3, 'statistics_numbers')
 gui.createPanel(panel2, 'statistics_trend')

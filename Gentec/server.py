@@ -274,6 +274,44 @@ class GentecEO(Device):
             # add 1 shot after saving
             self._shot += 1
 
+    is_use_default_path = attribute(
+        label="default save path",
+        dtype=bool,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        hw_memorized=True,
+        doc='The default saving path is "Z:\Laser Beam Images\gentec\[device_name]\[date]_[device_name].csv". This will disable the save path below.'
+    )
+
+    def read_is_use_default_path(self):
+        self._is_use_default_path_read_count += 1
+        if self._is_use_default_path and self._is_use_default_path_read_count > 99:
+            self.overwrite_save_path_with_default(
+                create_info=False, auto_change_info=True)
+        return self._is_use_default_path
+
+    def write_is_use_default_path(self, value):
+        if value:
+            self.overwrite_save_path_with_default()
+        self._is_use_default_path = value
+
+    def overwrite_save_path_with_default(self, create_info=True, auto_change_info=False):
+        date = datetime.datetime.now().date().strftime("%Y%m%d")
+        new_path = f"Z:\\Laser Beam Images\\gentec\\{self.friendly_name}\\{date}_{self.friendly_name}.csv"
+        if self.create_save_file(new_path, create_info):
+            if hasattr(self, '_save_path'):
+                if self._save_path != new_path:
+                    if auto_change_info:
+                        logging.info(
+                            f'Save path is automatically changed to from "{self._save_path}" to "{new_path}" since today is a new day.')
+                    else:
+                        logging.info(
+                            f'Save path is changed to from "{self._save_path}" to "{new_path}".')
+            else:
+                logging.info(
+                    f'Save path is initialized to "{new_path}".')
+            self._save_path = new_path
+
     shot = attribute(
         label="shot # (saved)",
         dtype=int,
@@ -343,32 +381,34 @@ class GentecEO(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized=True,
         doc='save data path, use ";" to separate multiple paths'
     )
 
     def read_save_path(self):
-        if len(self._save_path) > 20:
-            return f'{self._save_path[0:10]}...{self._save_path[-10:-1]}'
-        else:
-            return self._save_path
+        return self._save_path
 
     def write_save_path(self, value):
         if self.create_save_file(value):
-            self._save_path = value
+            if self._save_path != value:
+                self._save_path = value
+                self.write_is_use_default_path(False)
 
-    def create_save_file(self, path):
+    def create_save_file(self, path, info=True):
         if os.path.isfile(path):
-            print(f'{path} exists! New data will be appended to it.')
+            if info:
+                logging.info(
+                    f'{path} exists! New data will be appended to it.')
             return True
         else:
             try:
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, "w") as my_empty_csv:
-                    print(f'{path} created!')
+                    if info:
+                        logging.info(f'{path} created!')
                     return True
             except:
-                print('create failed')
+                if info:
+                    logging.info('create failed')
                 return False
 
     start_statistics = attribute(
@@ -656,11 +696,12 @@ class GentecEO(Device):
         self._set_zero = value
 
     def init_device(self):
+        self._is_use_default_path = True
+        self._is_use_default_path_read_count = 0
         self._debug = 0
         self._historical_data = [['time', 'value']]
         self._historical_data_number = []
         self._start_statistics = False
-        self._save_path = ''
         self._save_data = False
         # shot is next shot number which will be saved to text file. read_shot returns self._shot -1
         self._shot = 1

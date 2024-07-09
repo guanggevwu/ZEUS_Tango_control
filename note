@@ -1,0 +1,11 @@
+scp -r C:\Users\User\Desktop\code\ZEUS_Tango_control\Basler\basler_client_GUI.py qzhangqz@141.213.13.38:/home/qzhangqz/dev/tango_project/tango/pytango_dev/Basler/
+push_change_event seems only push change to Taurus instead of CLI
+if server polling is not set, taurus will use its own polling and will call read_attr at its polling rate, except for 2D images (will not poll). Besides, it will do a instant read_attr after write_attr. If Taurus is not start, there will be no polling. When you read the attr, the read_attr function will be execute.
+if server is set to polling to a number, read_attr will be called at the server polling rate and it will be called at server start. Taurus will not call read_attr, so it won't affect other client when server polling is set. CLI will not call read_attr before polling period is reached.
+
+if Tango polling period < Taurus polling period, Taurus GUI will use Tango polling period only for str (not for 2D array with image module and int with label).
+if Tango polling period > Taurus polling period, Taurus GUI will use Tango polling period.
+
+To disable polling when using Taurus, set server polling to a large number.
+
+self.push_change_event will push changes to attr value but not to the Taurus GUI. For 2D image attr with taurus image module, push event will change GUI. Taurus GUI still uses the polling period defined by server or itself.

@@ -14,30 +14,27 @@ if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
 
-# TriggerSource = type('TriggerSource', (TaurusValueComboBox,), {
-#                      '__init__': add_value_pairs((('Off', 'Off'), ('Software', 'Software')))})
+import argparse
 
+parser = argparse.ArgumentParser(description='GUI for Gentec-EO devices')
+parser.add_argument('device', default='test/gentec/1', nargs='?',
+                    help="device full name")
+parser.add_argument('-p', '--polling', type=int, default=3000,
+                    help="polling period")
+parser.add_argument('-c', '--compact', action='store_true')
+args = parser.parse_args()
 
-# if the polling periods in Taurus is shorter than these in Tango, it either doesn't work or is wasted.
-# if the polling periods in Taurus is longer than these in Tango, it only retrives part of information from the server.
-if len(sys.argv) > 1:
-    device_name = sys.argv[1]
-else:
-    raise NameError("name 'device_name' is not defined")
+device_name = args.device
+changeDefaultPollingPeriod(args.polling)
+is_form_compact = args.compact
 
 exclude = ['is_new_image']
-changeDefaultPollingPeriod(int(sys.argv[2])) if len(sys.argv) > 2 else None
 dp = Device(device_name)
 
 attrs = dp.get_attribute_list()
 commands = dp.get_command_list()
 model = [device_name] + [device_name + '/' +
                          attr for attr in attrs if attr not in exclude]
-
-
-# with open("modification.json") as outfile:
-#     modification = json.load(outfile)
-
 
 app = TaurusApplication(cmd_line_parser=None,
                         app_name=sys.argv[1].replace('/', '_'))
@@ -83,18 +80,17 @@ form_model.insert(trigger_selector_idx+2, f'{device_name}/gain')
 panel2_w1.model = form_model
 panel2_layout.addWidget(panel2_w1)
 
-# change the bool write to auto apply.
-for i in form_model:
-    if i.split('/')[-1] in attrs and dp.attribute_query(i.split('/')[-1]).data_type == 1:
-        idx = form_model.index(i)
-        panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
-
 # change the text write widget to dropdown list and set auto apply
 dropdown = {'trigger_source': (('Off', 'Off'), ('Software', 'Software'), ('External', 'Line1')), 'trigger_selector': (
     ('AcquisitionStart', 'AcquisitionStart'), ('FrameStart', 'FrameStart')), }
-for key, value in dropdown.items():
-    idx = form_model.index(f'{device_name}/{key}')
-    panel2_w1[idx].writeWidgetClass = create_my_dropdown_list_class(key, value)
+for idx, full_attr in enumerate(form_model):
+    # change the bool write to auto apply.
+    if full_attr.split('/')[-1] in attrs and dp.attribute_query(full_attr.split('/')[-1]).data_type == 1:
+        idx = form_model.index(full_attr)
+        panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
+    if full_attr.split('/')[-1] in dropdown:
+        panel2_w1[idx].writeWidgetClass = create_my_dropdown_list_class(
+            full_attr.split('/')[-1], dropdown[full_attr.split('/')[-1]])
 
 gui.createPanel(panel2, 'parameters')
 gui.removePanel('Manual')

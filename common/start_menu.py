@@ -27,8 +27,10 @@ class Menu:
         if self.menu_dict[key][2] and "server" in key:
             print(f'{key} was already started. Ignore the operation.')
         else:
+            if len(input_txt.split()) > 1:
+                input_txt = input_txt.split()
             p = subprocess.Popen(
-                [f'{self.python_path}', f'{script_path}', f'{input_txt}'])
+                [f'{self.python_path}', f'{script_path}', input_txt])
             self.menu_dict[key][2].append(p.pid)
             print(f'{p.pid} is started')
 

@@ -81,7 +81,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        doc='save the images or not'
+        doc='save the images on the server'
     )
 
     save_path = attribute(
@@ -90,7 +90,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        doc='save data path, use ";" to seperate multiple paths'
+        doc='save data path on the server, use ";" to seperate multiple paths'
     )
 
     trigger_source = attribute(
@@ -400,12 +400,12 @@ class Basler(Device):
         if not hasattr(self, '_save_path'):
             self._save_path = os.path.join(
                 os.path.dirname(__file__), 'basler_tmp_data')
-        if len(self._save_path) > 20:
-            if ";" in self._save_path:
-                return ";".join([f'{e[0:2]}...{e[-2:-1]}' for e in self._save_path.split(';')])
-            return f'{self._save_path[0:5]}...{self._save_path[-5:-1]}'
-        else:
-            return self._save_path
+        # if len(self._save_path) > 20:
+        #     if ";" in self._save_path:
+        #         return ";".join([f'{e[0:2]}...{e[-2:-1]}' for e in self._save_path.split(';')])
+        #     return f'{self._save_path[0:5]}...{self._save_path[-5:]}'
+        # else:
+        return self._save_path
 
     def write_save_path(self, value):
         try:
@@ -572,19 +572,18 @@ class Basler(Device):
                         image_name = f'{now}.tiff'
                         data.save(os.path.join(path, image_name))
                 self._is_new_image = True
-                self.push_change_event("image", self._image)
+                # self.push_change_event("image", self._image)
+                self.push_change_event("image", self.read_image())
                 # show image count while not in live mode
                 if self.read_trigger_source().lower() != "off":
                     self.i += 1
                     logging.info(
-                        f'{self.i}/{self._grab_number}')
-                    # get ready after successfully acquiring a set of images
-                    if self.i == self._grab_number:
-                        self.get_ready()
-                return self._is_new_image
+                        f'{self.i}')
             else:
-                logging.info("Started grabbing but no images retrieved yet!")
-                return self._is_new_image
+                if self._debug:
+                    logging.info(
+                        "Started grabbing but no images retrieved yet!")
+            return self._is_new_image
         if self._debug:
             logging.info(
                 f"{self.idx} old images. mean intensity: {np.mean(self._image)}")
@@ -592,11 +591,7 @@ class Basler(Device):
         return self._is_new_image
 
     def read_image(self):
-        if self._debug:
-            if self._is_new_image:
-                logging.info("getting new images.")
-            else:
-                logging.info("getting old images.")
+        # now read_image() is only triggered when it is a new image.
         return self._image
 
     def disable_polling(self, attr):
@@ -608,21 +603,6 @@ class Basler(Device):
         if not self.is_attribute_polled(attr):
             self.poll_attribute(attr, self._polling)
             logging.info(f'polling period of {attr} is set to {self._polling}')
-
-    # @command()
-    # def image_reader(self):
-    #     # <- with this line we force change event generation, and transmitting new image
-    #     if self._is_new_image:
-    #         logging.info("sending push event")
-    #         self.push_change_event("image", self._image)
-    #     else:
-    #         logging.info("No sending since it is an old image")
-
-    # @command()
-    # def ext_sent(self):
-    #     # I don't find a way to know if an external trigger is received. Using camera.RetrieveResult(2000, pylon.TimeoutHandling_ThrowException) is bad because the timeout is too long.
-    #     if not self._save_data:
-    #         self.enable_polling('is_new_image')
 
     @command()
     def get_ready(self):
@@ -636,12 +616,7 @@ class Basler(Device):
             self.set_state(DevState.ON)
         else:
             self.i = 0
-            # if self.camera.TriggerSelector.Value == 'FrameStart':
-            #     self._grab_number = 20
-            # else:
-            #     self._grab_number = self._frames_per_trigger * self._repetition
             self._grab_number = 9999
-            # self.disable_polling('is_new_image')
             self.camera.StartGrabbingMax(
                 self._grab_number, pylon.GrabStrategy_OneByOne)
             logging.info(
