@@ -219,6 +219,7 @@ class GentecEO(Device):
         dtype=bool,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
+        hw_memorized=True,
         doc='save the data'
     )
 
@@ -233,11 +234,11 @@ class GentecEO(Device):
         return self._save_data
 
     def write_save_data(self, value):
-        if self._save_data != value:
-            self._save_data = value
-            if value:
-                self.write_save_path(self._save_path)
-                self.get_existing_rows()
+        if value:
+            if not hasattr(self, '_save_path'):
+                return
+            self.write_save_path(self._save_path, uncheck_default=False)
+        self._save_data = value
 
     def get_existing_rows(self):
         with open(self._save_path) as csvfile:
@@ -285,32 +286,19 @@ class GentecEO(Device):
 
     def read_is_use_default_path(self):
         self._is_use_default_path_read_count += 1
-        if self._is_use_default_path and self._is_use_default_path_read_count > 99:
-            self.overwrite_save_path_with_default(
-                create_info=False, auto_change_info=True)
+        if self._is_use_default_path and self._is_use_default_path_read_count > 299:
+            date = datetime.datetime.now().date().strftime("%Y%m%d")
+            new_path = f"Z:\\Laser Beam Images\\gentec\\{self.friendly_name}\\{date}_{self.friendly_name}.csv"
+            self.write_save_path(new_path, uncheck_default=False)
+            self_is_use_default_path_read_count = 0
         return self._is_use_default_path
 
     def write_is_use_default_path(self, value):
         if value:
-            self.overwrite_save_path_with_default()
+            date = datetime.datetime.now().date().strftime("%Y%m%d")
+            new_path = f"Z:\\Laser Beam Images\\gentec\\{self.friendly_name}\\{date}_{self.friendly_name}.csv"
+            self.write_save_path(new_path, uncheck_default=False)
         self._is_use_default_path = value
-
-    def overwrite_save_path_with_default(self, create_info=True, auto_change_info=False):
-        date = datetime.datetime.now().date().strftime("%Y%m%d")
-        new_path = f"Z:\\Laser Beam Images\\gentec\\{self.friendly_name}\\{date}_{self.friendly_name}.csv"
-        if self.create_save_file(new_path, create_info):
-            if self._save_path:
-                if self._save_path != new_path:
-                    if auto_change_info:
-                        logging.info(
-                            f'Save path is automatically changed to from "{self._save_path}" to "{new_path}" since today is a new day.')
-                    else:
-                        logging.info(
-                            f'Save path is changed to from "{self._save_path}" to "{new_path}".')
-            else:
-                logging.info(
-                    f'Save path is initialized to "{new_path}".')
-            self._save_path = new_path
 
     shot = attribute(
         label="shot # (saved)",
@@ -387,11 +375,13 @@ class GentecEO(Device):
     def read_save_path(self):
         return self._save_path
 
-    def write_save_path(self, value):
+    def write_save_path(self, value, uncheck_default=True):
         if self.create_save_file(value):
-            if self._save_path != value:
-                self._save_path = value
+            self._save_path = value
+            if uncheck_default:
                 self.write_is_use_default_path(False)
+            if self.read_save_data():
+                self.get_existing_rows()
 
     def create_save_file(self, path, info=True):
         if os.path.isfile(path):

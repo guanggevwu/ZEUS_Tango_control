@@ -16,7 +16,7 @@ import argparse
 parser = argparse.ArgumentParser(description='GUI for Gentec-EO devices')
 parser.add_argument('device', default='test/gentec/1', nargs='?',
                     help="device full name")
-parser.add_argument('-p', '--polling', type=int, default=200,
+parser.add_argument('-p', '--polling', type=int, default=500,
                     help="polling period")
 parser.add_argument('-c', '--compact', action='store_true')
 args = parser.parse_args()
