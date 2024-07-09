@@ -299,7 +299,6 @@ class GentecEO(Device):
         date = datetime.datetime.now().date().strftime("%Y%m%d")
         new_path = f"Z:\\Laser Beam Images\\gentec\\{self.friendly_name}\\{date}_{self.friendly_name}.csv"
         if self.create_save_file(new_path, create_info):
-            print(self._save_path)
             if self._save_path:
                 if self._save_path != new_path:
                     if auto_change_info:
