@@ -299,7 +299,8 @@ class GentecEO(Device):
         date = datetime.datetime.now().date().strftime("%Y%m%d")
         new_path = f"Z:\\Laser Beam Images\\gentec\\{self.friendly_name}\\{date}_{self.friendly_name}.csv"
         if self.create_save_file(new_path, create_info):
-            if hasattr(self, '_save_path'):
+            print(self._save_path)
+            if self._save_path:
                 if self._save_path != new_path:
                     if auto_change_info:
                         logging.info(
@@ -703,6 +704,7 @@ class GentecEO(Device):
         self._historical_data_number = []
         self._start_statistics = False
         self._save_data = False
+        self._save_path = ''
         # shot is next shot number which will be saved to text file. read_shot returns self._shot -1
         self._shot = 1
         self._statistics_shots = 0
