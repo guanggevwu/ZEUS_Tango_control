@@ -290,7 +290,7 @@ class GentecEO(Device):
             date = datetime.datetime.now().date().strftime("%Y%m%d")
             new_path = f"Z:\\Laser Beam Images\\gentec\\{self.friendly_name}\\{date}_{self.friendly_name}.csv"
             self.write_save_path(new_path, uncheck_default=False)
-            self_is_use_default_path_read_count = 0
+            self._is_use_default_path_read_count = 0
         return self._is_use_default_path
 
     def write_is_use_default_path(self, value):
