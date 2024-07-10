@@ -6,9 +6,13 @@
 
 1. Make sure the device is not used by vendor software.
 2. Open a terminal. Enter the following command and replace the path if it is different on the computer:
-   cd .\Desktop\zeus_cde\ZEUS_Tango_control\
+
+```
+   cd .\Desktop\zeus_code\ZEUS_Tango_control\
    .\venv\Scripts\Activate.ps1
    python .\Gentec\menu.py
+```
+
 3. On the popup window, select correct device name (for example "MA1") and "start server". In the terminal, it should show something similar to
    "Genotec-eo device is connected. Model: PH100-Si-HA-OD1. Serial number: 268995"
 
