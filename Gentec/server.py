@@ -329,18 +329,17 @@ class GentecEO(Device):
 
     def read_average(self):
         value, unit = self.format_unit(self._average, self._base_unit)
-        return f'{value:.6f} {unit}'
+        return f'{value:.4f} {unit}'
 
-    std = attribute(
-        label="std",
+    rsd = attribute(
+        label="rsd",
         dtype=str,
         access=AttrWriteType.READ,
-        doc='standard deviation since starting statistics'
+        doc='relative standard deviation since starting statistics'
     )
 
-    def read_std(self):
-        value, unit = self.format_unit(self._std, self._base_unit)
-        return f'{value:.6f} {unit}'
+    def read_rsd(self):
+        return f'{self._rsd*100:.4f}%'
 
     max = attribute(
         label="max",
@@ -351,7 +350,7 @@ class GentecEO(Device):
 
     def read_max(self):
         value, unit = self.format_unit(self._max, self._base_unit)
-        return f'{value:.6f} {unit}'
+        return f'{value:.4f} {unit}'
 
     min = attribute(
         label="min",
@@ -362,7 +361,7 @@ class GentecEO(Device):
 
     def read_min(self):
         value, unit = self.format_unit(self._min, self._base_unit)
-        return f'{value:.6f} {unit}'
+        return f'{value:.4f} {unit}'
 
     save_path = attribute(
         label='save path (file)',
@@ -490,7 +489,7 @@ class GentecEO(Device):
             label="reading",
             dtype=str,
             # unit=self._base_unit,
-            # format='9.6f',
+            # format='9.4f',
             access=AttrWriteType.READ,
             polling_period=self.polling,
             doc='reading value (energy or power)'
@@ -549,7 +548,7 @@ class GentecEO(Device):
             self._historical_data_number.append(
                 self._main_value)
             self._average = np.mean(self._historical_data_number)
-            self._std = np.std(self._historical_data_number)
+            self._rsd = np.std(self._historical_data_number)/self._average
             self._max = np.max(self._historical_data_number)
             self._min = np.min(self._historical_data_number)
     # self.get_attribute_config('main_value')[
@@ -557,7 +556,7 @@ class GentecEO(Device):
             self.push_change_event(
                 "statistics_shots", self.read_statistics_shots())
             self.push_change_event("average", self.read_average())
-            self.push_change_event("std", self.read_std())
+            self.push_change_event("rsd", self.read_rsd())
             self.push_change_event("max", self.read_max())
             self.push_change_event("min", self.read_min())
             self.push_change_event(
@@ -587,7 +586,7 @@ class GentecEO(Device):
             "main_value_float", self.read_main_value_float('placeholder'))
         if self._new:
             self.do_things_if_new()
-        return f'{self._main_value_adjust:.6f} {self._main_value_adjust_unit}'
+        return f'{self._main_value_adjust:.4f} {self._main_value_adjust_unit}'
 
     def read_main_value_float(self, attr):
         return self._main_value
@@ -698,7 +697,7 @@ class GentecEO(Device):
         self._shot = 1
         self._statistics_shots = 0
         self._average = 0
-        self._std = 0
+        self._rsd = 0
         self._max = 0
         self._min = 0
         Device.init_device(self)
