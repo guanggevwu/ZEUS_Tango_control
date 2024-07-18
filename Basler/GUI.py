@@ -10,18 +10,14 @@ from taurus.qt.qtgui.display import TaurusLabel
 import sys
 import json
 import os
+import tango
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
+    from common.TaurusGUI_Argparse import TaurusArgparse
 
-import argparse
-
-parser = argparse.ArgumentParser(description='GUI for Gentec-EO devices')
-parser.add_argument('device', default='test/gentec/1', nargs='?',
-                    help="device full name")
-parser.add_argument('-p', '--polling', type=int, default=3000,
-                    help="polling period")
-parser.add_argument('-c', '--compact', action='store_true')
+parser = TaurusArgparse(
+    description='GUI for Basler camera', device_default='test/basler/1')
 args = parser.parse_args()
 
 device_name = args.device
@@ -40,10 +36,41 @@ app = TaurusApplication(cmd_line_parser=None,
                         app_name=sys.argv[1].replace('/', '_'))
 gui = TaurusGui()
 
+# panel 1
 panel1 = Qt.QWidget()
 panel1_layout = Qt.QVBoxLayout()
 panel1.setLayout(panel1_layout)
 
+# sets of widgets. Labels in top.
+panel1_shot = Qt.QWidget()
+panel1_shot_layout = Qt.QHBoxLayout()
+panel1_shot.setLayout(panel1_shot_layout)
+panel1_image_shot_w1, panel1_image_shot_w2 = TaurusLabel(), TaurusLabel()
+panel1_image_shot_w1.model, panel1_image_shot_w1.bgRole = device_name + \
+    '/' + 'image_number#label', ''
+panel1_image_shot_w2.model = device_name + '/' + 'image_number'
+panel1_shot_layout.addWidget(panel1_image_shot_w1)
+panel1_shot_layout.addWidget(panel1_image_shot_w2)
+
+if hasattr(Device('laser/gentec/Onshot'), 'get_attribute_list'):
+    panel1_gentec_shot_w1, panel1_gentec_shot_w2, panel1_gentec_shot_w3, panel1_gentec_shot_w4 = TaurusLabel(
+    ), TaurusLabel(), TaurusLabel(), TaurusLabel()
+    panel1_gentec_shot_w2.model = 'laser/gentec/Onshot' + '/' + 'shot'
+
+    panel1_gentec_shot_w1.model, panel1_gentec_shot_w1.bgRole = 'laser/gentec/Onshot' + \
+        '/' + 'shot#label', ''
+    panel1_gentec_shot_w3.model = 'laser/gentec/Onshot' + '/' + 'main_value'
+
+    panel1_gentec_shot_w1.model, panel1_gentec_shot_w1.bgRole = 'laser/gentec/Onshot' + \
+        '/' + 'main_value#label', ''
+    panel1_shot_layout.addWidget(panel1_gentec_shot_w1)
+    panel1_shot_layout.addWidget(panel1_gentec_shot_w2)
+    panel1_shot_layout.addWidget(panel1_gentec_shot_w3)
+    panel1_shot_layout.addWidget(panel1_gentec_shot_w4)
+
+panel1_layout.addWidget(panel1_shot)
+
+# sets of widgets. Image in mid.
 panel1_w1 = TaurusImageDialog()
 panel1_w1.model = device_name + '/' + 'image'
 panel1_layout.addWidget(panel1_w1)
@@ -52,8 +79,11 @@ panel1_1 = Qt.QWidget()
 panel1_1_layout = Qt.QHBoxLayout()
 panel1_1.setLayout(panel1_1_layout)
 
-for cmd in commands:
-    if cmd not in ['Init', 'State', 'Status']:
+# sets of widgets. command in bottom.
+order_list = ['get_ready', 'relax', 'send_software_trigger', 'reset_number']
+
+for cmd in order_list:
+    if cmd in commands:
         panel1_1_w = TaurusCommandButton(
             command=cmd
         )

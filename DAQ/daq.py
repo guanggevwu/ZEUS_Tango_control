@@ -25,7 +25,8 @@ class Daq:
         self.cam_dir = []
         if os.path.exists(self.dir):
             files_num = sum([len(files) for r, d, files in os.walk(self.dir)])
-            is_overwrite = input(f'{self.dir} already exists and has {files_num} files in it. Overwrite? (y/n)')
+            is_overwrite = input(
+                f'{self.dir} already exists and has {files_num} files in it. Overwrite? (y/n)')
             if is_overwrite.lower() != 'y':
                 raise
         for name in self.select_cam_list:
@@ -42,8 +43,8 @@ class Daq:
         logging.info(f'Connected: {self.cams_names}')
 
     def set_camera_default_configuration(self):
-        config_dict = {'ta2-nearfield': { 'format_pixel': "Mono12", "exposure":200000, "gain":230, "trigger_selector":"FrameStart", "trigger_source": "external", "is_polling_periodically":False}, 'ta2-farfield': {'format_pixel': "Mono12", "exposure":200000, "gain":0, "trigger_selector":"FrameStart", "trigger_source": "external", "is_polling_periodically":False},
-        'ta2-gossip': {'format_pixel': "Mono12", "exposure":20000, "gain":240, "trigger_selector":"FrameStart", "trigger_source": "external", "is_polling_periodically":False} }
+        config_dict = {'ta2-nearfield': {'format_pixel': "Mono12", "exposure": 200000, "gain": 230, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}, 'ta2-farfield': {'format_pixel': "Mono12", "exposure": 200000, "gain": 0, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False},
+                       'ta2-gossip': {'format_pixel': "Mono12", "exposure": 20000, "gain": 240, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}}
         json_object = json.dumps(config_dict)
         with open(os.path.join(self.dir, "settings.json"), "w") as settings_File:
             settings_File.write(json_object)
@@ -102,7 +103,8 @@ class Daq:
             logging.info(f"trigger {i} sent!")
 
     def acquisition(self):
-
+        for idx, bs in enumerate(self.cams):
+            bs.reset()
         while True:
             is_new_flag = []
             for idx, bs in enumerate(self.cams):

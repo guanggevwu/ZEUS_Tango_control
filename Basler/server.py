@@ -223,6 +223,27 @@ class Basler(Device):
         else:
             self.poll_attribute('is_new_image', value)
 
+    image_number = attribute(
+        label='image #',
+        dtype=int,
+        access=AttrWriteType.READ,
+        polling_period=polling,
+        doc="image number since reset"
+    )
+
+    def read_image_number(self):
+        return self._image_number
+
+    def read_polling_period(self):
+        return self.get_attribute_poll_period('is_new_image')
+
+    def write_polling_period(self, value):
+        if self._exposure/1000 > 0.9 * value * self._timeout_polling_ratio:
+            logging.info(
+                f'{value} ms is too short compared to the exposure time {self._exposure/1000} ms. Minimum value is {self._exposure/1000/0.9/self._timeout_polling_ratio}. Discard!')
+        else:
+            self.poll_attribute('is_new_image', value)
+
     def initialize_dynamic_attributes(self):
         '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
         exposure = attribute(
@@ -323,6 +344,7 @@ class Basler(Device):
         self._is_polling_periodically = False
         self._debug = False
         self._save_data = False
+        self._image_number = 0
         super().init_device()
         self.set_state(DevState.INIT)
         self.idx = 0
@@ -574,9 +596,12 @@ class Basler(Device):
                 self._is_new_image = True
                 # self.push_change_event("image", self._image)
                 self.push_change_event("image", self.read_image())
+                self.push_change_event(
+                    "image_number", self.read_image_number())
                 # show image count while not in live mode
                 if self.read_trigger_source().lower() != "off":
                     self.i += 1
+                    self._image_number += 1
                     logging.info(
                         f'{self.i}')
             else:
@@ -639,6 +664,12 @@ class Basler(Device):
         self.camera.StopGrabbing()
         self.set_state(DevState.ON)
         logging.info("Grabbing stops")
+
+    @command()
+    def reset_number(self):
+        self._image_number = 0
+        self.set_state(DevState.ON)
+        logging.info("Reset image number")
 
 
 if __name__ == "__main__":

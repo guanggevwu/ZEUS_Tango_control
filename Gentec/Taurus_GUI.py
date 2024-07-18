@@ -1,3 +1,4 @@
+import argparse
 from taurus_pyqtgraph import TaurusTrend, TaurusPlot
 from taurus.qt.qtgui.application import TaurusApplication
 from taurus.qt.qtgui.taurusgui import TaurusGui
@@ -5,20 +6,16 @@ from taurus.external.qt import Qt
 from taurus import Device, changeDefaultPollingPeriod
 from taurus.qt.qtgui.panel import TaurusForm
 from taurus.qt.qtgui.input import TaurusValueComboBox
+from taurus import tauruscustomsettings
 import sys
 import os
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
+    from common.TaurusGUI_Argparse import TaurusArgparse
 
-import argparse
-
-parser = argparse.ArgumentParser(description='GUI for Gentec-EO devices')
-parser.add_argument('device', default='test/gentec/1', nargs='?',
-                    help="device full name")
-parser.add_argument('-p', '--polling', type=int, default=500,
-                    help="polling period")
-parser.add_argument('-c', '--compact', action='store_true')
+parser = TaurusArgparse(
+    description='GUI for Gentec-EO devices', device_default='test/gentec/1')
 args = parser.parse_args()
 
 device_name = args.device
@@ -32,7 +29,7 @@ model = [device_name + '/' +
          attr for attr in attrs if not attr.startswith('hide_')]
 statistic_panel = ['shot', 'statistics_shots',
                    'average', 'max', 'min', 'rsd',  'start_statistics', ]
-app = TaurusApplication(cmd_line_parser=None, app_name=device_name)
+app = TaurusApplication(cmd_line_parser=None, app_name='test_gentec_1')
 gui = TaurusGui()
 
 panel1 = Qt.QWidget()
