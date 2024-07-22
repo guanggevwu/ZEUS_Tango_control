@@ -22,7 +22,6 @@ logging.basicConfig(handlers=handlers,
 class GentecEO(Device):
 
     polling = 200
-    waiting = 0.1
     # is_memorized = True means the previous entered set value is remembered and is only for Read_WRITE access. For example in GUI, the previous set value,instead of 0, will be shown at the set value field.
     # hw_memorized=True, means the set value is written at the initialization step. Some of the properties are remembered in the camera's memory, so no need to remember them.
     is_memorized = True
@@ -234,11 +233,10 @@ class GentecEO(Device):
         return self._save_data
 
     def write_save_data(self, value):
-        if value:
-            if not hasattr(self, '_save_path'):
-                return
-            self.write_save_path(self._save_path, uncheck_default=False)
-        self._save_data = value
+        if value and self.write_save_path(self._save_path, uncheck_default=False):
+            self._save_data = value
+        else:
+            self._save_data = False
 
     def get_existing_rows(self):
         with open(self._save_path) as csvfile:
@@ -381,6 +379,9 @@ class GentecEO(Device):
                 self.write_is_use_default_path(False)
             if self.read_save_data():
                 self.get_existing_rows()
+            return True
+        else:
+            return False
 
     def create_save_file(self, path, info=True):
         if os.path.isfile(path):
