@@ -22,7 +22,7 @@ logging.basicConfig(handlers=handlers,
 class GentecEO(Device):
 
     polling = 200
-    # is_memorized = True means the previous entered set value is remembered and is only for Read_WRITE access. For example in GUI, the previous set value,instead of 0, will be shown at the set value field.
+    # memorized = True means the previous entered set value is remembered and is only for Read_WRITE access. For example in GUI, the previous set value,instead of 0, will be shown at the set value field.
     # hw_memorized=True, means the set value is written at the initialization step. Some of the properties are remembered in the camera's memory, so no need to remember them.
     is_memorized = True
 
@@ -642,7 +642,7 @@ class GentecEO(Device):
 
     def write_display_range(self, attr):
         for k, v in self.range_dict.items():
-            if float(attr) == v[0]:
+            if float(attr.get_write_value()) == v[0]:
                 self.device.write(f'*SCS{k}'.encode())
         time.sleep(0.5)
         self._display_range = attr

@@ -6,7 +6,8 @@ from taurus.external.qt import Qt
 from taurus import Device, changeDefaultPollingPeriod
 from taurus.qt.qtgui.panel import TaurusForm
 from taurus.qt.qtgui.input import TaurusValueComboBox
-from taurus import tauruscustomsettings
+from taurus.qt.qtgui.button import TaurusCommandButton
+
 import sys
 import os
 if True:
@@ -15,7 +16,7 @@ if True:
     from common.TaurusGUI_Argparse import TaurusArgparse
 
 parser = TaurusArgparse(
-    description='GUI for Gentec-EO devices', device_default='test/gentec/1')
+    description='GUI for Gentec-EO devices', device_default='test/dg535/1', polling_default=3000)
 args = parser.parse_args()
 
 device_name = args.device
@@ -27,8 +28,7 @@ attrs = dp.get_attribute_list()
 commands = dp.get_command_list()
 model = [device_name + '/' +
          attr for attr in attrs if not attr.startswith('hide_')]
-statistic_panel = ['shot', 'statistics_shots',
-                   'average', 'max', 'min', 'rsd',  'start_statistics', ]
+
 app = TaurusApplication(cmd_line_parser=None,
                         app_name=device_name.replace('/', '_'))
 gui = TaurusGui()
@@ -40,9 +40,9 @@ panel1.setLayout(panel1_layout)
 
 panel1_w1 = TaurusForm()
 
-form_model = [i for i in model if i.split('/')[-1] not in statistic_panel]
-order_list = ['model', 'main_value', 'read_time', 'save_data', 'is_use_default_path',
-              'save_path', 'display_range', 'auto_range', 'wavelength']
+form_model = [i for i in model]
+order_list = ['name_attr', 'trigger', 'internal_rate', 'burst_rate', 'A_relative_channel', 'A_relative_delay', 'B_relative_channel',
+              'B_relative_delay', 'C_relative_channel', 'C_relative_delay', 'D_relative_channel', 'D_relative_delay', 'send_write', 'send_query']
 for idx, attr in enumerate(order_list):
     form_model.remove(f'{device_name}/{attr}')
     form_model.insert(idx, f'{device_name}/{attr}')
@@ -54,12 +54,14 @@ panel1_w1.compact = is_form_compact
 # TaurusLabel auto trim function not work in TaurusForm
 # change the text write widget to dropdown list and set auto apply
 # must convert numpy.float64 to float so that the dropdown list can work.
-dropdown = {'display_range': ((text, float(value)) for text, value in zip(
-    dp.hide_display_range_dropdown_text_list, dp.hide_display_range_dropdown_text_value))}
-if dp.model == "PH100-Si-HA-OD1":
-    dropdown['measure_mode'] = (('Power', '0'), ('SSE', '2'))
-else:
-    dropdown['measure_mode'] = (('Energy', '1'), ('SSE', '2'))
+dropdown = {}
+common_dropdown = (('T0', 'T0'), ('A', 'A'),
+                   ('B', 'B'), ('C', 'C'), ('D', 'D'))
+for channel in ['A', 'B', 'C', 'D']:
+    dropdown[f'{channel}_relative_channel'] = tuple(
+        i for i in common_dropdown if i != (channel, channel))
+dropdown['trigger'] = (('Internal', 'Internal'), ('External', 'External'),
+                       ('Single Shot', 'Single Shot'), ('Burst', 'Burst'))
 
 # change the bool write to auto apply.
 for idx, full_attr in enumerate(form_model):
@@ -67,42 +69,28 @@ for idx, full_attr in enumerate(form_model):
         panel1_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
     if full_attr.split('/')[-1] in dropdown:
         panel1_w1[idx].writeWidgetClass = create_my_dropdown_list_class(
-            full_attr.split('/')[-1], dropdown[full_attr.split('/')[-1]])
-    # if full_attr.split('/')[-1] == 'save_path':
-    #     panel1_w1[idx].setCompact(True)
+            full_attr.split('/')[-1], dropdown[full_attr.split('/')[-1]], autoApply=False)
 
-panel2 = TaurusPlot()
-model2 = [f'{device_name}/historical_data_number']
-panel2.setModel(model2)
+panel1_command = Qt.QWidget()
+panel1_command_layout = Qt.QHBoxLayout()
+panel1_command.setLayout(panel1_command_layout)
 
-# panel for statistics
-panel3 = TaurusForm()
-statistic_panel.insert(0, 'main_value')
-form_model_3 = [device_name + '/' +
-                attr for attr in statistic_panel if not attr.startswith('hide_')]
+# sets of widgets. command in bottom.
+order_list = ['send_single_shot']
 
-panel3.model = form_model_3
-# change the bool write to auto apply.
-for i in form_model_3:
-    if i.split('/')[-1] in attrs and dp.attribute_query(i.split('/')[-1]).data_type == 1:
-        idx = form_model_3.index(i)
-        panel3[idx].writeWidgetClass = MyTaurusValueCheckBox
+for cmd in order_list:
+    if cmd in commands:
+        panel1_command_w = TaurusCommandButton(
+            command=cmd
+        )
+        panel1_command_w.setCustomText(cmd)
+        panel1_command_w.setModel(device_name)
+        panel1_command_layout.addWidget(panel1_command_w)
+panel1_layout.addWidget(panel1_command)
 
-# change font size
-for row in panel3:
-    for method_attr in ['readWidget', 'writeWidget', 'unitsWidget', 'labelWidget']:
-        col_widget = getattr(row, method_attr)()
-        if col_widget:
-            col_widget.setStyleSheet("font-size: 20px")
-
-
-panel3.compact = is_form_compact
 
 gui.removePanel('Manual')
 gui.createPanel(panel1, 'parameters')
-gui.createPanel(panel3, 'statistics_numbers')
-gui.createPanel(panel2, 'statistics_trend')
-
 
 gui.show()
 app.exec_()

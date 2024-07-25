@@ -10,13 +10,14 @@ class MyTaurusValueCheckBox(TaurusValueCheckBox):
         self.showText = False
 
 
-def add_value_pairs(values):
+def add_value_pairs(values, autoApply=True):
     def constructor(self):
         TaurusValueComboBox.__init__(self)
         self.addValueNames(values)
-        self.autoApply = True
+        self.autoApply = autoApply
     return constructor
 
-def create_my_dropdown_list_class(key, value):
+
+def create_my_dropdown_list_class(key, value, autoApply=True):
     return type(key, (TaurusValueComboBox,), {
-            '__init__': add_value_pairs(value)})
+        '__init__': add_value_pairs(value, autoApply)})

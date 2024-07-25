@@ -58,6 +58,7 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "laser_warning_sign": {'server': 'LaserWarningSign/laser_warning_sign_sr', '_class': 'LaserWarningSign', 'name': 'facility/laser_warning_sign/1'},
             "waverunner_104mxi_1": {'server': 'LeCroy/old_scope', '_class': 'LeCroy', 'name': 'facility/lecroy/waverunner_104mxi_1'},
             "wavesurfer_3034z_1": {'server': 'LeCroy/wavesurfer_3034z_1', '_class': 'LeCroy', 'name': 'facility/lecroy/wavesurfer_3034z_1'},
+            "dg535_test": {'server': 'DG535/testsr', '_class': 'DG535', 'name': 'test/dg535/1'},
             }
 
 

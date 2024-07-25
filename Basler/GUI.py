@@ -33,7 +33,7 @@ model = [device_name] + [device_name + '/' +
                          attr for attr in attrs if attr not in exclude]
 
 app = TaurusApplication(cmd_line_parser=None,
-                        app_name=sys.argv[1].replace('/', '_'))
+                        app_name=device_name.replace('/', '_'))
 gui = TaurusGui()
 
 # panel 1
