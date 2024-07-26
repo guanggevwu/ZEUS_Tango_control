@@ -135,6 +135,18 @@ print(scope.waveform_c1_x)
 print(scope.waveform_c1_y)
 ```
 
+## DG535
+
+Requires Pyvisa
+
+```python
+import tango
+
+dg = tango.DeviceProxy('facility/dgd535/1')
+print(dg.A_relative_channel)
+print(dg.A_relative_delay)
+```
+
 ## Laser warning sign
 
 To acquire the status of the laser warning signs:

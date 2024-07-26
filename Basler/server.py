@@ -98,7 +98,6 @@ class Basler(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        # hw_memorized=True,
         doc='off or software or external'
     )
 
@@ -157,12 +156,6 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
     )
-
-    # framerate = attribute(
-    #     label="max framerate",
-    #     dtype=float,
-    #     access=AttrWriteType.READ,
-    # )
 
     binning_horizontal = attribute(
         label="binning_horizontal",
