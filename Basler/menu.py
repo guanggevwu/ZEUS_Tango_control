@@ -35,8 +35,10 @@ class BaslerMenu(Menu):
         device_names = self.db.get_device_name('*', class_name)
         instances = [e.split('/')[-1]
                      for e in self.servers if e.split('/')[0] == class_name]
+        # list(self.combination_table_server) is just the keys, i.e., the text shown in the dropdown list.
+        instances = list(self.combination_table_server)+(instances)
         self.menu_dict = {'start server': ['server.py', instances, []],
-                          'start Taurus GUI': ['GUI.py', tuple(device_names.value_string), []]}
+                          'start Taurus GUI': ['GUI.py', (*list(self.combination_table_client), *tuple(device_names.value_string)), []]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             # value[0][:-3], i.e., 'gentec_server' is the attribute name
             setattr(self, value[0][:-3], StringVar())

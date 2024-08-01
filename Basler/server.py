@@ -285,7 +285,7 @@ class Basler(Device):
         self.remove_attribute('sensor_readout_mode')
 
     def read_exposure(self, attr):
-        if self._model in self.model_type:
+        if self._model_category == 1:
             self._exposure = self.camera.ExposureTime.Value
         else:
             self._exposure = self.camera.ExposureTimeAbs.Value
@@ -298,21 +298,21 @@ class Basler(Device):
             logging.info(
                 f'Changed the image retrieve timeout to {self._polling} to match the long exposure time')
         # "a2A1920-51gmBAS" is the farfield camera
-        if self._model in self.model_type:
+        if self._model_category == 1:
             self.camera.ExposureTime.Value = attr.get_write_value()
         else:
             self.camera.ExposureTimeAbs.Value = attr.get_write_value()
         self._exposure = attr.get_write_value()
 
     def read_gain(self, attr):
-        if self._model in self.model_type:
+        if self._model_category == 1:
             self._gain = self.camera.Gain.Value
         else:
             self._gain = self.camera.GainRaw()
         return float(self._gain)
 
     def write_gain(self, attr):
-        if self._model in self.model_type:
+        if self._model_category == 1:
             self.camera.Gain.Value = float(attr.get_write_value())
         else:
             self.camera.GainRaw.Value = int(attr.get_write_value())
@@ -333,10 +333,11 @@ class Basler(Device):
         self.camera.Height.Value = attr.get_write_value()
 
     def init_device(self):
-        self.model_type = ['a2A1920-51gmBAS', 'a2A2590-22gmBAS']
+        self.model_type = ['a2A1920-51gmBAS', 'a2A2590-22gmBAS','a2A5320-7gmPRO']
         self._is_polling_periodically = False
         self._debug = False
         self._save_data = False
+        self._save_path = ''
         self._image_number = 0
         super().init_device()
         self.set_state(DevState.INIT)
@@ -349,6 +350,10 @@ class Basler(Device):
                     instance.CreateDevice(self.device))
                 self.camera.Open()
                 self.read_model()
+                if self._model in self.model_type or self._model.startswith('a2'):
+                    self._model_category = 1
+                else:
+                    self._model_category = 0
                 self.read_exposure('')
                 self.read_frames_per_trigger()
                 self._polling = self.get_attribute_poll_period('is_new_image')
@@ -388,16 +393,17 @@ class Basler(Device):
     #     return self.device.GetSerialNumber()
 
     def read_save_data(self):
-        if not hasattr(self, '_save_data'):
-            self._save_data = False
         return self._save_data
 
     def write_save_data(self, value):
-        if not hasattr(self, '_save_data'):
-            self._save_data = value
         if self._save_data != value:
-            self._save_data = value
             logging.info(f'save status is changed to {value}')
+        self._save_data = value
+        if value:
+            try:
+                os.makedirs(self._save_path, exist_ok=True)
+            except FileNotFoundError:
+                return            
 
     def read_is_polling_periodically(self):
         if not self._is_polling_periodically:
@@ -411,10 +417,6 @@ class Basler(Device):
         self.read_is_polling_periodically()
 
     def read_save_path(self):
-        # The value of save path (short name) can be different from the self._save_path (full name).
-        if not hasattr(self, '_save_path'):
-            self._save_path = os.path.join(
-                os.path.dirname(__file__), 'basler_tmp_data')
         # if len(self._save_path) > 20:
         #     if ";" in self._save_path:
         #         return ";".join([f'{e[0:2]}...{e[-2:-1]}' for e in self._save_path.split(';')])
@@ -423,10 +425,11 @@ class Basler(Device):
         return self._save_path
 
     def write_save_path(self, value):
-        try:
-            os.makedirs(value, exist_ok=True)
-        except FileNotFoundError:
-            return
+        if self._save_data:
+            try:
+                os.makedirs(value, exist_ok=True)
+            except FileNotFoundError:
+                return
         self._save_path = value
 
     def read_model(self):
@@ -512,7 +515,7 @@ class Basler(Device):
         self.get_ready()
 
     def read_frames_per_trigger(self):
-        if self._model in self.model_type:
+        if self._model_category == 1:
             self._frames_per_trigger = self.camera.AcquisitionBurstFrameCount.Value
         else:
             self._frames_per_trigger = self.camera.AcquisitionFrameCount.Value
@@ -522,7 +525,7 @@ class Basler(Device):
         is_grabbing = self.camera.IsGrabbing()
         if is_grabbing:
             self.camera.StopGrabbing()
-        if self._model in self.model_type:
+        if self._model_category == 1:
             self.camera.AcquisitionBurstFrameCount.SetValue(value)
         else:
             self.camera.AcquisitionFrameCount.SetValue(value)
@@ -543,7 +546,7 @@ class Basler(Device):
 
     def read_fps(self):
         if self.camera.AcquisitionFrameRateEnable.Value:
-            if self._model in self.model_type:
+            if self._model_category == 1:
                 self._fps = self.camera.AcquisitionFrameRate.Value
             else:
                 self._fps = self.camera.AcquisitionFrameRateAbs.Value
@@ -554,7 +557,7 @@ class Basler(Device):
     def write_fps(self, value):
         if value:
             self.camera.AcquisitionFrameRateEnable.SetValue(True)
-            if self._model in self.model_type:
+            if self._model_category == 1:
                 self.camera.AcquisitionFrameRate.SetValue(value)
             else:
                 self.camera.AcquisitionFrameRateAbs.SetValue(value)
