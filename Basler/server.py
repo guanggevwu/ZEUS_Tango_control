@@ -227,16 +227,6 @@ class Basler(Device):
     def read_image_number(self):
         return self._image_number
 
-    def read_polling_period(self):
-        return self.get_attribute_poll_period('is_new_image')
-
-    def write_polling_period(self, value):
-        if self._exposure/1000 > 0.9 * value * self._timeout_polling_ratio:
-            logging.info(
-                f'{value} ms is too short compared to the exposure time {self._exposure/1000} ms. Minimum value is {self._exposure/1000/0.9/self._timeout_polling_ratio}. Discard!')
-        else:
-            self.poll_attribute('is_new_image', value)
-
     def initialize_dynamic_attributes(self):
         '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
         exposure = attribute(

@@ -28,7 +28,7 @@ class Menu:
             input_txts = self.combination_table_server[input_txt]
         elif 'GUI' in key and input_txt.split()[0] in self.combination_table_client:
             # the input_txt format is '{device_name} [--polling {polling_period}]'
-            input_txts = [' '.join([i, *input_txt.split()[1:]]) for i in self.combination_table_client[input_txt]]
+            input_txts = [' '.join([i, *input_txt.split()[1:]]) for i in self.combination_table_client[input_txt.split()[0]]]
         else:
             input_txts = [input_txt]
         for input_txt in input_txts:
@@ -43,7 +43,7 @@ class Menu:
                     [f'{self.python_path}', f'{script_path}', *input_txt])
                 self.menu_dict[key][2].append([p.pid, input_txt])
                 print(f'{p.pid} is started for {input_txt}')
-            time.sleep(2)
+            time.sleep(3)
 
     def terminate_all(self):
         for key, value in self.menu_dict.items():
