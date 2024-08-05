@@ -93,7 +93,7 @@ for row in panel3:
     for method_attr in ['readWidget', 'writeWidget', 'unitsWidget', 'labelWidget']:
         col_widget = getattr(row, method_attr)()
         if col_widget:
-            col_widget.setStyleSheet("font-size: 20px")
+            col_widget.setFont(Qt.QFont("Sans Serif", 20))
 
 
 panel3.compact = is_form_compact

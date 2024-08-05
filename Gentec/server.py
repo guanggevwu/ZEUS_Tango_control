@@ -642,9 +642,9 @@ class GentecEO(Device):
 
     def write_display_range(self, attr):
         for k, v in self.range_dict.items():
-            if float(attr.get_write_value()) == v[0]:
+            if float(attr) == v[0]:
                 self.device.write(f'*SCS{k}'.encode())
-        time.sleep(0.5)
+        time.sleep(0.2)
         self._display_range = attr
 
     def read_trigger_level(self, attr):
