@@ -82,7 +82,6 @@ Use live mode with the trigger off.
 ```python
 import tango
 
-# replace 'test/basler/1' with your device name
 dp = tango.DeviceProxy('test/basler/1')
 dp.trigger_source = 'Off'
 ```
@@ -93,13 +92,12 @@ Acquire a set of images from the camera with external triggers. When the bandwid
 import tango
 import numpy as np
 
-# replace 'test/basler/1' with your device name
 dp = tango.DeviceProxy('test/basler/1')
-dp.save_data = True
 dp.trigger_selector = 'AcquisitionStart'
 dp.repetition = 3
 dp.frames_per_trigger = 3
 dp.trigger_source = 'External'
+dp.is_polling_periodically = False
 img_num_to_acquire = dp.repetition * dp.frames_per_trigger
 acquired = 0
 while True:
