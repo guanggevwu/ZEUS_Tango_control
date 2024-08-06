@@ -66,6 +66,18 @@ class Basler(Device):
     def read_user_defined_name(self):
         return self.camera.GetDeviceInfo().GetUserDefinedName()
 
+    inferred_energy = attribute(
+        label="inferred energy",
+        dtype=float,
+        unit='J',
+        polling_period = polling,
+        access=AttrWriteType.READ,
+        doc='The energy is inferred by multiplying the image average instensity by a constant from calibration'
+    )
+
+    def read_inferred_energy(self):
+        return self._inferred_energy
+    
     is_polling_periodically = attribute(
         label="polling periodically",
         dtype=bool,
@@ -329,6 +341,7 @@ class Basler(Device):
         self._save_data = False
         self._save_path = ''
         self._image_number = 0
+        self._inferred_energy = 0
         super().init_device()
         self.set_state(DevState.INIT)
         self.idx = 0
@@ -565,6 +578,7 @@ class Basler(Device):
                 int(100), pylon.TimeoutHandling_Return)
             if grabResult and grabResult.GrabSucceeded():
                 self._image = grabResult.Array
+                self._inferred_energy = np.mean(self._image)*1.243
                 grabResult.Release()
                 if self._debug:
                     logging.info(
@@ -584,6 +598,8 @@ class Basler(Device):
                 self.push_change_event("image", self.read_image())
                 self.push_change_event(
                     "image_number", self.read_image_number())
+                self.push_change_event(
+                    "inferred_energy", self.read_inferred_energy())
                 # show image count while not in live mode
                 if self.read_trigger_source().lower() != "off":
                     self.i += 1

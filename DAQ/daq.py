@@ -37,6 +37,7 @@ class Daq:
                 bs = tango.DeviceProxy(self.device_name_prefix + name)
                 self.cams.append(bs)
                 self.cams_names.append(name)
+                # start from shot 1, not shot 0
                 self.shot_numbers.append(1)
                 if dir:
                     os.makedirs(os.path.join(self.dir, name), exist_ok=True)
@@ -46,9 +47,10 @@ class Daq:
                 logging.info(f"{name} is not found!")
         logging.info(f'Connected: {self.cams_names}')
 
-    def set_camera_default_configuration(self):
-        config_dict = {'ta2-nearfield': {'format_pixel': "Mono12", "exposure": 1000, "gain": 230, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}, 'ta2-farfield': {'format_pixel': "Mono12", "exposure": 1000, "gain": 0, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False},
-                       'ta2-gossip': {'format_pixel': "Mono12", "exposure": 1000, "gain": 240, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}}
+    def set_camera_default_configuration(self, config_dict=None):
+        if config_dict is None:
+            config_dict = {'ta2-nearfield': {'format_pixel': "Mono12", "exposure": 1000, "gain": 230, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}, 'ta2-farfield': {'format_pixel': "Mono12", "exposure": 1000, "gain": 0, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False},
+                        'ta2-gossip': {'format_pixel': "Mono12", "exposure": 1000, "gain": 240, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False},'PW_Comp_In':{'format_pixel': "Mono12", "exposure": 5000, "gain": 136, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}}
         json_object = json.dumps(config_dict)
         with open(os.path.join(self.dir, "settings.json"), "w+") as settings_File:
             settings_File.write(json_object)
@@ -60,7 +62,7 @@ class Daq:
                 bs.relax()
                 for key, value in cam_settings.items():
                     setattr(bs, key, value)
-            logging.info('Boring! Waiting for a trigger.')
+            
 
     def get_image(self, bs):
         bits = bs.format_pixel.lower().replace('mono', '')
@@ -123,22 +125,26 @@ class Daq:
             time.sleep(interval)
             logging.info(f"trigger {i} sent!")
 
-    def acquisition(self, stitch = True):
+    def acquisition(self, stitch = True, shot_limit=float('inf')):
         '''
         Main acquisition function. Use external trigger and save data.
         '''
+        logging.info('Waiting for a trigger...')
         for idx, bs in enumerate(self.cams):
             bs.reset_number()
         while True:
-            
             is_new_flag = []
             for idx, bs in enumerate(self.cams):
                 is_new_flag.append(bs.is_new_image)
             for idx, bs in enumerate(self.cams):
-                if is_new_flag[idx]:
+                if self.shot_numbers[idx]<= shot_limit and is_new_flag[idx]:
                     data, data_array = self.get_image(bs)
+                    if bs.name == 'PW_Comp_In':
+                        file_name = '_'.join([f'shot{self.shot_numbers[idx]}', f'{bs.inferred_energy}J'])
+                    else:
+                        file_name = f'shot{self.shot_numbers[idx]}'
                     data.save(os.path.join(
-                        self.cam_dir[idx], f'shot{self.shot_numbers[idx]}.tiff'))
+                        self.cam_dir[idx], f'{file_name}.tiff'))
                     logging.info("Shot {} taken for {} saved {}:".format(
                         self.shot_numbers[idx], self.cams_names[idx],  {data.size}))
                     if stitch:
@@ -175,7 +181,7 @@ class Daq:
                     break
         gap_x, gap_y = 30, 30
         tile_size_x, tile_size_y = 600, 400        
-        large_image_p = Image.new("L", [(gap_x+tile_size_x)*self.col+gap_x, (gap_y+tile_size_y)*self.col+gap_y])
+        large_image_p = Image.new("L", [(gap_x+tile_size_x)*self.col+gap_x, (gap_y+tile_size_y)*self.row+gap_y])
         for cam_name, image in self.image_list[shotname].items():
             idx = self.select_cam_list.index(cam_name)
             y_i, x_i = np.unravel_index(idx, (self.row, self.col))

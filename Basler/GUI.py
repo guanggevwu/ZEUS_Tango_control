@@ -54,13 +54,16 @@ class BaslerGUI():
         panel1 = Qt.QWidget()
         panel1_layout = Qt.QVBoxLayout()
         panel1.setLayout(panel1_layout)
+        if device_name == 'laser/basler/PW_Comp_In':
+            self.add_readonly_label_widget(panel1_layout, device_name, 'inferred_energy')
         if not simple:
             # sets of widgets. Labels in top.
             panel1_shot = Qt.QWidget()
             panel1_shot_layout = Qt.QHBoxLayout()
             panel1_shot.setLayout(panel1_shot_layout)
-            self.add_readonly_label_widget(panel1_shot_layout, device_name, 'image_num')
-            self.add_energy_shot_num_value_widget(panel1_shot_layout, 'laser/gentec/Onshot')
+            self.add_readonly_label_widget(panel1_shot_layout, device_name, 'image_number')
+            self.add_readonly_label_widget(panel1_shot_layout, 'laser/gentec/Onshot', 'shot')
+            self.add_readonly_label_widget(panel1_shot_layout, 'laser/gentec/Onshot', 'main_value')
 
             panel1_layout.addWidget(panel1_shot)
 
@@ -70,23 +73,6 @@ class BaslerGUI():
         panel1_layout.addWidget(panel1_w1)
         if not simple:
             self.add_command(panel1_layout, device_name, ['get_ready', 'relax', 'send_software_trigger', 'reset_number'])
-        # panel1_1 = Qt.QWidget()
-        # panel1_1_layout = Qt.QHBoxLayout()
-        # panel1_1.setLayout(panel1_1_layout)
-
-        # if not simple:
-        #     # sets of widgets. command in bottom.
-        #     order_list = ['get_ready', 'relax', 'send_software_trigger', 'reset_number']
-
-        #     for cmd in order_list:
-        #         if cmd in self.attr_list[device_name]['commands']:
-        #             panel1_1_w = TaurusCommandButton(
-        #                 command=cmd
-        #             )
-        #             panel1_1_w.setCustomText(cmd)
-        #             panel1_1_w.setModel(device_name)
-        #             panel1_1_layout.addWidget(panel1_1_w)
-        #     panel1_layout.addWidget(panel1_1)
 
         self.gui.createPanel(panel1, f'{device_name}_image')
 
