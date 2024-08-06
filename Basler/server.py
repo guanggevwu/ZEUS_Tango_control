@@ -72,7 +72,7 @@ class Basler(Device):
         unit='J',
         polling_period = polling,
         access=AttrWriteType.READ,
-        doc='The energy is inferred by multiplying the image average instensity by a constant from calibration. E = (<I> - 0.931)*1.3046.'
+        doc='E = (<I> - 0.611)*1.283.'
     )
 
     def read_inferred_energy(self):
@@ -578,7 +578,7 @@ class Basler(Device):
                 int(100), pylon.TimeoutHandling_Return)
             if grabResult and grabResult.GrabSucceeded():
                 self._image = grabResult.Array
-                self._inferred_energy = (np.mean(self._image) - 0.931)*1.3046
+                self._inferred_energy = (np.mean(self._image) - 0.611)*1.283
                 grabResult.Release()
                 if self._debug:
                     logging.info(
