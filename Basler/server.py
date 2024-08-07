@@ -50,6 +50,7 @@ class Basler(Device):
         label="hot spot",
         dtype=float,
         unit='J*cm**-2',
+        format='8.4f',
         polling_period = polling,
         access=AttrWriteType.READ,
     )

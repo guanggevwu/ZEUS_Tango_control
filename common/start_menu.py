@@ -35,7 +35,7 @@ class Menu:
             # using os.system cause hang up in server code
             # os.system(
             #     f'{self.python_path} {script_path} {input_txt}')
-            if input_txt in [i[1] for i in self.menu_dict[key][2]]:
+            if 'server' in key and input_txt in [i[1] for i in self.menu_dict[key][2]]:
                 print(f'{key} for {input_txt} has run already. Ignore the operation.')
             else:
                 input_txt = input_txt.split()

@@ -126,7 +126,7 @@ class BaslerGUI():
     #         layout.addWidget(panel1_gentec_shot_w3)
     #         layout.addWidget(panel1_gentec_shot_w4)        
         
-    def create_form_panel(self, device_name):
+    def create_form_panel(self, device_name, exclude=['image', 'flux','energy', 'hot_spot']):
 
         panel2 = Qt.QWidget()
         panel2_layout = Qt.QVBoxLayout()
@@ -134,7 +134,8 @@ class BaslerGUI():
 
 
         panel2_w1 = TaurusForm()
-        form_model = [self.attr_list[device_name]['model'][0]]+self.attr_list[device_name]['model'][2:]
+        form_model = self.attr_list[device_name]['model']
+        form_model =[i for i in form_model if i.split('/')[-1] not in exclude]
         form_model.remove(f'{device_name}/exposure')
         form_model.remove(f'{device_name}/gain')
         trigger_selector_idx = form_model.index(f'{device_name}/trigger_selector')
