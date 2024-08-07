@@ -4,7 +4,6 @@ import tango
 from tango import AttrWriteType, DevState, DevFloat, EncodedAttribute
 from tango.server import Device, attribute, command, device_property
 from pypylon import pylon
-from numpy import array
 import numpy as np
 import time
 import datetime
@@ -38,6 +37,23 @@ class Basler(Device):
         access=AttrWriteType.READ,
     )
 
+    flux = attribute(
+        label="flux",
+        max_dim_x=4096,
+        max_dim_y=4096,
+        dtype=((float,),),
+        unit='J/cm2',
+        access=AttrWriteType.READ,
+    )
+
+    hot_spot = attribute(
+        label="hot spot",
+        dtype=float,
+        unit='J*cm**-2',
+        polling_period = polling,
+        access=AttrWriteType.READ,
+    )
+
     serial_number = device_property(dtype=str, default_value='')
     friendly_name = device_property(dtype=str, default_value='')
 
@@ -66,17 +82,17 @@ class Basler(Device):
     def read_user_defined_name(self):
         return self.camera.GetDeviceInfo().GetUserDefinedName()
 
-    inferred_energy = attribute(
-        label="inferred energy",
+    energy = attribute(
+        label="energy",
         dtype=float,
         unit='J',
         polling_period = polling,
         access=AttrWriteType.READ,
-        doc='E = (<I> - 0.965)*1.307.'
+        doc='Calibrated by QE150. E = (<I> - 0.965)*1.307.'
     )
 
-    def read_inferred_energy(self):
-        return self._inferred_energy
+    def read_energy(self):
+        return self._energy
     
     is_polling_periodically = attribute(
         label="polling periodically",
@@ -341,7 +357,8 @@ class Basler(Device):
         self._save_data = False
         self._save_path = ''
         self._image_number = 0
-        self._inferred_energy = 0
+        self._energy = 0
+        self._hot_spot = 0
         super().init_device()
         self.set_state(DevState.INIT)
         self.idx = 0
@@ -365,6 +382,8 @@ class Basler(Device):
                 self._timeout_polling_ratio = 0.75
                 self._is_new_image = False
                 self._image = np.zeros(
+                    (self.camera.Height.Value, self.camera.Width.Value))
+                self._flux = np.zeros(
                     (self.camera.Height.Value, self.camera.Width.Value))
                 # always use continuous mode. Although it seems this is the default, still set it here in case.
                 self.camera.AcquisitionMode.SetValue('Continuous')
@@ -578,7 +597,9 @@ class Basler(Device):
                 int(100), pylon.TimeoutHandling_Return)
             if grabResult and grabResult.GrabSucceeded():
                 self._image = grabResult.Array
-                self._inferred_energy = (np.mean(self._image) - 0.965)*1.307
+                self._energy = (np.mean(self._image) - 0.965)*1.307
+                self._flux = (self._image - 0.965)/(611*508)*1.307/(4.9/102)**2
+                self._hot_spot = np.max(self._flux)
                 grabResult.Release()
                 if self._debug:
                     logging.info(
@@ -596,10 +617,13 @@ class Basler(Device):
                 self._is_new_image = True
                 # self.push_change_event("image", self._image)
                 self.push_change_event("image", self.read_image())
+                self.push_change_event("flux", self.read_flux())
                 self.push_change_event(
                     "image_number", self.read_image_number())
                 self.push_change_event(
-                    "inferred_energy", self.read_inferred_energy())
+                    "energy", self.read_energy())
+                self.push_change_event(
+                    "hot_spot", self.read_hot_spot())
                 # show image count while not in live mode
                 if self.read_trigger_source().lower() != "off":
                     self.i += 1
@@ -620,6 +644,13 @@ class Basler(Device):
     def read_image(self):
         # now read_image() is only triggered when it is a new image.
         return self._image
+    
+    def read_flux(self):
+        return self._flux
+    
+    def read_hot_spot(self):
+        # now read_image() is only triggered when it is a new image.
+        return self._hot_spot
 
     def disable_polling(self, attr):
         if self.is_attribute_polled(attr):
@@ -643,7 +674,7 @@ class Basler(Device):
             self.set_state(DevState.ON)
         else:
             self.i = 0
-            self._grab_number = 9999
+            self._grab_number = 99999
             self.camera.StartGrabbingMax(
                 self._grab_number, pylon.GrabStrategy_OneByOne)
             logging.info(

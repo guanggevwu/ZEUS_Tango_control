@@ -48,33 +48,34 @@ class BaslerGUI():
         self.attr_list[device_name] = device_info
 
 
-    def create_image_panel(self, device_name, simple=False):
+    def create_image_panel(self, device_name, image='image', image_number=True, energy_meter=False, calibration=False, command=True):
         '''create TaurusForm panel'''
         # panel 1
         panel1 = Qt.QWidget()
         panel1_layout = Qt.QVBoxLayout()
         panel1.setLayout(panel1_layout)
-        if device_name == 'laser/basler/PW_Comp_In':
-            self.add_readonly_label_widget(panel1_layout, device_name, 'inferred_energy')
-        if not simple:
-            # sets of widgets. Labels in top.
-            panel1_shot = Qt.QWidget()
-            panel1_shot_layout = Qt.QHBoxLayout()
-            panel1_shot.setLayout(panel1_shot_layout)
+
+        panel1_shot = Qt.QWidget()
+        panel1_shot_layout = Qt.QHBoxLayout()
+        panel1_shot.setLayout(panel1_shot_layout)
+        if image_number:
             self.add_readonly_label_widget(panel1_shot_layout, device_name, 'image_number')
+        if calibration:
+            self.add_readonly_label_widget(panel1_shot_layout, device_name, 'energy')
+            self.add_readonly_label_widget(panel1_shot_layout, device_name, 'hot_spot')
+        if energy_meter:
             self.add_readonly_label_widget(panel1_shot_layout, 'laser/gentec/Onshot', 'shot')
             self.add_readonly_label_widget(panel1_shot_layout, 'laser/gentec/Onshot', 'main_value')
-
-            panel1_layout.addWidget(panel1_shot)
+        panel1_layout.addWidget(panel1_shot)
 
         # sets of widgets. Image in mid.
         panel1_w1 = TaurusImageDialog()
-        panel1_w1.model = device_name + '/' + 'image'
+        panel1_w1.model = device_name + '/' + image
         panel1_layout.addWidget(panel1_w1)
-        if not simple:
+        if command:
             self.add_command(panel1_layout, device_name, ['get_ready', 'relax', 'send_software_trigger', 'reset_number'])
 
-        self.gui.createPanel(panel1, f'{device_name}_image')
+        self.gui.createPanel(panel1, f'{device_name}_{image}')
 
     def add_readonly_label_widget(self, layout, device_name, attr_name, check_exist=False):
         # if check_exist:
@@ -173,15 +174,23 @@ class BaslerGUI():
 if __name__ == "__main__":
     basler_app = BaslerGUI(args.device, args.polling)
     combination_table =  {'TA1_conf1_combine':['TA1/basler/TA1-Ebeam', 'TA1/basler/TA1-EspecH', 'TA1/basler/TA1-EspecL', 'TA1/basler/TA1-Shadowgraphy'], 'TA2_conf1_combine':['TA2/basler/TA2-NearField', 'TA2/basler/TA2-FarField']} 
+    image_panel_config = {'combine':{"image_number": False, 'command':False}, 'laser/basler/PW_Comp_In':{'image':'flux', 'calibration': True}}
+
+    # get the device list
     if 'combine' in args.device:
         device_list = combination_table[args.device]
-        simple = True
     else:
         device_list = [args.device]
-        simple = False
+    # get the configuration 
+    if 'combine' in args.device:
+        pass_config = image_panel_config['combine']
+    elif args.device in image_panel_config:
+        pass_config = image_panel_config[args.device]
+    else:
+        pass_config = {}
     for d in device_list:
         basler_app.add_device(d)
-        basler_app.create_image_panel(d, simple=simple)
+        basler_app.create_image_panel(d, **pass_config)
         basler_app.create_form_panel(d)
     if 'combine' in args.device:
         basler_app.combined_panel(device_list)

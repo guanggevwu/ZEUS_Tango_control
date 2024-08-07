@@ -41,9 +41,9 @@ class Menu:
                 input_txt = input_txt.split()
                 p = subprocess.Popen(
                     [f'{self.python_path}', f'{script_path}', *input_txt])
-                self.menu_dict[key][2].append([p.pid, input_txt])
-                print(f'{p.pid} is started for {input_txt}')
-            time.sleep(3)
+                self.menu_dict[key][2].append([p.pid, input_txt[0]])
+                print(f'{p.pid} is started for {input_txt[0]}')
+                time.sleep(3)
 
     def terminate_all(self):
         for key, value in self.menu_dict.items():
