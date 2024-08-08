@@ -42,7 +42,7 @@ class Basler(Device):
         max_dim_x=4096,
         max_dim_y=4096,
         dtype=((float,),),
-        unit='J/cm2',
+        unit='J*cm**-2',
         access=AttrWriteType.READ,
     )
 
@@ -599,8 +599,8 @@ class Basler(Device):
             if grabResult and grabResult.GrabSucceeded():
                 self._image = grabResult.Array
                 self._energy = (np.mean(self._image) - 0.965)*1.307
-                self._flux = (self._image - 0.965)/(611*508)*1.307/(4.9/102)**2
-                self._hot_spot = np.max(self._flux)
+                self._flux = (self._image - 0.965)/(611*508)*1.307/(4.9/102)**2*0.814
+                self._hot_spot = np.max(self._flux)*0.814
                 grabResult.Release()
                 if self._debug:
                     logging.info(
