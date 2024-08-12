@@ -15,15 +15,14 @@ logging.basicConfig(
 
 
 class Daq:
-    def __init__(self, dir=None, device_name_prefix='TA2/basler/', select_cam_list=None, shots=1, debug=False):
+    def __init__(self, dir=None, select_cam_list=None, shots=1, debug=False):
         self.dir = dir
-        self.device_name_prefix = device_name_prefix
         self.select_cam_list = select_cam_list
+        self.shortname_list = [i.split('/')[-1] for i in select_cam_list]
         self.shots = shots
         self.debug = debug
         self.cams = []
         self.cams_names = []
-        self.shot_numbers = []
         self.cam_dir = []
         self.image_list = defaultdict(dict)
         if os.path.exists(self.dir):
@@ -32,25 +31,25 @@ class Daq:
                 f'{self.dir} already exists and has {files_num} files in it. Overwrite? (y/n)')
             if is_overwrite.lower() != 'y':
                 raise
-        for name in self.select_cam_list:
+        for name, shortname in zip(self.select_cam_list, self.shortname_list):
             try:
-                bs = tango.DeviceProxy(self.device_name_prefix + name)
+                bs = tango.DeviceProxy(name)
                 self.cams.append(bs)
-                self.cams_names.append(name)
+                self.cams_names.append(shortname)
                 # start from shot 1, not shot 0
-                self.shot_numbers.append(1)
                 if dir:
-                    os.makedirs(os.path.join(self.dir, name), exist_ok=True)
+                    os.makedirs(os.path.join(self.dir, shortname), exist_ok=True)
                     os.makedirs(os.path.join(self.dir, 'stitching'), exist_ok=True)
-                    self.cam_dir.append(os.path.join(self.dir, name))
+                    self.cam_dir.append(os.path.join(self.dir, shortname))
             except:
-                logging.info(f"{name} is not found!")
+                logging.info(f"{shortname} is not found!")
         logging.info(f'Connected: {self.cams_names}')
 
     def set_camera_default_configuration(self, config_dict=None):
         if config_dict is None:
+            # use lower case
             config_dict = {'ta2-nearfield': {'format_pixel': "Mono12", "exposure": 1000, "gain": 230, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}, 'ta2-farfield': {'format_pixel': "Mono12", "exposure": 1000, "gain": 0, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False},
-                        'ta2-gossip': {'format_pixel': "Mono12", "exposure": 1000, "gain": 240, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False},'PW_Comp_In':{'format_pixel': "Mono12", "exposure": 5000, "gain": 136, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}}
+                        'ta2-gossip': {'format_pixel': "Mono12", "exposure": 1000, "gain": 240, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False},'PW_Comp_In'.lower():{'format_pixel': "Mono8", "exposure": 5000, "gain": 136, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}}
         json_object = json.dumps(config_dict)
         with open(os.path.join(self.dir, "settings.json"), "w+") as settings_File:
             settings_File.write(json_object)
@@ -130,17 +129,22 @@ class Daq:
         Main acquisition function. Use external trigger and save data.
         '''
         logging.info('Waiting for a trigger...')
+        self.shot_numbers = [1 for i in range(len(self.cams))]
         for idx, bs in enumerate(self.cams):
             bs.reset_number()
         while True:
             is_new_flag = []
+            # when there is a short limit, the acquisition stops after the requested image numbers are reached.
+            finished_cam = [False for i in range(len(self.cams))]
             for idx, bs in enumerate(self.cams):
                 is_new_flag.append(bs.is_new_image)
             for idx, bs in enumerate(self.cams):
-                if self.shot_numbers[idx]<= shot_limit and is_new_flag[idx]:
+                if self.shot_numbers[idx] > shot_limit:
+                    finished_cam[idx] = True
+                elif is_new_flag[idx]:
                     data, data_array = self.get_image(bs)
-                    if bs.name == 'PW_Comp_In':
-                        file_name = '_'.join([f'shot{self.shot_numbers[idx]}', f'{bs.inferred_energy}J'])
+                    if bs.user_defined_name == 'PW_Comp_In' or bs.user_defined_name == 'TA2-FarField':
+                        file_name = '_'.join([f'shot{self.shot_numbers[idx]}', f'{bs.inferred_energy:.2f}J'])
                     else:
                         file_name = f'shot{self.shot_numbers[idx]}'
                     data.save(os.path.join(
@@ -153,7 +157,9 @@ class Daq:
                         if len(self.image_list[f'shot{self.shot_numbers[idx]}']) == len(self.select_cam_list):
                             self.stitch_images(f'shot{self.shot_numbers[idx]}').save(os.path.join(self.dir, 'stitching', f'shot{self.shot_numbers[idx]}.tiff'))
                     self.shot_numbers[idx] += 1
-
+            if not False in finished_cam:
+                return
+            
     def imadjust(self, input, tol=0.01):
         """
         input: numpy array
