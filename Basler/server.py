@@ -1,6 +1,5 @@
 #!/usr/bin/python3 -u
 # -*- coding: utf-8 -*-
-import tango
 from tango import AttrWriteType, DevState, DevFloat, EncodedAttribute
 from tango.server import Device, attribute, command, device_property
 from pypylon import pylon
@@ -10,7 +9,10 @@ import datetime
 import logging
 from PIL import Image
 import os
-
+import sys
+if True:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from common.other import generate_basename
 # -----------------------------
 
 handlers = [logging.StreamHandler()]
@@ -37,6 +39,15 @@ class Basler(Device):
         access=AttrWriteType.READ,
     )
 
+    read_time = attribute(
+        label="read time",
+        dtype="str",
+        access=AttrWriteType.READ,
+    )
+
+    def read_read_time(self):
+        return self._read_time
+
     flux = attribute(
         label="flux",
         max_dim_x=4096,
@@ -51,7 +62,6 @@ class Basler(Device):
         dtype=float,
         unit='J*cm**-2',
         format='8.4f',
-        polling_period = polling,
         access=AttrWriteType.READ,
     )
 
@@ -87,14 +97,13 @@ class Basler(Device):
         label="energy",
         dtype=float,
         unit='J',
-        polling_period = polling,
         access=AttrWriteType.READ,
         doc='Calibrated by QE150. E = (<I> - 0.965)*1.307.'
     )
 
     def read_energy(self):
         return self._energy
-    
+
     is_polling_periodically = attribute(
         label="polling periodically",
         dtype=bool,
@@ -119,8 +128,39 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        doc='save data path on the server, use ";" to seperate multiple paths'
+        doc='Save data path on the server. Use %date to indicate today; Use ";" to seperate multiple paths'
     )
+
+    save_interval = attribute(
+        label='save interval',
+        dtype=float,
+        access=AttrWriteType.READ_WRITE,
+        unit='s',
+        memorized=is_memorized,
+        hw_memorized=True,
+        doc='If the trigger interval is longer than the save_interval threshold, images will be saved. Otherwise, no saving.'
+    )
+
+    def read_save_interval(self):
+        return self._save_interval
+
+    def write_save_interval(self, value):
+        self._save_interval = value
+
+    naming_format = attribute(
+        label='naming format',
+        dtype=str,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        hw_memorized=True,
+        doc='Naming format for the image file. For example, "%s_%t_%e%f", where %s is for shot number, %t is for timestamp, %e is for energy, %f is .tiff'
+    )
+
+    def read_naming_format(self):
+        return self._naming_format
+
+    def write_naming_format(self, value):
+        self._naming_format = value
 
     trigger_source = attribute(
         label="trigger source",
@@ -217,6 +257,7 @@ class Basler(Device):
     is_debug_mode = attribute(
         label='debug',
         dtype=bool,
+        memorized=is_memorized,
         hw_memorized=True,
         access=AttrWriteType.READ_WRITE,
     )
@@ -249,7 +290,6 @@ class Basler(Device):
         label='image #',
         dtype=int,
         access=AttrWriteType.READ,
-        polling_period=polling,
         doc="image number since reset"
     )
 
@@ -352,17 +392,20 @@ class Basler(Device):
         self.camera.Height.Value = attr.get_write_value()
 
     def init_device(self):
-        self.model_type = ['a2A1920-51gmBAS', 'a2A2590-22gmBAS','a2A5320-7gmPRO']
+        self.model_type = ['a2A1920-51gmBAS',
+                           'a2A2590-22gmBAS', 'a2A5320-7gmPRO']
         self._is_polling_periodically = False
         self._debug = False
         self._save_data = False
         self._save_path = ''
+        self._naming_format = '%t%f'
+        self._save_interval = 0
         self._image_number = 0
         self._energy = 0
         self._hot_spot = 0
+        self._read_time = 'N/A'
         super().init_device()
         self.set_state(DevState.INIT)
-        self.idx = 0
         try:
             self.device = self.get_camera_device()
             if self.device is not None:
@@ -426,7 +469,7 @@ class Basler(Device):
             try:
                 os.makedirs(self._save_path, exist_ok=True)
             except FileNotFoundError:
-                return            
+                return
 
     def read_is_polling_periodically(self):
         if not self._is_polling_periodically:
@@ -445,15 +488,30 @@ class Basler(Device):
         #         return ";".join([f'{e[0:2]}...{e[-2:-1]}' for e in self._save_path.split(';')])
         #     return f'{self._save_path[0:5]}...{self._save_path[-5:]}'
         # else:
+        # if the _use_date flag is True and the date is a new day, run write_save_path again to update the date
+        if self._use_date and os.path.split(self._save_path)[1] != datetime.datetime.today().strftime("%Y%m%d"):
+            self.write_save_path(os.path.join(os.path.split(self._save_path)[
+                0], '%date'))
         return self._save_path
 
     def write_save_path(self, value):
+        # if the entered path has %date in it, replace %date with today's date and mark a _use_date flag
+        if '%date' in value:
+            self._use_date = True
+            value = value.replace(
+                '%date', datetime.datetime.today().strftime("%Y%m%d"))
+        else:
+            self._use_date = False
+        value_split = value.split(';')
         if self._save_data:
-            try:
-                os.makedirs(value, exist_ok=True)
-            except FileNotFoundError:
-                return
+            for idx, v in enumerate(value_split):
+                try:
+                    os.makedirs(v, exist_ok=True)
+                except OSError as inst:
+                    logging.error(inst)
+                    raise (f'error on save_path part {idx}')
         self._save_path = value
+        self.push_change_event("save_path", self.read_save_path())
 
     def read_model(self):
         self._model = self.camera.GetDeviceInfo().GetModelName()
@@ -590,32 +648,30 @@ class Basler(Device):
             self._fps = 0
 
     def read_is_new_image(self):
-        self.idx += 1
+        # self.i, grabbing successfully grabbed image. self._image_number, image counting and can be reset at any time.
         self._is_new_image = False
         while self.camera.IsGrabbing():
             # the retrieve time out may need to be reconsidered.
             grabResult = self.camera.RetrieveResult(
                 int(100), pylon.TimeoutHandling_Return)
             if grabResult and grabResult.GrabSucceeded():
+                if self.read_trigger_source().lower() != "off":
+                    self.i += 1
+                    self._image_number += 1
+                    logging.info(
+                        f'{self.i}')
                 self._image = grabResult.Array
                 self._energy = (np.mean(self._image) - 0.965)*1.307
-                self._flux = (self._image - 0.965)/(611*508)*1.307/(4.9/102)**2*0.814
+                self._flux = (self._image - 0.965)/(611*508) * \
+                    1.307/(4.9/102)**2*0.814
                 self._hot_spot = np.max(self._flux)*0.814
                 grabResult.Release()
                 if self._debug:
                     logging.info(
-                        f"{self.idx} new. mean intensity: {np.mean(self._image)}")
-                # self.push_change_event('image', self._image)
-                if self._save_data and self._save_path:
-                    data = Image.fromarray(self._image)
-                    parse_save_path = self._save_path.split(';')
-                    for path in parse_save_path:
-                        os.makedirs(path, exist_ok=True)
-                        now = datetime.datetime.strftime(
-                            datetime.datetime.now(), '%Y-%m-%d-%H-%M-%S-%f')
-                        image_name = f'{now}.tiff'
-                        data.save(os.path.join(path, image_name))
+                        f"{self._image_number} new. mean intensity: {np.mean(self._image)}")
+
                 self._is_new_image = True
+                self._read_time = datetime.datetime.now().strftime("%H-%M-%S.%f")
                 # self.push_change_event("image", self._image)
                 self.push_change_event("image", self.read_image())
                 self.push_change_event("flux", self.read_flux())
@@ -626,29 +682,45 @@ class Basler(Device):
                 self.push_change_event(
                     "hot_spot", self.read_hot_spot())
                 # show image count while not in live mode
-                if self.read_trigger_source().lower() != "off":
-                    self.i += 1
-                    self._image_number += 1
-                    logging.info(
-                        f'{self.i}')
-            else:
-                if self._debug:
-                    logging.info(
-                        "Started grabbing but no images retrieved yet!")
+                if self._save_data and self._save_path:
+                    parse_save_path = self._save_path.split(';')
+                    self.time1 = time.perf_counter()
+                    should_save = True
+                    if hasattr(self, 'time0'):
+                        self.time_interval = self.time1 - self.time0
+                        # ----create the interval threshold, read time attr
+                        if self.time_interval < self._save_interval:
+                            for path in parse_save_path:
+                                if os.path.exists(os.path.join(
+                                        path, f'{self.image_basename}')):
+                                    os.remove(os.path.join(
+                                        path, f'{self.image_basename}'))
+                                    logging.info(
+                                        f"Removed previous saved image {self.image_basename}")
+                                should_save = False
+                    self.time0 = self.time1
+                    # generate file name after delete the old file name
+                    self.image_basename = generate_basename(
+                        self._naming_format, {'%s': f'ImageNum{self._image_number}', '%t': f'Time{self._read_time}', '%e': f'Energy{self._energy:.3f}J', '%f': '.tiff'})
+                    if should_save:
+                        data = Image.fromarray(self._image)
+                        for path in parse_save_path:
+                            os.makedirs(path, exist_ok=True)
+                            data.save(os.path.join(path, self.image_basename))
+                            if self._debug:
+                                logging.info(
+                                    f"Image is save to {os.path.join(path, self.image_basename)}")
             return self._is_new_image
-        if self._debug:
-            logging.info(
-                f"{self.idx} old images. mean intensity: {np.mean(self._image)}")
         # return False if there is no new image
         return self._is_new_image
 
     def read_image(self):
         # now read_image() is only triggered when it is a new image.
         return self._image
-    
+
     def read_flux(self):
         return self._flux
-    
+
     def read_hot_spot(self):
         # now read_image() is only triggered when it is a new image.
         return self._hot_spot

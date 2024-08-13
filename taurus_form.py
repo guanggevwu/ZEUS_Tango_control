@@ -11,7 +11,7 @@ import tango
 app = TaurusApplication(sys.argv, cmd_line_parser=None)
 w = TaurusForm()
 
-device_name = 'test/gentec/1'
+device_name = 'test/dg535/1'
 dp = tango.DeviceProxy(device_name)
 # dp = taurus.Device(device_name)
 

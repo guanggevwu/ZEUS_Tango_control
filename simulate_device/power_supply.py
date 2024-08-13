@@ -5,13 +5,13 @@ import time
 import numpy
 from tango import AttrQuality, AttrWriteType, DispLevel, DevState, DebugIt
 from tango.server import Device, attribute, command, pipe, device_property
+from datetime import datetime
 
 
 class PowerSupply(Device):
     voltage = attribute(
         label="Voltage",
         dtype=float,
-        display_level=DispLevel.OPERATOR,
         access=AttrWriteType.READ,
         unit="V",
         format="8.4f",
@@ -20,7 +20,6 @@ class PowerSupply(Device):
     current = attribute(
         label="Current",
         dtype=float,
-        display_level=DispLevel.EXPERT,
         access=AttrWriteType.READ_WRITE,
         unit="A",
         format="8.4f",
@@ -33,6 +32,7 @@ class PowerSupply(Device):
         fget="get_current",
         fset="set_current",
         doc="the power supply current",
+        rel_change=1,
     )
     noise = attribute(label="Noise", dtype=((int,),),
                       max_dim_x=1024, max_dim_y=1024)
@@ -42,7 +42,9 @@ class PowerSupply(Device):
 
     def init_device(self):
         Device.init_device(self)
-        self.__current = 0.0
+        self.__current = 1.0
+        self.set_change_event('voltage', False, True)
+        self.set_change_event('current', False, True)
         self.set_state(DevState.STANDBY)
 
     def read_voltage(self):
@@ -50,6 +52,8 @@ class PowerSupply(Device):
         return 9.99, time.time(), AttrQuality.ATTR_WARNING
 
     def get_current(self):
+        now = datetime.now()
+        # self.__current = float(now.second)
         return self.__current
 
     def set_current(self, current):

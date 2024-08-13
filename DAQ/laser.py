@@ -4,14 +4,16 @@ from datetime import datetime
 import os
 import logging
 from daq import Daq
+import atexit
+
 
 dt_string = datetime.now().strftime("%Y%m%d")
-run_num = input('\nPlease input a run number: ')
-save_dir = os.path.join(r'N:\2024\Qing_test', f'{dt_string}_run{run_num}')
+
+save_dir = r'Z:\Laser Beam Images\Qing_test'
 # select_cam_list = ['TA2-NearField', 'TA2-FarField', "TA2-GOSSIP"]
-select_cam_list = ['TA2-NearField', 'TA2-FarField']
+select_cam_list = ['test/basler/testcam']
 daq = Daq(select_cam_list, dir=save_dir)
+atexit.register(daq.termination)
 daq.set_camera_configuration()
-daq.take_background()
 daq.test_mode()
-daq.acquisition()
+daq.acquisition(interval_threshold=0)
