@@ -19,11 +19,10 @@ logging.basicConfig(
 
 
 class Daq:
-    def __init__(self, select_cam_list, dir='', date_in_low_level=False, debug=False, check_exist=True):
+    def __init__(self, select_cam_list, dir='', debug=False, check_exist=True):
         self.cam_info = defaultdict(dict)
         self.dir = dir
         self.select_cam_list = select_cam_list
-        self.date_in_low_level = date_in_low_level
         for c in select_cam_list:
             try:
                 bs = tango.DeviceProxy(c)
@@ -33,9 +32,6 @@ class Daq:
                 self.cam_info[c]['cam_dir'] = os.path.join(
                     self.dir, self.cam_info[c]['shortname'])
                 self.cam_info[c]['images_to_stitch'] = {}
-                if date_in_low_level:
-                    self.cam_info[c]['cam_dir'] = os.path.join(
-                        self.cam_info[c]['cam_dir'], datetime.today().strftime('%Y-%m-%d'))
                 Yes_for_all = False
                 if dir and check_exist and not Yes_for_all and os.path.exists(self.cam_info[c]['cam_dir']):
                     files_num = sum(
@@ -67,13 +63,12 @@ class Daq:
         if config_dict is None:
             # use lower case
             config_dict = {'ta2-nearfield': {'format_pixel': "Mono12", "exposure": 1000, "gain": 230, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}, 'ta2-farfield': {'format_pixel': "Mono12", "exposure": 1000, "gain": 0, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False},
-                           'ta2-gossip': {'format_pixel': "Mono12", "exposure": 1000, "gain": 240, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}, 'PW_Comp_In'.lower(): {'format_pixel': "Mono12", "exposure": 5000, "gain": 136, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False, "saving_format": '%s_%t_%e%f'}, 'testcam': {'format_pixel': "Mono8", "exposure": 1000, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False, "saving_format": '%s_%t_%e%f'}}
+                           'ta2-gossip': {'format_pixel': "Mono12", "exposure": 1000, "gain": 240, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}, 'PW_Comp_In'.lower(): {'format_pixel': "Mono12", "exposure": 5000, "gain": 136, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False, "saving_format": '%s_%t_%e_%h.%f'}, 'testcam': {'format_pixel': "Mono8", "exposure": 1000, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False, "saving_format": '%s_%t_%e_%h.%f'}, 'all': {}}
         self.config_dict = config_dict
         if saving:
             json_object = json.dumps(config_dict)
-            json_dir = self.cam_dir if self.date_in_low_level else self.dir
-            os.makedirs(json_dir, exist_ok=True)
-            with open(os.path.join(json_dir, "settings.json"), "w+") as settings_File:
+            os.makedirs(self.dir, exist_ok=True)
+            with open(os.path.join(self.dir, "settings.json"), "w+") as settings_File:
                 settings_File.write(json_object)
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
@@ -82,6 +77,7 @@ class Daq:
                 cam_settings = config_dict[dev_short_name.lower()]
             elif 'all' in config_dict:
                 cam_settings = config_dict['all']
+            info['config_dict'] = cam_settings
             bs.relax()
             for key, value in cam_settings.items():
                 if hasattr(bs, key):
@@ -177,16 +173,16 @@ class Daq:
                     #         os.remove(os.path.join(
                     #             info['cam_dir'], f'{info["file_name"]}.tiff'))
                     # info['time0'] = info['time1']
-                    info['file_name'] = '%s%f' if 'saving_format' not in info else info['saving_format']
+                    info['file_name'] = '%s.%f' if 'saving_format' not in info['config_dict'] else info['config_dict']['saving_format']
                     info['file_name'] = generate_basename(
-                        info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': f'Time{bs.read_time}', '%e': f'{bs.energy:.3f}J', '%f': '.tiff'})
+                        info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': f'Time{bs.read_time}', '%e': f'Energy{bs.energy:.3f}J', '%h': f'Energy{bs.hot_spot:.4f}Jcm-2', '%f': 'tiff'})
                     # the saving interval threshold has been enabled in server side.
                     # if info['shot_num'] == 1 or (info['time_interval'] > interval_threshold):
                     data.save(os.path.join(
                         info['cam_dir'], info["file_name"]))
                     logging.info("Shot {} taken for {} saved {} to {}:".format(
                         info['shot_num'], info['shortname'],  {data.size}, {os.path.join(
-                        info['cam_dir'], info["file_name"])}))
+                            info['cam_dir'], info["file_name"])}))
                     if stitch:
                         adjusted_image = self.stretch_image(data_array)
                         info['images_to_stitch'][f'shot{info["shot_num"]}'] = adjusted_image
@@ -247,6 +243,7 @@ class Daq:
         return large_image_p
 
     def termination(self, config_dict=None):
+        logging.info('terminating...')
         if config_dict is None:
             config_dict = {'all': {"is_polling_periodically": True}}
         self.set_camera_configuration(

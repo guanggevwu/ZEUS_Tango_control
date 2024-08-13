@@ -63,6 +63,7 @@ class Basler(Device):
         unit='J*cm**-2',
         format='8.4f',
         access=AttrWriteType.READ,
+        doc="Average of the 10 highest pixel values and then multiplied by 0.814."
     )
 
     serial_number = device_property(dtype=str, default_value='')
@@ -153,7 +154,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        doc='Naming format for the image file. For example, "%s_%t_%e%f", where %s is for shot number, %t is for timestamp, %e is for energy, %f is .tiff'
+        doc='Naming format for the image file. For example, "%s_%t_%e_%h%f", where %s is for shot number, %t is for timestamp, %e is for energy, %h is for hot spot, %f is .tiff'
     )
 
     def read_naming_format(self):
@@ -398,7 +399,7 @@ class Basler(Device):
         self._debug = False
         self._save_data = False
         self._save_path = ''
-        self._naming_format = '%t%f'
+        self._naming_format = '%t.%f'
         self._save_interval = 0
         self._image_number = 0
         self._energy = 0
@@ -664,7 +665,8 @@ class Basler(Device):
                 self._energy = (np.mean(self._image) - 0.965)*1.307
                 self._flux = (self._image - 0.965)/(611*508) * \
                     1.307/(4.9/102)**2*0.814
-                self._hot_spot = np.max(self._flux)*0.814
+                self._hot_spot = np.mean(-np.partition(-self._flux,
+                                         10)[:10])*0.814
                 grabResult.Release()
                 if self._debug:
                     logging.info(
@@ -701,7 +703,7 @@ class Basler(Device):
                     self.time0 = self.time1
                     # generate file name after delete the old file name
                     self.image_basename = generate_basename(
-                        self._naming_format, {'%s': f'ImageNum{self._image_number}', '%t': f'Time{self._read_time}', '%e': f'Energy{self._energy:.3f}J', '%f': '.tiff'})
+                        self._naming_format, {'%s': f'ImageNum{self._image_number}', '%t': f'Time{self._read_time}', '%e': f'Energy{self._energy:.3f}J', '%h': f'Energy{self._hot_spot:.4f}Jcm-2', '%f': 'tiff'})
                     if should_save:
                         data = Image.fromarray(self._image)
                         for path in parse_save_path:
@@ -722,7 +724,6 @@ class Basler(Device):
         return self._flux
 
     def read_hot_spot(self):
-        # now read_image() is only triggered when it is a new image.
         return self._hot_spot
 
     def disable_polling(self, attr):
