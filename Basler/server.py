@@ -666,7 +666,7 @@ class Basler(Device):
                 self._energy = (np.mean(self._image) - 0.965)*1.307
                 self._flux = (self._image - 0.965)/(611*508) * \
                     1.307/(4.9/102)**2*0.814
-                self._hot_spot = np.mean(-np.partition(-self._flux,
+                self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
                                          10)[:10])*0.814
                 grabResult.Release()
                 if self._debug:
@@ -704,7 +704,7 @@ class Basler(Device):
                     self.time0 = self.time1
                     # generate file name after delete the old file name
                     self.image_basename = generate_basename(
-                        self._naming_format, {'%s': f'ImageNum{self._image_number}', '%t': f'Time{self._read_time}', '%e': f'Energy{self._energy:.3f}J', '%h': f'Energy{self._hot_spot:.4f}Jcm-2', '%f': 'tiff'})
+                        self._naming_format, {'%s': f'ImageNum{self._image_number}', '%t': f'Time{self._read_time}', '%e': f'Energy{self._energy:.3f}J', '%h': f'HotSpot{self._hot_spot:.4f}Jcm-2', '%f': 'tiff'})
                     if should_save:
                         data = Image.fromarray(self._image)
                         for path in parse_save_path:
