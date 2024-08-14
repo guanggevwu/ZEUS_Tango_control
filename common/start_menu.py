@@ -19,7 +19,7 @@ class Menu:
         self.servers = self.db.get_server_list()
         # when start the server, the server name is derived from the full device name. When the last part of the device name is equal to the server name, we must manually define it. The 'combine' is only for GUI combination show.
         self.combination_table_client = {'TA1_conf1': ['TA1/basler/TA1-Ebeam', 'TA1/basler/TA1-EspecH', 'TA1/basler/TA1-EspecL', 'TA1/basler/TA1-Shadowgraphy'], 'TA1_conf1_combine': [
-            'TA1_conf1_combine'], 'TA2_conf1': ['TA2/basler/TA2-NearField', 'TA2/basler/TA2-FarField'], 'TA2_conf1_combine': ['TA2_conf1_combine']}
+            'TA1_conf1_combine'], 'TA2_conf1': ['TA2/basler/TA2-NearField', 'TA2/basler/TA2-FarField'], 'TA2_conf1_combine': ['TA2_conf1_combine'], 'PW_Comp_In_conf1': ['laser/basler/PW_Comp_In_NF',  'laser/basler/PW_Comp_In_FF'], 'PW_Comp_In_combine': ['PW_Comp_In_combine']}
         self.combination_table_server = {key: [i.split(
             '/')[-1] for i in value] for key, value in self.combination_table_client.items() if 'combine' not in key}
         # manually define the server name

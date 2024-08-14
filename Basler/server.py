@@ -405,6 +405,7 @@ class Basler(Device):
         self._energy = 0
         self._hot_spot = 0
         self._read_time = 'N/A'
+        self._use_date = False
         super().init_device()
         self.set_state(DevState.INIT)
         try:

@@ -45,6 +45,8 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "basler": {'server': 'Basler/testsr', '_class': 'Basler', 'name': 'test/basler/1'},
             "basler_SF2": {'server': 'Basler/MA2', '_class': 'Basler', 'name': 'laser/basler/SF2'},
             "basler_MA2-Input": {'server': 'Basler/MA2', '_class': 'Basler', 'name': 'laser/basler/MA2-Input'},
+            "basler_PW_Comp_In_NF": {'server': 'Basler/PW_Comp_In_NF', '_class': 'Basler', 'name': 'laser/basler/PW_Comp_In_NF'},
+            "basler_PW_Comp_In_FF": {'server': 'Basler/PW_Comp_In_FF', '_class': 'Basler', 'name': 'laser/basler/PW_Comp_In_FF'},
             "basler_TA2-NearField": {'server': 'Basler/TA2-NearField', '_class': 'Basler', 'name': 'TA2/basler/TA2-NearField'},
             "basler_TA2-FarField": {'server': 'Basler/TA2-FarField', '_class': 'Basler', 'name': 'TA2/basler/TA2-FarField'},
             "basler_TA2-Alignment": {'server': 'Basler/TA2-Alignment', '_class': 'Basler', 'name': 'TA2/basler/TA2-Alignment'},

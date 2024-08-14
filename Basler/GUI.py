@@ -170,9 +170,9 @@ class BaslerGUI():
 if __name__ == "__main__":
     basler_app = BaslerGUI(args.device, args.polling)
     combination_table = {'TA1_conf1_combine': ['TA1/basler/TA1-Ebeam', 'TA1/basler/TA1-EspecH', 'TA1/basler/TA1-EspecL',
-                                               'TA1/basler/TA1-Shadowgraphy'], 'TA2_conf1_combine': ['TA2/basler/TA2-NearField', 'TA2/basler/TA2-FarField']}
-    image_panel_config = {'combine': {"image_number": False, 'command': False},
-                          'laser/basler/PW_Comp_In': {'image': 'flux', 'calibration': True}, 'test/basler/testcam': {'image': 'flux', 'calibration': True}}
+                                               'TA1/basler/TA1-Shadowgraphy'], 'TA2_conf1_combine': ['TA2/basler/TA2-NearField', 'TA2/basler/TA2-FarField'],'PW_Comp_In_combine': [ 'laser/basler/PW_Comp_In_NF',  'laser/basler/PW_Comp_In_FF']}
+    image_panel_config = {'TA1_conf1_combine': {"image_number": False, 'command': False}, 'TA2_conf1_combine': {"image_number": False, 'command': False}, 'PW_Comp_In_combine': {'image': 'flux', 'calibration': True},
+                          'laser/basler/PW_Comp_In_NF': {'image': 'flux', 'calibration': True}, 'test/basler/testcam': {'image': 'flux', 'calibration': True},'laser/basler/PW_Comp_In_FF': {'image': 'flux', 'calibration': True}}
 
     # get the device list
     if 'combine' in args.device:
@@ -180,9 +180,7 @@ if __name__ == "__main__":
     else:
         device_list = [args.device]
     # get the configuration
-    if 'combine' in args.device:
-        pass_config = image_panel_config['combine']
-    elif args.device in image_panel_config:
+    if args.device in image_panel_config:
         pass_config = image_panel_config[args.device]
     else:
         pass_config = {}
