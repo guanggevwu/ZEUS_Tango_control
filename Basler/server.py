@@ -154,7 +154,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        doc='Naming format for the image file. For example, "%s_%t_%e_%h%f", where %s is for shot number, %t is for timestamp, %e is for energy, %h is for hot spot, %f is .tiff'
+        doc='Naming format for the image file. For example, "%s_%t_%e_%h.%f", where %s is for shot number, %t is for timestamp, %e is for energy, %h is for hot spot, %f is tiff'
     )
 
     def read_naming_format(self):
