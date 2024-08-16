@@ -69,7 +69,7 @@ class Basler(Device):
     serial_number = device_property(dtype=str, default_value='')
     friendly_name = device_property(dtype=str, default_value='')
 
-    # image_encoded = attribute(label='encnoded image',
+    # image_encoded = attribute(label='encoded image',
     #            access=AttrWriteType.READ)
 
     # no need since it is a device property
@@ -129,7 +129,7 @@ class Basler(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        doc='Save data path on the server. Use %date to indicate today; Use ";" to seperate multiple paths'
+        doc='Save data path on the server. Use %date to indicate today; Use ";" to separate multiple paths'
     )
 
     save_interval = attribute(
@@ -168,6 +168,7 @@ class Basler(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
+        hw_memorized=True,
         doc='off or software or external'
     )
 
@@ -176,7 +177,8 @@ class Basler(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        doc='usually use acquisition start'
+        hw_memorized=True,
+        doc='FrameStart for one image per trigger and AcquisitionStart for multiple images per trigger.'
     )
 
     frames_per_trigger = attribute(
@@ -357,7 +359,6 @@ class Basler(Device):
             self.poll_attribute('is_new_image', int(self._polling))
             logging.info(
                 f'Changed the image retrieve timeout to {self._polling} to match the long exposure time')
-        # "a2A1920-51gmBAS" is the farfield camera
         if self._model_category == 1:
             self.camera.ExposureTime.Value = attr.get_write_value()
         else:
