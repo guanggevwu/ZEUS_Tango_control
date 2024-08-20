@@ -163,6 +163,36 @@ class Basler(Device):
     def write_naming_format(self, value):
         self._naming_format = value
 
+    lr_flip = attribute(
+        label='lr flip',
+        dtype=bool,
+        access=AttrWriteType.READ_WRITE,
+        memorized=True,
+        hw_memorized=True,
+        doc="flip the image left-right"
+    )
+
+    def read_lr_flip(self):
+        return self._lr_flip
+
+    def write_lr_flip(self, value):
+        self._lr_flip = value
+
+    ud_flip = attribute(
+        label='ud flip',
+        dtype=bool,
+        access=AttrWriteType.READ_WRITE,
+        memorized=True,
+        hw_memorized=True,
+        doc="flip the image up-down"
+    )
+
+    def read_ud_flip(self):
+        return self._ud_flip
+
+    def write_ud_flip(self, value):
+        self._ud_flip = value
+
     trigger_source = attribute(
         label="trigger source",
         dtype=str,
@@ -407,6 +437,8 @@ class Basler(Device):
         self._hot_spot = 0
         self._read_time = 'N/A'
         self._use_date = False
+        self._lr_flip = False
+        self._ud_flip = False
         super().init_device()
         self.set_state(DevState.INIT)
         try:
@@ -664,6 +696,10 @@ class Basler(Device):
                     logging.info(
                         f'{self.i}')
                 self._image = grabResult.Array
+                if self._lr_flip:
+                    self._image = np.fliplr(self._image)
+                if self._ud_flip:
+                    self._image = np.flipud(self._image)
                 self._energy = (np.mean(self._image) - 0.965)*1.307
                 self._flux = (self._image - 0.965)/(611*508) * \
                     1.307/(4.9/102)**2*0.814
@@ -734,7 +770,7 @@ class Basler(Device):
             logging.info(f'polling for {attr} is disabled')
 
     def enable_polling(self, attr):
-        if not self.is_attribute_polled(attr):
+        if not self.is_attribute_polled(attr) and self._polling:
             self.poll_attribute(attr, self._polling)
             logging.info(f'polling period of {attr} is set to {self._polling}')
 

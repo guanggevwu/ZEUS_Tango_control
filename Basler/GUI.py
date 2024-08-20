@@ -15,6 +15,7 @@ if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
     from common.TaurusGUI_Argparse import TaurusArgparse
+    from common.config import device_name_table, image_panel_config
 
 parser = TaurusArgparse(
     description='GUI for Basler camera', device_default='test/basler/1', polling_default=1000)
@@ -148,16 +149,17 @@ class BaslerGUI():
 
         self.gui.createPanel(panel2, f'{device_name}_paramters')
 
-    def combined_panel(self, device_list):
+    def combined_panel(self, device_list, combine_form_with_onshot=False):
         panel3 = Qt.QWidget()
         panel3_layout = Qt.QVBoxLayout()
         panel3.setLayout(panel3_layout)
-        self.add_readonly_label_widget(
-            panel3_layout, 'laser/gentec/Onshot', 'name_attr', check_exist=True)
-        self.add_readonly_label_widget(
-            panel3_layout, 'laser/gentec/Onshot', 'shot', check_exist=True)
-        self.add_readonly_label_widget(
-            panel3_layout, 'laser/gentec/Onshot', 'main_value', check_exist=True)
+        if combine_form_with_onshot:
+            self.add_readonly_label_widget(
+                panel3_layout, 'laser/gentec/Onshot', 'name_attr', check_exist=True)
+            self.add_readonly_label_widget(
+                panel3_layout, 'laser/gentec/Onshot', 'shot', check_exist=True)
+            self.add_readonly_label_widget(
+                panel3_layout, 'laser/gentec/Onshot', 'main_value', check_exist=True)
         for d in device_list:
             self.add_readonly_label_widget(
                 panel3_layout, d, 'user_defined_name')
@@ -169,26 +171,23 @@ class BaslerGUI():
 
 if __name__ == "__main__":
     basler_app = BaslerGUI(args.device, args.polling)
-    combination_table = {'TA1_conf1_combine': ['TA1/basler/TA1-Ebeam', 'TA1/basler/TA1-EspecH', 'TA1/basler/TA1-EspecL',
-                                               'TA1/basler/TA1-Shadowgraphy'], 'TA2_conf1_combine': ['TA2/basler/TA2-NearField', 'TA2/basler/TA2-FarField'],'PW_Comp_In_combine': [ 'laser/basler/PW_Comp_In_NF',  'laser/basler/PW_Comp_In_FF']}
-    image_panel_config = {'TA1_conf1_combine': {"image_number": False, 'command': False}, 'TA2_conf1_combine': {"image_number": False, 'command': False}, 'PW_Comp_In_combine': {'image': 'flux', 'calibration': True},
-                          'laser/basler/PW_Comp_In_NF': {'image': 'flux', 'calibration': True}, 'test/basler/testcam': {'image': 'flux', 'calibration': True},'laser/basler/PW_Comp_In_FF': {'image': 'flux', 'calibration': True}}
-
     # get the device list
-    if 'combine' in args.device:
-        device_list = combination_table[args.device]
+    if 'combination' in args.device:
+        device_list = device_name_table[args.device]
     else:
         device_list = [args.device]
     # get the configuration
+    pass_config1, pass_config2 = {}, {}
     if args.device in image_panel_config:
-        pass_config = image_panel_config[args.device]
-    else:
-        pass_config = {}
+        pass_config1 = {key: value for key, value in image_panel_config[args.device].items(
+        ) if key != "combine_form_with_onshot"}
+        pass_config2 = {key: value for key, value in image_panel_config[args.device].items(
+        ) if key == "combine_form_with_onshot"}
     for d in device_list:
         basler_app.add_device(d)
-        basler_app.create_image_panel(d, **pass_config)
+        basler_app.create_image_panel(d, **pass_config1)
         basler_app.create_form_panel(d)
-    if 'combine' in args.device:
-        basler_app.combined_panel(device_list)
+    if 'combination' in args.device:
+        basler_app.combined_panel(device_list, **pass_config2)
     basler_app.gui.show()
     basler_app.app.exec_()

@@ -10,7 +10,7 @@ if True:
     from common.start_menu import Menu
 
 
-class BaslerMenu(Menu):
+class FileReaderMenu(Menu):
     def __init__(self, root):
         super().__init__()
         class_name = type(self).__name__.replace('Menu', '')
@@ -35,12 +35,10 @@ class BaslerMenu(Menu):
         device_names = self.db.get_device_name('*', class_name)
         instances = [e.split('/')[-1]
                      for e in self.servers if e.split('/')[0] == class_name]
-        # list(self.combination_table) is just the keys, i.e., the text shown in the dropdown list.
-        instances = list(self.instance_table)+(instances)
-        device_names = list(self.device_name_table) + \
-            list(device_names.value_string)
-        self.menu_dict = {'start server': ['server.py', instances, []],
-                          'start Taurus GUI': ['GUI.py', device_names, []]}
+        # list(self.combination_table_server) is just the keys, i.e., the text shown in the dropdown list.
+        instances = list(self.combination_table_server)+(instances)
+        self.menu_dict = {'start server': ['file_reader_server.py', instances, []],
+                          'start Taurus GUI': ['GUI.py', (*list(self.combination_table_client), *tuple(device_names.value_string)), []]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             # value[0][:-3], i.e., 'gentec_server' is the attribute name
             setattr(self, value[0][:-3], StringVar())
@@ -59,6 +57,6 @@ class BaslerMenu(Menu):
 
 if __name__ == '__main__':
     root = Tk()
-    dummy = BaslerMenu(root)
+    dummy = FileReaderMenu(root)
     atexit.register(dummy.terminate_all)
     root.mainloop()
