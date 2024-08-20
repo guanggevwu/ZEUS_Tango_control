@@ -8,4 +8,9 @@ if Tango polling period > Taurus polling period, Taurus GUI will use Tango polli
 
 To disable polling when using Taurus, set server polling to a large number.
 
+# the statement about self.push_change_event may be wrong. 20240813
 self.push_change_event will push changes to attr value but not to the Taurus GUI. For 2D image attr with taurus image module, push event will change GUI. Taurus GUI still uses the polling period defined by server or itself.
+
+
+update the database server:
+add export PKG_CONFIG_PATH=/usr/local/tango/lib/pkgconfig to .bashrc and do a source ~/.bashrc

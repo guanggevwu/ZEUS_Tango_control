@@ -700,11 +700,11 @@ class Basler(Device):
                     self._image = np.fliplr(self._image)
                 if self._ud_flip:
                     self._image = np.flipud(self._image)
-                self._energy = (np.mean(self._image) - 0.965)*1.307
-                self._flux = (self._image - 0.965)/(611*508) * \
-                    1.307/(4.9/102)**2*0.814
+                self._energy = (np.mean(self._image))*0.674
+                self._flux = (self._image)/(611*508) * \
+                    0.674/(4.9/102)**2*0.815
                 self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
-                                         10)[:10])*0.814
+                                         10)[:10])*0.815
                 grabResult.Release()
                 if self._debug:
                     logging.info(
