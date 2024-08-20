@@ -719,8 +719,9 @@ class GentecEO(Device):
                 decoded = decoded+chr(int(i[-2:], 16))
                 decoded = decoded+chr(int(i[-4:-2], 16))
             self._serial_number = decoded[42*2:45*2]
-            self._model = decoded[26*2:35*2]
-            self._model = self._model.replace('\x00', '')
+            self._model = decoded[26*2:42*2]
+            self._model = self._model.replace(
+                '\x00', '').replace(chr(int('CC', 16)), '')
             if self._model == "PH100-Si-HA-OD1":
                 self._new = True
                 self.read_set_zero('any')
