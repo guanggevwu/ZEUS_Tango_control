@@ -30,9 +30,17 @@ class GentecEO(Device):
 
     def find_com_number(self):
         all_ports = serial.tools.list_ports.comports()
-        for p in all_ports:
-            if p.manufacturer == 'Gentec-EO':
-                return p
+        filtered_ports = [
+            p for p in all_ports if p.manufacturer == 'Gentec-EO']
+        if len(filtered_ports) == 1:
+            return filtered_ports[0]
+        elif self.friendly_name == "QE12":
+            filtered_ports = [
+                p for p in filtered_ports if p.serial_number == '23869B4602001200']
+        elif self.friendly_name == "QE195":
+            filtered_ports = [
+                p for p in filtered_ports if p.serial_number == '27869B461E002000']
+        return filtered_ports[0]
 
     model = attribute(
         label="model",
@@ -451,6 +459,9 @@ class GentecEO(Device):
             # for 'QE65LP-S-MB-QED-IN', the range is 3 mj to 300j
             if self._model == 'QE65LP-S-MB-QED-IN':
                 self.display_range_steps = range(19, 30)
+            # for 'QE65LP-S-MB-QED-IN', the range is 30 mj to 300j
+            if self._model.startswith('QE195'):
+                self.display_range_steps = range(21, 30)
             # somehow the last two I are in a special format
             elif 'QE12LP-S-MB-INT' in self._model:
                 self.display_range_steps = range(17, 27)
