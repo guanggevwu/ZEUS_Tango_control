@@ -156,8 +156,10 @@ class FileReader(Device):
             self.previous_list = self.previous_list + [new_files[0]]
             logging.info(f"Detected a new file {new_files[0]}.")
             self._current_file = new_files[0]
-            self._image = np.array(Image.open(
-                os.path.join(self._folder_path, self._current_file)))
+            self._image_PIL = Image.open(
+                os.path.join(self._folder_path, self._current_file))
+            self._image = np.array(self._image_PIL)
+            self._format_pixel = str(self.mode_to_bpp[self._image_PIL.mode])
             self._modification_time = datetime.datetime.fromtimestamp(os.path.getmtime(
                 os.path.join(self._folder_path, self._current_file))).strftime("%m/%d %H:%M:%S:%f")
             self._image_number += 1
@@ -170,6 +172,15 @@ class FileReader(Device):
             return True
         else:
             return False
+
+    format_pixel = attribute(
+        label="pixel format",
+        dtype=str,
+        access=AttrWriteType.READ,
+    )
+
+    def read_format_pixel(self):
+        return self._format_pixel
 
     is_debug = attribute(
         label='debug',
@@ -196,6 +207,9 @@ class FileReader(Device):
         self._modification_time = 'N/A'
         self._image = np.zeros([1000, 1000])
         self._image_number = 0
+        self._format_pixel = 'unknown'
+        self.mode_to_bpp = {"1": 1, "L": 8, "P": 8, "RGB": 24, "RGBA": 32, "CMYK": 32, "YCbCr": 24, "LAB": 24, "HSV": 24, "I": 32, "F": 32, "I;16": 16,
+                            "I;16B": 16, "I;16L": 16, "I;16S": 16, "I;16BS": 16, "I;16LS": 16, "I;32": 32, "I;32B": 32, "I;32L": 32, "I;32S": 32, "I;32BS": 32, "I;32LS": 32}
         # self._polling_period = self.get_attribute_poll_period('is_new_image')
         # if self._polling_period == 0:
         #     self._polling_period = 200
@@ -213,6 +227,11 @@ class FileReader(Device):
             self.poll_attribute(attr, self._polling_period)
             logging.info(
                 f'polling period of {attr} is set to {self._polling_period}')
+
+    @command()
+    def reset_number(self):
+        self._image_number = 0
+        logging.info("Reset image number")
 
 
 if __name__ == "__main__":

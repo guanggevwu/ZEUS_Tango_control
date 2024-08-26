@@ -700,7 +700,7 @@ class GentecEO(Device):
         self._is_use_default_path = True
         self._is_use_default_path_read_count = 0
         self._debug = 0
-        self._historical_data = [['time', 'value']]
+        self._historical_data = [['pulse #', 'time', 'value']]
         self._historical_data_number = []
         self._start_statistics = False
         self._save_data = False

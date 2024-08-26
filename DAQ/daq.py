@@ -9,6 +9,9 @@ import json
 from collections import defaultdict
 from PIL import ImageDraw
 import sys
+import atexit
+from config import default_config_dict
+
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from common.other import generate_basename
@@ -23,6 +26,7 @@ class Daq:
         self.cam_info = defaultdict(dict)
         self.dir = dir
         self.select_cam_list = select_cam_list
+        Yes_for_all = False
         for c in select_cam_list:
             try:
                 bs = tango.DeviceProxy(c)
@@ -32,7 +36,6 @@ class Daq:
                 self.cam_info[c]['cam_dir'] = os.path.join(
                     self.dir, self.cam_info[c]['shortname'])
                 self.cam_info[c]['images_to_stitch'] = {}
-                Yes_for_all = False
                 if dir and check_exist and not Yes_for_all and os.path.exists(self.cam_info[c]['cam_dir']):
                     files_num = sum(
                         [len(files) for r, d, files in os.walk(self.cam_info[c]['cam_dir'])])
@@ -42,8 +45,9 @@ class Daq:
                         if is_overwrite.lower() == 'a':
                             Yes_for_all = True
                         elif is_overwrite.lower() != 'y':
-                            logging.info(
-                                "Raise because of not wanting to overwrite!")
+                            # will not be terminated because this is in a try closure
+                            exception = Exception(
+                                "Raise because of refusing to overwrite!")
                             raise
                 if dir:
                     os.makedirs(os.path.join(
@@ -53,17 +57,18 @@ class Daq:
 
                 logging.info(f'Connected: {c}')
             except:
-                logging.info(f"{c} is not found!")
-        if not len(select_cam_list):
-            logging.info("No cameras are found! Raise!")
-            raise
+                if 'exception' in locals():
+                    raise (exception)
+                else:
+                    raise (f"{c} is not found!")
         self.debug = debug
+        atexit.register(self.termination)
 
     def set_camera_configuration(self, config_dict=None, saving=True):
         if config_dict is None:
-            # use lower case
-            config_dict = {'ta2-nearfield': {'format_pixel': "Mono12", "exposure": 1000, "gain": 230, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}, 'ta2-farfield': {'format_pixel': "Mono12", "exposure": 1000, "gain": 0, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False},
-                           'ta2-gossip': {'format_pixel': "Mono12", "exposure": 1000, "gain": 240, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False}, 'PW_Comp_In'.lower(): {'format_pixel': "Mono12", "exposure": 5000, "gain": 136, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False, "saving_format": '%s_%t_%e_%h.%f'}, 'testcam': {'format_pixel': "Mono8", "exposure": 1000, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False, "saving_format": '%s_%t_%e_%h.%f'}, 'all': {}}
+            config_dict = default_config_dict
+        config_dict = {key: value for key,
+                       value in config_dict.items() if key in [v['shortname'] for v in self.cam_info.values()]}
         self.config_dict = config_dict
         if saving:
             json_object = json.dumps(config_dict)
@@ -78,13 +83,14 @@ class Daq:
             elif 'all' in config_dict:
                 cam_settings = config_dict['all']
             info['config_dict'] = cam_settings
-            bs.relax()
+            if 'basler' in bs.dev_name():
+                bs.relax()
             for key, value in cam_settings.items():
                 if hasattr(bs, key):
                     setattr(bs, key, value)
 
     def get_image(self, bs):
-        bits = bs.format_pixel.lower().replace('mono', '')
+        bits = ''.join([i for i in bs.format_pixel if i.isdigit()])
         if int(bits) > 8:
             bits = '16'
         current_image = bs.image.astype(f'uint{bits}')
@@ -113,7 +119,7 @@ class Daq:
                 if stitch:
                     adjusted_image = self.stretch_image(data_array)
                     info['images_to_stitch']['background'] = adjusted_image
-                    if len([value['background'] for key, value in info.items() if key == 'images_to_stitch']) == len(self.cam_info):
+                    if sum([1 for one_cam in self.cam_info.values() if 'background' in one_cam['images_to_stitch']]) == len(self.cam_info):
                         self.stitch_images('background').save(
                             os.path.join(self.dir, 'stitching', f'background.tiff'))
             else:
@@ -136,7 +142,8 @@ class Daq:
         test the camera using software trigger
         """
         for c, info in self.cam_info.items():
-            info['device_proxy'].trigger_source = "software"
+            if 'basler' in info['device_proxy'].dev_name():
+                info['device_proxy'].trigger_source = "software"
 
     def simulate_send_software_trigger(self, interval, shots=1):
         for i in range(shots):
@@ -173,22 +180,30 @@ class Daq:
                     #         os.remove(os.path.join(
                     #             info['cam_dir'], f'{info["file_name"]}.tiff'))
                     # info['time0'] = info['time1']
-                    info['file_name'] = '%s.%f' if 'saving_format' not in info['config_dict'] else info['config_dict']['saving_format']
+                    if ('config_dict' not in info) or ('saving_format' not in info['config_dict']):
+                        info['file_name'] = '%s.%f'
+                    else:
+                        info['file_name'] = info['config_dict']['saving_format']
                     info['file_name'] = generate_basename(
-                        info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': f'Time{bs.read_time}', '%e': f'Energy{bs.energy:.3f}J', '%h': f'Energy{bs.hot_spot:.4f}Jcm-2', '%f': 'tiff'})
+                        info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%e': 'Energy{energy:.3f}J', '%h': 'HotSpot{hot_spot:.4f}Jcm-2', '%f': 'tiff', 'device_proxy': bs})
                     # the saving interval threshold has been enabled in server side.
                     # if info['shot_num'] == 1 or (info['time_interval'] > interval_threshold):
                     data.save(os.path.join(
                         info['cam_dir'], info["file_name"]))
-                    logging.info("Shot {} taken for {} saved {} to {}:".format(
+                    logging.info("Shot {} taken for {} (size: {}) saved to {}".format(
                         info['shot_num'], info['shortname'],  {data.size}, {os.path.join(
                             info['cam_dir'], info["file_name"])}))
                     if stitch:
                         adjusted_image = self.stretch_image(data_array)
                         info['images_to_stitch'][f'shot{info["shot_num"]}'] = adjusted_image
-                        if len([value[f'shot{info["shot_num"]}'] for key, value in info.items() if key == 'images_to_stitch']) == len(self.cam_info):
-                            self.stitch_images(f'shot{info["shot_num"]}').save(
-                                os.path.join(self.dir, 'stitching', f'shot{info["shot_num"]}.tiff'))
+                        if sum([1 for one_cam in self.cam_info.values() if f'shot{info["shot_num"]}' in one_cam['images_to_stitch']]) == len(self.cam_info):
+                            stitch_save_path = os.path.join(
+                                self.dir, 'stitching', f'shot{info["shot_num"]}.tiff')
+                            large_image_p = self.stitch_images(
+                                f'shot{info["shot_num"]}')
+                            large_image_p.save(stitch_save_path)
+                            logging.info(
+                                f"Shot {info['shot_num']} taken for stitching (size: {large_image_p.size}) saved to {stitch_save_path}")
                     info['shot_num'] += 1
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
                 return
@@ -237,7 +252,7 @@ class Daq:
             I1 = ImageDraw.Draw(large_image_p)
             # Add Text to an image
             I1.text((gap_x+x_i*(gap_x+tile_size_x)+0.5*tile_size_x, gap_y+y_i *
-                    (gap_y+tile_size_y)-0.5*gap_y), cam_name, fill="white", anchor="mm")
+                    (gap_y+tile_size_y)-0.5*gap_y), cam_name, fill="white", anchor="mm", font_size=20)
             del info['images_to_stitch'][image_name]
         # large_image_p.show()
         return large_image_p
@@ -247,18 +262,15 @@ class Daq:
         if config_dict is None:
             config_dict = {'all': {"is_polling_periodically": True}}
         self.set_camera_configuration(
-            config_dict=config_dict)
+            config_dict=config_dict, saving=False)
 
 
-if __name__ == "__main__":
-    dt_string = datetime.now().strftime("%Y%m%d")
-    run_num = input('\nPlease input a run number: ')
-    save_dir = os.path.join(r'N:\2024\Qing_test', f'{dt_string}_run{run_num}')
-    # select_cam_list = ['TA2-NearField', 'TA2-FarField', "TA2-GOSSIP"]
-    select_cam_list = ['TA2-NearField', 'TA2-FarField']
-    daq = Daq(save_dir, select_cam_list=select_cam_list, shots=30)
-    daq.set_camera_configuration()
-    daq.take_background()
-    # daq.set_aquisition_start_mode()
-    # daq.test_mode()
-    # daq.acquisition()
+# if __name__ == "__main__":
+#     dt_string = datetime.now().strftime("%Y%m%d")
+#     run_num = input('\nPlease input a run number: ')
+#     save_dir = os.path.join(r'N:\2024\Qing_test', f'{dt_string}_run{run_num}')
+#     # select_cam_list = ['TA2-NearField', 'TA2-FarField', "TA2-GOSSIP"]
+#     select_cam_list = ['TA2-NearField', 'TA2-FarField']
+#     daq = Daq(save_dir, select_cam_list=select_cam_list, shots=30)
+#     daq.set_camera_configuration()
+#     daq.take_background()
