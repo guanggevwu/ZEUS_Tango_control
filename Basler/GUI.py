@@ -41,7 +41,6 @@ class BaslerGUI():
         exclude = ['is_new_image']
         device_info = {}
         device_info['dp'] = Device(device_name)
-
         device_info['attrs'] = device_info['dp'].get_attribute_list()
         device_info['commands'] = device_info['dp'].get_command_list()
         device_info['model'] = [device_name] + [device_name + '/' +
@@ -125,13 +124,16 @@ class BaslerGUI():
 
         panel2_w1 = TaurusForm()
         form_model = self.attr_list[device_name]['model']
-        form_model = [i for i in form_model if i.split('/')[-1] not in exclude]
-        form_model.remove(f'{device_name}/exposure')
-        form_model.remove(f'{device_name}/gain')
-        trigger_selector_idx = form_model.index(
-            f'{device_name}/trigger_selector')
-        form_model.insert(trigger_selector_idx+1, f'{device_name}/exposure')
-        form_model.insert(trigger_selector_idx+2, f'{device_name}/gain')
+        if 'basler' in device_name.lower():
+            form_model = [i for i in form_model if i.split(
+                '/')[-1] not in exclude]
+            form_model.remove(f'{device_name}/exposure')
+            form_model.remove(f'{device_name}/gain')
+            trigger_selector_idx = form_model.index(
+                f'{device_name}/trigger_selector')
+            form_model.insert(trigger_selector_idx+1,
+                              f'{device_name}/exposure')
+            form_model.insert(trigger_selector_idx+2, f'{device_name}/gain')
         panel2_w1.model = form_model
         panel2_layout.addWidget(panel2_w1)
 

@@ -13,8 +13,10 @@ if True:
 class BaslerMenu(Menu):
     def __init__(self, root):
         super().__init__()
-        class_name = type(self).__name__.replace('Menu', '')
-        root.title(f"{class_name} menu")
+        self.get_class_related_info()
+        root.title(f"{self.class_name} menu")
+        self.menu_dict = {'start server': ['server.py', self.instances, []],
+                          'start Taurus GUI': ['GUI.py', self.device_names, []]}
         frame1 = ttk.Frame(root, padding="3 3 12 12")
         frame1.grid(column=0, row=0, sticky=(N, W, E, S))
         root.columnconfigure(0, weight=1)
@@ -32,15 +34,6 @@ class BaslerMenu(Menu):
         s.configure('Sty1.TCombobox',
                     font=('Helvetica', self.fontsize))
 
-        device_names = self.db.get_device_name('*', class_name)
-        instances = [e.split('/')[-1]
-                     for e in self.servers if e.split('/')[0] == class_name]
-        # list(self.combination_table) is just the keys, i.e., the text shown in the dropdown list.
-        instances = list(self.instance_table)+(instances)
-        device_names = list(self.device_name_table) + \
-            list(device_names.value_string)
-        self.menu_dict = {'start server': ['server.py', instances, []],
-                          'start Taurus GUI': ['GUI.py', device_names, []]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             # value[0][:-3], i.e., 'gentec_server' is the attribute name
             setattr(self, value[0][:-3], StringVar())

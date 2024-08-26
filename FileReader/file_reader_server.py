@@ -72,8 +72,9 @@ class FileReader(Device):
             self._folder_path = value
             self.read_file_list()
             self.previous_list = list(self._file_list)
+            self._image_number = len(self._file_list)
             logging.info(
-                f"{len(self._file_list)} {self._file_extension} files are found in the {self._folder_path}")
+                f"{self._image_number} {self._file_extension} files are found in the {self._folder_path}")
 
     file_extension = attribute(
         label="file extension",
@@ -99,7 +100,6 @@ class FileReader(Device):
         file_folder = os.listdir(self._folder_path)
         self._file_list = [i for i in file_folder if i.split(".")[-1] == self._file_extension and os.path.isfile(
             os.path.join(self._folder_path, i))]
-        self.debug_stream("debugging")
         return self._file_list
 
     current_file = attribute(
@@ -110,6 +110,16 @@ class FileReader(Device):
 
     def read_current_file(self):
         return self._current_file
+
+    image_number = attribute(
+        label='image #',
+        dtype=int,
+        access=AttrWriteType.READ,
+        doc="image number"
+    )
+
+    def read_image_number(self):
+        return self._image_number
 
     modification_time = attribute(
         label="created time",
@@ -150,10 +160,13 @@ class FileReader(Device):
                 os.path.join(self._folder_path, self._current_file)))
             self._modification_time = datetime.datetime.fromtimestamp(os.path.getmtime(
                 os.path.join(self._folder_path, self._current_file))).strftime("%m/%d %H:%M:%S:%f")
+            self._image_number += 1
             self.push_change_event("image", self.read_image())
             self.push_change_event("current_file", self.read_current_file())
             self.push_change_event("modification_time",
                                    self.read_modification_time())
+            self.push_change_event("image_number",
+                                   self.read_image_number())
             return True
         else:
             return False
@@ -182,6 +195,7 @@ class FileReader(Device):
         self._current_file = ''
         self._modification_time = 'N/A'
         self._image = np.zeros([1000, 1000])
+        self._image_number = 0
         # self._polling_period = self.get_attribute_poll_period('is_new_image')
         # if self._polling_period == 0:
         #     self._polling_period = 200

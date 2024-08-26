@@ -21,7 +21,7 @@ class Gentec:
         # attrs = self.dp.get_attribute_list()
         # self.required_list. keys are the attributes of tango device and values are the label names.
         self.required_list = {
-            'name_attr': 'name', 'main_value': 'main value', 'shot': 'shot # (total)', 'statistics_shots': 'shot (statistics)', 'average': "average", 'std': 'std'}
+            'name_attr': 'name', 'main_value': 'main value', 'shot': 'shot # (total)', 'statistics_shots': 'shot (statistics)', 'average': "average", 'rsd': 'rsd'}
         root.title("Simplified Gentec")
         frame1 = ttk.Frame(root, padding="3 3 12 12")
         frame1.grid(column=0, row=0, sticky=(N, W, E, S))

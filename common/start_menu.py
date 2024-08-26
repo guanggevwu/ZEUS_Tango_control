@@ -21,6 +21,17 @@ class Menu:
         self.device_name_table = device_name_table
         self.instance_table = instance_table
 
+    def get_class_related_info(self):
+        self.class_name = type(self).__name__.replace('Menu', '')
+        self.device_names = self.db.get_device_name('*', self.class_name)
+        # only get the device names with the correct class name
+        self.device_names = [i for i in list(self.device_name_table) if self.class_name.lower() in i.split("_")] + \
+            list(self.device_names.value_string)
+        self.instances = [e.split('/')[-1]
+                          for e in self.servers if e.split('/')[0] == self.class_name]
+        self.instances = [i for i in list(
+            self.instance_table) if self.class_name.lower() in i.split("_")]+(self.instances)
+
     def start_window(self, menu_file_path, key):
         script_path = os.path.join(
             os.path.dirname(menu_file_path), self.menu_dict[key][0])

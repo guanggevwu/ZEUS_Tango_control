@@ -13,8 +13,10 @@ if True:
 class DG535Menu(Menu):
     def __init__(self, root):
         super().__init__()
-        class_name = type(self).__name__.replace('Menu', '')
-        root.title(f"{class_name} menu")
+        self.get_class_related_info()
+        root.title(f"{self.class_name} menu")
+        self.menu_dict = {'start server': ['server.py', self.instances, []],
+                          'start Taurus GUI': ['GUI.py', self.device_names, []]}
         frame1 = ttk.Frame(root, padding="3 3 12 12")
         frame1.grid(column=0, row=0, sticky=(N, W, E, S))
         root.columnconfigure(0, weight=1)
@@ -32,11 +34,6 @@ class DG535Menu(Menu):
         s.configure('Sty1.TCombobox',
                     font=('Helvetica', self.fontsize))
 
-        device_names = self.db.get_device_name('*', class_name)
-        instances = [e.split('/')[-1]
-                     for e in self.servers if e.split('/')[0] == class_name]
-        self.menu_dict = {'start server': ['dg535_server.py', instances, []],
-                          'start GUI': ['GUI.py', tuple(device_names.value_string), []]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             setattr(self, value[0][:-3], StringVar())
             setattr(self, f'{value[0][:-3]}_combobox', ttk.Combobox(frame1, textvariable=getattr(
