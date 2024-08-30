@@ -423,6 +423,7 @@ class Basler(Device):
     def init_device(self):
         self.model_type = ['a2A1920-51gmBAS',
                            'a2A2590-22gmBAS', 'a2A5320-7gmPRO']
+        self.path_raw = ''
         self._is_polling_periodically = False
         self._debug = False
         self._save_data = False
@@ -513,19 +514,13 @@ class Basler(Device):
             self.enable_polling('is_new_image')
 
     def read_save_path(self):
-        # if len(self._save_path) > 20:
-        #     if ";" in self._save_path:
-        #         return ";".join([f'{e[0:2]}...{e[-2:-1]}' for e in self._save_path.split(';')])
-        #     return f'{self._save_path[0:5]}...{self._save_path[-5:]}'
-        # else:
-        # if the _use_date flag is True and the date is a new day, run write_save_path again to update the date
-        if self._use_date and os.path.split(self._save_path)[1] != datetime.datetime.today().strftime("%Y%m%d"):
-            self.write_save_path(os.path.join(os.path.split(self._save_path)[
-                0], '%date'))
+        if self._use_date and datetime.datetime.today().strftime("%Y%m%d") not in self._save_path:
+            self.write_save_path(self.path_raw)
         return self._save_path
 
     def write_save_path(self, value):
         # if the entered path has %date in it, replace %date with today's date and mark a _use_date flag
+        self.path_raw = value
         if '%date' in value:
             self._use_date = True
             value = value.replace(

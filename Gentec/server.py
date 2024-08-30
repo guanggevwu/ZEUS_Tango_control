@@ -20,8 +20,6 @@ logging.basicConfig(handlers=handlers,
 
 
 class GentecEO(Device):
-
-    polling = 200
     # memorized = True means the previous entered set value is remembered and is only for Read_WRITE access. For example in GUI, the previous set value,instead of 0, will be shown at the set value field.
     # hw_memorized=True, means the set value is written at the initialization step. Some of the properties are remembered in the camera's memory, so no need to remember them.
     is_memorized = True
@@ -78,6 +76,15 @@ class GentecEO(Device):
     def read_read_time(self):
         return self._read_time
 
+    main_value = attribute(
+        name="main_value",
+        label="reading",
+        dtype=str,
+        access=AttrWriteType.READ,
+        polling_period=200,
+        doc='reading value (energy or power)'
+    )
+
     wavelength = attribute(
         label="wavelength",
         dtype=int,
@@ -109,6 +116,7 @@ class GentecEO(Device):
         dtype=bool,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
+        hw_memorized=True,
         doc='enable or disable auto range'
     )
 
@@ -221,45 +229,6 @@ class GentecEO(Device):
         time.sleep(0.5)
         self._offset = value
 
-    save_path = attribute(
-        label='save path (file)',
-        dtype=str,
-        access=AttrWriteType.READ_WRITE,
-        memorized=is_memorized,
-        doc='save data path, use ";" to separate multiple paths'
-    )
-
-    def read_save_path(self):
-        return self._save_path
-
-    def write_save_path(self, value, uncheck_default=True):
-        if self.create_save_file(value):
-            self._save_path = value
-            if uncheck_default:
-                self.write_is_use_default_path(False)
-            if self.read_save_data():
-                self.get_existing_rows()
-            return True
-        else:
-            return False
-
-    def create_save_file(self, path, info=True):
-        if os.path.isfile(path):
-            if info:
-                logging.info(
-                    f'{path} exists! New data will be appended to it.')
-            return True
-        else:
-            try:
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, "w") as my_empty_csv:
-                    if info:
-                        logging.info(f'{path} created!')
-                    return True
-            except:
-                if info:
-                    logging.info('create failed')
-                return False
     save_data = attribute(
         label="save data",
         dtype=bool,
@@ -273,13 +242,23 @@ class GentecEO(Device):
         return self._save_data
 
     def write_save_data(self, value):
-        if value and self.write_save_path(self._save_path, uncheck_default=False):
-            self._save_data = value
+        self._try_save_data = value
+        if value:
+            try:
+                os.makedirs(os.path.dirname(self._save_path), exist_ok=True)
+                self._save_data = value
+            except FileNotFoundError:
+                logging.info(
+                    f"Folder creation failed! If you see this server start-up, it is usually fine since {self._save_path=} is not initialized yet!")
+                return
+            self.get_existing_rows()
         else:
-            self._save_data = False
+            self._save_data = value
+        logging.info(f'save status is changed to {value}')
 
     def get_existing_rows(self):
-        with open(self._save_path) as csvfile:
+        with open(self._save_path, 'a+') as csvfile:
+            csvfile.seek(0)
             self.should_write_header = False
             reader = csv.reader(csvfile)
             idx = -1
@@ -307,36 +286,12 @@ class GentecEO(Device):
             # if not csvfile.tell():
             #     writer.writeheader()
             row_dict = {}
+            self.read_display_range()
             for key in fieldnames:
                 row_dict[key] = getattr(self, f'_{key}')
             writer.writerow(row_dict)
             # add 1 shot after saving
             self._shot += 1
-
-    is_use_default_path = attribute(
-        label="default save path",
-        dtype=bool,
-        access=AttrWriteType.READ_WRITE,
-        memorized=is_memorized,
-        hw_memorized=True,
-        doc='The default saving path is "Z:\Laser Beam Images\gentec\[device_name]\[date]_[device_name].csv". This will disable the save path below.'
-    )
-
-    def read_is_use_default_path(self):
-        self._is_use_default_path_read_count += 1
-        if self._is_use_default_path and self._is_use_default_path_read_count > 299:
-            date = datetime.datetime.now().date().strftime("%Y%m%d")
-            new_path = f"Z:\\Laser Beam Images\\gentec\\{self.friendly_name}\\{date}_{self.friendly_name}.csv"
-            self.write_save_path(new_path, uncheck_default=False)
-            self._is_use_default_path_read_count = 0
-        return self._is_use_default_path
-
-    def write_is_use_default_path(self, value):
-        if value:
-            date = datetime.datetime.now().date().strftime("%Y%m%d")
-            new_path = f"Z:\\Laser Beam Images\\gentec\\{self.friendly_name}\\{date}_{self.friendly_name}.csv"
-            self.write_save_path(new_path, uncheck_default=False)
-        self._is_use_default_path = value
 
     shot = attribute(
         label="shot # (saved)",
@@ -400,6 +355,33 @@ class GentecEO(Device):
     def read_min(self):
         value, unit = self.format_unit(self._min, self._base_unit)
         return f'{value:.4f} {unit}'
+
+    save_path = attribute(
+        label='save path (file)',
+        dtype=str,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        hw_memorized=True,
+    )
+
+    def read_save_path(self):
+        if self._use_date and datetime.datetime.today().strftime("%Y%m%d") not in self._save_path:
+            self.write_save_path(self.path_raw)
+        return self._save_path
+
+    # I assume "write_save_data" is done before "write_save_path" when hw_memorized is True.
+    def write_save_path(self, value):
+        # if the entered path has %date in it, replace %date with today's date and mark a _use_date flag
+        self.path_raw = value
+        if '%date' in value:
+            self._use_date = True
+            value = value.replace(
+                '%date', datetime.datetime.today().strftime("%Y%m%d"))
+        else:
+            self._use_date = False
+        self._save_path = value
+        self.write_save_data(self._try_save_data)
+        self.push_change_event("save_path", self.read_save_path())
 
     start_statistics = attribute(
         label="start statistics",
@@ -488,17 +470,6 @@ class GentecEO(Device):
             doc='display_range_dropdown'
         )
 
-        main_value = attribute(
-            name="main_value",
-            label="reading",
-            dtype=str,
-            # unit=self._base_unit,
-            # format='9.4f',
-            access=AttrWriteType.READ,
-            polling_period=self.polling,
-            doc='reading value (energy or power)'
-        )
-
         main_value_float = attribute(
             name="main_value_float",
             label="reading float",
@@ -514,6 +485,8 @@ class GentecEO(Device):
             label='trigger level',
             dtype=str,
             access=AttrWriteType.READ_WRITE,
+            memorized=True,
+            hw_memorized=True,
             doc='Set trigger level. Is the base value equal'
         )
 
@@ -526,7 +499,6 @@ class GentecEO(Device):
             doc='Set currrent value as 0. Better not to use this since it takes 10 secs to do the subtraction and may cause error. Why not use offset?'
         )
 
-        self.add_attribute(main_value)
         self.add_attribute(main_value_float)
         self.add_attribute(hide_display_range_dropdown_text_list)
         self.add_attribute(hide_display_range_dropdown_text_value)
@@ -568,7 +540,7 @@ class GentecEO(Device):
             self.push_change_event(
                 "historical_data", self.read_historical_data())
 
-    def read_main_value(self, attr):
+    def read_main_value(self):
         # check if it is new data. The sequence is important. Must check if this is new first then read. If read first, then it is always old.
         if self._model != "PH100-Si-HA-OD1":
             self.device.write(b'*NVU')
@@ -630,7 +602,7 @@ class GentecEO(Device):
     display_range = attribute(
         label="range",
         dtype=str,
-        polling_period=polling,
+        polling_period=500,
         memorized=is_memorized,
         access=AttrWriteType.READ_WRITE,
         doc='range'
@@ -689,13 +661,16 @@ class GentecEO(Device):
         self._set_zero = value
 
     def init_device(self):
-        self._is_use_default_path = True
-        self._is_use_default_path_read_count = 0
+        '''
+        save_data is initialized before save_path during the initialization caused by hw_memorized. self.write_save_data(True) will not set self._save to True because self._save_path is an empty string at that moment. Introducing self._try_save_data will save the intended status and can be used later in write_save_path function.
+        '''
         self._debug = 0
         self._historical_data = [['pulse #', 'time', 'value']]
         self._historical_data_number = []
         self._start_statistics = False
+        self._use_date = False
         self._save_data = False
+        self._try_save_data = False
         self._save_path = ''
         # shot is next shot number which will be saved to text file. read_shot returns self._shot -1
         self._shot = 1
@@ -733,6 +708,10 @@ class GentecEO(Device):
                 self.read_trigger_level('any')
             self.read_auto_range()
             self.read_offset()
+            self.read_wavelength()
+            self.read_measure_mode()
+            self.read_attenuator()
+            self.read_multiplier()
             print(
                 f'Genotec-eo device is connected. Model: {self._model}. Serial number: {self._serial_number}')
             self.set_state(DevState.ON)

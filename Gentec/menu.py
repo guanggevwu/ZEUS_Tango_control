@@ -39,7 +39,7 @@ class GentecEOMenu(Menu):
             # value[0][:-3], i.e., 'gentec_server' is the attribute name
             setattr(self, value[0][:-3], StringVar())
             setattr(self, f'{value[0][:-3]}_combobox', ttk.Combobox(frame1, textvariable=getattr(
-                self, value[0][:-3]),  font=('Helvetica', self.fontsize), width=15))
+                self, value[0][:-3]),  font=('Helvetica', self.fontsize), width=20))
             getattr(self, f'{value[0][:-3]}_combobox').grid(
                 column=0, row=idx, columnspan=1, sticky=[N, E, S])
             ttk.Button(frame1, text=f"{key}", command=partial(self.start_window, __file__, f'{key}'), style='Sty1.TButton').grid(

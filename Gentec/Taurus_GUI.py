@@ -41,7 +41,7 @@ panel1.setLayout(panel1_layout)
 panel1_w1 = TaurusForm()
 
 form_model = [i for i in model if i.split('/')[-1] not in statistic_panel]
-order_list = ['model', 'main_value', 'read_time', 'save_data', 'is_use_default_path',
+order_list = ['model', 'main_value', 'read_time', 'save_data',
               'save_path', 'display_range', 'auto_range', 'wavelength']
 for idx, attr in enumerate(order_list):
     form_model.remove(f'{device_name}/{attr}')
