@@ -18,7 +18,6 @@ logging.basicConfig(handlers=handlers,
 
 
 class FileReader(Device):
-    polling = 200
 
     is_polling_periodically = attribute(
         label="polling periodically",
@@ -71,7 +70,7 @@ class FileReader(Device):
         if os.path.isdir(value):
             self._folder_path = value
             self.read_file_list()
-            self.previous_list = list(self._file_list)
+            self.previous_list = self._file_list
             self._image_number = len(self._file_list)
             logging.info(
                 f"{self._image_number} {self._file_extension} files are found in the {self._folder_path}")
@@ -93,6 +92,7 @@ class FileReader(Device):
     file_list = attribute(
         label="file list",
         dtype=(str,),
+        max_dim_x=10000,
         access=AttrWriteType.READ,
     )
 
@@ -121,14 +121,14 @@ class FileReader(Device):
     def read_image_number(self):
         return self._image_number
 
-    modification_time = attribute(
-        label="created time",
+    read_time = attribute(
+        label="modification time",
         dtype="str",
         access=AttrWriteType.READ,
     )
 
-    def read_modification_time(self):
-        return self._modification_time
+    def read_read_time(self):
+        return self._read_time
 
     image = attribute(
         label="image",
@@ -148,6 +148,8 @@ class FileReader(Device):
     )
 
     def read_is_new_image(self):
+        # logging.info(f'{len(self.previous_list)=}')
+        # logging.info(f'{len(self.read_file_list())=}')
         new_files = [i for i in self.read_file_list()
                      if i not in self.previous_list]
         if new_files != []:
@@ -156,19 +158,20 @@ class FileReader(Device):
             self.previous_list = self.previous_list + [new_files[0]]
             logging.info(f"Detected a new file {new_files[0]}.")
             self._current_file = new_files[0]
-            self._image_PIL = Image.open(
+            image_PIL = Image.open(
                 os.path.join(self._folder_path, self._current_file))
-            self._image = np.array(self._image_PIL)
-            self._format_pixel = str(self.mode_to_bpp[self._image_PIL.mode])
-            self._modification_time = datetime.datetime.fromtimestamp(os.path.getmtime(
+            self._image = np.array(image_PIL)
+            self._format_pixel = str(self.mode_to_bpp[image_PIL.mode])
+            self._read_time = datetime.datetime.fromtimestamp(os.path.getmtime(
                 os.path.join(self._folder_path, self._current_file))).strftime("%m/%d %H:%M:%S:%f")
             self._image_number += 1
             self.push_change_event("image", self.read_image())
             self.push_change_event("current_file", self.read_current_file())
-            self.push_change_event("modification_time",
-                                   self.read_modification_time())
+            self.push_change_event("read_time",
+                                   self.read_read_time())
             self.push_change_event("image_number",
                                    self.read_image_number())
+
             return True
         else:
             return False
@@ -201,10 +204,11 @@ class FileReader(Device):
     def init_device(self):
         self._debug = False
         self._is_polling_periodically = False
+        self._polling_period = 199
         self._folder_path = ''
         self._file_extension = 'tiff'
         self._current_file = ''
-        self._modification_time = 'N/A'
+        self._read_time = 'N/A'
         self._image = np.zeros([1000, 1000])
         self._image_number = 0
         self._format_pixel = 'unknown'
@@ -213,7 +217,7 @@ class FileReader(Device):
         # self._polling_period = self.get_attribute_poll_period('is_new_image')
         # if self._polling_period == 0:
         #     self._polling_period = 200
-        print(
+        logging.info(
             f'FileReader is started.')
         self.set_state(DevState.ON)
 
@@ -224,6 +228,8 @@ class FileReader(Device):
 
     def enable_polling(self, attr):
         if not self.is_attribute_polled(attr):
+            if not self._polling_period:
+                self._polling_period = 200
             self.poll_attribute(attr, self._polling_period)
             logging.info(
                 f'polling period of {attr} is set to {self._polling_period}')
@@ -232,6 +238,10 @@ class FileReader(Device):
     def reset_number(self):
         self._image_number = 0
         logging.info("Reset image number")
+
+    @command()
+    def read_files(self):
+        self.write_folder_path(self._folder_path)
 
 
 if __name__ == "__main__":

@@ -22,11 +22,14 @@ logging.basicConfig(
 
 
 class Daq:
-    def __init__(self, select_cam_list, dir='', debug=False, check_exist=True):
+    def __init__(self, select_cam_list, dir='', debug=False, check_exist=True, thread_event=None):
         self.cam_info = defaultdict(dict)
         self.dir = dir
         self.select_cam_list = select_cam_list
+        self.thread_event = thread_event
         Yes_for_all = False
+        if not len(select_cam_list):
+            raise Exception("Please select cameras!")
         for c in select_cam_list:
             try:
                 bs = tango.DeviceProxy(c)
@@ -58,9 +61,9 @@ class Daq:
                 logging.info(f'Connected: {c}')
             except:
                 if 'exception' in locals():
-                    raise (exception)
+                    raise exception
                 else:
-                    raise (f"{c} is not found!")
+                    raise Exception(f"{c} is not found!")
         self.debug = debug
         atexit.register(self.termination)
 
@@ -68,26 +71,40 @@ class Daq:
         if config_dict is None:
             config_dict = default_config_dict
         config_dict = {key: value for key,
-                       value in config_dict.items() if key in [v['shortname'] for v in self.cam_info.values()]}
-        self.config_dict = config_dict
-        if saving:
-            json_object = json.dumps(config_dict)
-            os.makedirs(self.dir, exist_ok=True)
-            with open(os.path.join(self.dir, "settings.json"), "w+") as settings_File:
-                settings_File.write(json_object)
+                       value in config_dict.items() if (key in [v['shortname'] for v in self.cam_info.values()]) or (key == 'all')}
+
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
             dev_short_name = bs.dev_name().split('/')[-1]
+            # if the device name is found in config_dict, use it. if not, use "all" instead. Else, pass an empty dict.
             if dev_short_name.lower() in config_dict:
-                cam_settings = config_dict[dev_short_name.lower()]
+                info['config_dict'] = config_dict[dev_short_name.lower()]
             elif 'all' in config_dict:
-                cam_settings = config_dict['all']
-            info['config_dict'] = cam_settings
+                info['config_dict'] = config_dict['all']
+            else:
+                info['config_dict'] = dict()
             if 'basler' in bs.dev_name():
                 bs.relax()
-            for key, value in cam_settings.items():
+            for key, value in info['config_dict'].items():
                 if hasattr(bs, key):
                     setattr(bs, key, value)
+            # if the saving_format is not set in the configuration
+            if ('saving_format' not in info['config_dict']):
+                info['file_name'] = '%s.%f'
+            else:
+                info['file_name'] = info['config_dict']['saving_format']
+        if saving:
+            Key_list = ['model', 'format_pixel', "exposure", "gain",
+                        "trigger_selector", "trigger_source", "is_polling_periodically"]
+            full_configuration = dict()
+            for c, info in self.cam_info.items():
+                if 'basler' in info['device_proxy'].dev_name():
+                    full_configuration[c] = {key: getattr(
+                        info['device_proxy'], key) for key in Key_list}
+            json_object = json.dumps(full_configuration)
+            os.makedirs(self.dir, exist_ok=True)
+            with open(os.path.join(self.dir, "settings.json"), "w+") as settings_File:
+                settings_File.write(json_object)
 
     def get_image(self, bs):
         bits = ''.join([i for i in bs.format_pixel if i.isdigit()])
@@ -107,15 +124,19 @@ class Daq:
         '''take a background image'''
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
-            bs.trigger_source = "software"
-            time.sleep(0.5)
-            bs.send_software_trigger()
-            time.sleep(0.5)
+            if 'basler' in bs.dev_name():
+                trigger_source = bs.trigger_source
+                bs.trigger_source = "software"
+                time.sleep(0.5)
+                bs.send_software_trigger()
+                time.sleep(0.5)
             if bs.is_new_image:
                 data, data_array = self.get_image(bs)
+                file_name = generate_basename(
+                    info['file_name'], {'%s': f'Background', '%t': 'Time{read_time}', '%e': 'Energy{energy:.3f}J', '%h': 'HotSpot{hot_spot:.4f}Jcm-2', '%f': 'tiff', 'device_proxy': bs})
                 data.save(os.path.join(
-                    info['cam_dir'], f'background.tiff'))
-                logging.info(f"background is saved {data.size}")
+                    info['cam_dir'], file_name))
+                logging.info(f"Background is saved {data.size}")
                 if stitch:
                     adjusted_image = self.stretch_image(data_array)
                     info['images_to_stitch']['background'] = adjusted_image
@@ -124,8 +145,8 @@ class Daq:
                             os.path.join(self.dir, 'stitching', f'background.tiff'))
             else:
                 logging.info('error')
-
-            bs.trigger_source = "external"
+            if 'basler' in bs.dev_name():
+                bs.trigger_source = trigger_source
 
     def set_acquisition_start_mode(self):
         '''Use AcquisitionStart mode to acquire a set of image from just one trigger
@@ -165,6 +186,9 @@ class Daq:
             bs.reset_number()
             info['shot_num'] = 1
         while True:
+            if self.thread_event is not None:
+                if self.thread_event.is_set():
+                    break
             for c, info in self.cam_info.items():
                 bs = info['device_proxy']
                 # when there is a short limit, the acquisition stops after the requested image numbers are reached.
@@ -173,26 +197,15 @@ class Daq:
                     info['is_completed'] = True
                 elif bs.is_new_image:
                     data, data_array = self.get_image(bs)
-                    # info['time1'] = time.perf_counter()
-                    # if info['shot_num'] > 1:
-                    #     info['time_interval'] = info['time1'] - info['time0']
-                    #     if info['time_interval'] < interval_threshold:
-                    #         os.remove(os.path.join(
-                    #             info['cam_dir'], f'{info["file_name"]}.tiff'))
-                    # info['time0'] = info['time1']
-                    if ('config_dict' not in info) or ('saving_format' not in info['config_dict']):
-                        info['file_name'] = '%s.%f'
-                    else:
-                        info['file_name'] = info['config_dict']['saving_format']
-                    info['file_name'] = generate_basename(
+                    file_name = generate_basename(
                         info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%e': 'Energy{energy:.3f}J', '%h': 'HotSpot{hot_spot:.4f}Jcm-2', '%f': 'tiff', 'device_proxy': bs})
                     # the saving interval threshold has been enabled in server side.
                     # if info['shot_num'] == 1 or (info['time_interval'] > interval_threshold):
                     data.save(os.path.join(
-                        info['cam_dir'], info["file_name"]))
+                        info['cam_dir'], file_name))
                     logging.info("Shot {} taken for {} (size: {}) saved to {}".format(
                         info['shot_num'], info['shortname'],  {data.size}, {os.path.join(
-                            info['cam_dir'], info["file_name"])}))
+                            info['cam_dir'], file_name)}))
                     if stitch:
                         adjusted_image = self.stretch_image(data_array)
                         info['images_to_stitch'][f'shot{info["shot_num"]}'] = adjusted_image

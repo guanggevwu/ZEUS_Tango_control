@@ -221,6 +221,45 @@ class GentecEO(Device):
         time.sleep(0.5)
         self._offset = value
 
+    save_path = attribute(
+        label='save path (file)',
+        dtype=str,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        doc='save data path, use ";" to separate multiple paths'
+    )
+
+    def read_save_path(self):
+        return self._save_path
+
+    def write_save_path(self, value, uncheck_default=True):
+        if self.create_save_file(value):
+            self._save_path = value
+            if uncheck_default:
+                self.write_is_use_default_path(False)
+            if self.read_save_data():
+                self.get_existing_rows()
+            return True
+        else:
+            return False
+
+    def create_save_file(self, path, info=True):
+        if os.path.isfile(path):
+            if info:
+                logging.info(
+                    f'{path} exists! New data will be appended to it.')
+            return True
+        else:
+            try:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "w") as my_empty_csv:
+                    if info:
+                        logging.info(f'{path} created!')
+                    return True
+            except:
+                if info:
+                    logging.info('create failed')
+                return False
     save_data = attribute(
         label="save data",
         dtype=bool,
@@ -231,13 +270,6 @@ class GentecEO(Device):
     )
 
     def read_save_data(self):
-        # if self._save_data:
-        #     if not self._save_path:
-        #         self.read_save_path()
-        #     if not os.path.isdir(os.path.dirname(self._save_path)):
-        #         print("Not a correct file path")
-        #         self._save_data = False
-        #         return self._save_data
         return self._save_data
 
     def write_save_data(self, value):
@@ -368,46 +400,6 @@ class GentecEO(Device):
     def read_min(self):
         value, unit = self.format_unit(self._min, self._base_unit)
         return f'{value:.4f} {unit}'
-
-    save_path = attribute(
-        label='save path (file)',
-        dtype=str,
-        access=AttrWriteType.READ_WRITE,
-        memorized=is_memorized,
-        doc='save data path, use ";" to separate multiple paths'
-    )
-
-    def read_save_path(self):
-        return self._save_path
-
-    def write_save_path(self, value, uncheck_default=True):
-        if self.create_save_file(value):
-            self._save_path = value
-            if uncheck_default:
-                self.write_is_use_default_path(False)
-            if self.read_save_data():
-                self.get_existing_rows()
-            return True
-        else:
-            return False
-
-    def create_save_file(self, path, info=True):
-        if os.path.isfile(path):
-            if info:
-                logging.info(
-                    f'{path} exists! New data will be appended to it.')
-            return True
-        else:
-            try:
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, "w") as my_empty_csv:
-                    if info:
-                        logging.info(f'{path} created!')
-                    return True
-            except:
-                if info:
-                    logging.info('create failed')
-                return False
 
     start_statistics = attribute(
         label="start statistics",

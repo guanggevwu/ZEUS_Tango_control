@@ -2,10 +2,10 @@ from datetime import datetime
 
 
 def generate_basename(rep: str, look_up: dict) -> str:
-    '''default to '%s' if rep is not set.
-    if interpretation is not needed, i.e., without {}, use the passed argument directly. Otherwise, get the attribute name first and replace attribute name in the argument with its value.
     '''
-    basename = '%s' if not rep else rep
+    if interpretation is not needed, i.e., without {}, use the passed arguments directly. Otherwise, get the attribute name first and replace attribute name in the argument with its value.
+    '''
+    basename = rep
     for c in look_up:
         if c in basename:
 

@@ -18,9 +18,9 @@ if True:
     from common.config import device_name_table, image_panel_config
 
 parser = TaurusArgparse(
-    description='GUI for Basler camera', device_default='test/basler/1', polling_default=1000)
-parser.add_argument('-s', '--simple', action='store_true',
-                    help="show image without shot number and command")
+    description='GUI for Basler camera', device_default='test/basler/testcam', nargs_string='+', polling_default=1000)
+# parser.add_argument('-s', '--simple', action='store_true',
+#                     help="show image without shot number and command")
 args = parser.parse_args()
 # device_name = args.device
 # changeDefaultPollingPeriod(args.polling)
@@ -30,10 +30,14 @@ args = parser.parse_args()
 class BaslerGUI():
     def __init__(self, device_name, polling, is_form_compact=False):
         changeDefaultPollingPeriod(polling)
-
+        if len(device_name) > 1:
+            app_name = device_name[0].replace(
+                '/', '_') + f'_and_{len(device_name)-1}_more'
+        else:
+            app_name = device_name[0].replace('/', '_')
         self.is_form_compact = is_form_compact
         self.app = TaurusApplication(cmd_line_parser=None,
-                                     app_name=device_name.replace('/', '_'))
+                                     app_name=app_name)
         self.gui = TaurusGui()
         self.attr_list = {}
 
@@ -77,8 +81,7 @@ class BaslerGUI():
         panel1_w1.model = device_name + '/' + image
         panel1_layout.addWidget(panel1_w1)
         if command:
-            self.add_command(panel1_layout, device_name, [
-                             'get_ready', 'relax', 'send_software_trigger', 'reset_number'])
+            self.add_command(panel1_layout, device_name)
 
         self.gui.createPanel(panel1, f'{device_name}_{image}')
 
@@ -99,12 +102,13 @@ class BaslerGUI():
         panel_layout.addWidget(panel1_w2)
         layout.addWidget(panel)
 
-    def add_command(self, layout, device_name, command_list):
+    def add_command(self, layout, device_name, command_list=None):
         panel = Qt.QWidget()
         panel_layout = Qt.QHBoxLayout()
         panel.setLayout(panel_layout)
-        command_list = ['get_ready', 'relax',
-                        'send_software_trigger', 'reset_number']
+        if command_list is None:
+            command_list = [
+                i.cmd_name for i in self.attr_list[device_name]['dp'].command_list_query()[3:]]
 
         for cmd in command_list:
             if cmd in self.attr_list[device_name]['commands']:
@@ -127,13 +131,6 @@ class BaslerGUI():
         if 'basler' in device_name.lower():
             form_model = [i for i in form_model if i.split(
                 '/')[-1] not in exclude]
-            form_model.remove(f'{device_name}/exposure')
-            form_model.remove(f'{device_name}/gain')
-            trigger_selector_idx = form_model.index(
-                f'{device_name}/trigger_selector')
-            form_model.insert(trigger_selector_idx+1,
-                              f'{device_name}/exposure')
-            form_model.insert(trigger_selector_idx+2, f'{device_name}/gain')
         panel2_w1.model = form_model
         panel2_layout.addWidget(panel2_w1)
 
@@ -166,30 +163,33 @@ class BaslerGUI():
             self.add_readonly_label_widget(
                 panel3_layout, d, 'user_defined_name')
             self.add_readonly_label_widget(panel3_layout, d, 'image_number')
-            self.add_command(panel3_layout, d, [
-                             'get_ready', 'relax', 'send_software_trigger', 'reset_number'])
+            self.add_command(panel3_layout, d)
         self.gui.createPanel(panel3, f'{len(device_list)} devices')
 
 
 if __name__ == "__main__":
     basler_app = BaslerGUI(args.device, args.polling)
     # get the device list
-    if 'combination' in args.device:
-        device_list = device_name_table[args.device]
+    if 'combination' in args.device[0]:
+        device_list = device_name_table[args.device[0]]
     else:
-        device_list = [args.device]
+        device_list = args.device
     # get the configuration
     pass_config1, pass_config2 = {}, {}
-    if args.device in image_panel_config:
-        pass_config1 = {key: value for key, value in image_panel_config[args.device].items(
+
+    if len(args.device) == 1 and args.device[0] in image_panel_config:
+        pass_config1 = {key: value for key, value in image_panel_config[args.device[0]].items(
         ) if key != "combine_form_with_onshot"}
-        pass_config2 = {key: value for key, value in image_panel_config[args.device].items(
+        pass_config2 = {key: value for key, value in image_panel_config[args.device[0]].items(
         ) if key == "combine_form_with_onshot"}
+    elif len(args.device) > 3:
+        pass_config1 = {"image_number": False,
+                        'command': False, "combine_form_with_onshot": True}
     for d in device_list:
         basler_app.add_device(d)
         basler_app.create_image_panel(d, **pass_config1)
         basler_app.create_form_panel(d)
-    if 'combination' in args.device:
+    if 'combination' in args.device[0] or len(args.device) > 1:
         basler_app.combined_panel(device_list, **pass_config2)
     basler_app.gui.show()
     basler_app.app.exec_()

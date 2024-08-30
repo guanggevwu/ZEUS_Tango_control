@@ -35,6 +35,9 @@ class Menu:
     def start_window(self, menu_file_path, key):
         script_path = os.path.join(
             os.path.dirname(menu_file_path), self.menu_dict[key][0])
+        if not os.path.isfile(script_path):
+            script_path = os.path.join(os.path.dirname(menu_file_path), [i for i in os.listdir(os.path.dirname(
+                menu_file_path)) if self.menu_dict[key][0] in i][0])
         # the input from input text field
         input_txt = getattr(self, self.menu_dict[key][0][:-3]).get()
         # if this is a combination for start server command, get the real instance from the combination table.

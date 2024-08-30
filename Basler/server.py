@@ -24,7 +24,6 @@ class Basler(Device):
     '''
     is_polling_periodically attribute. If is_polling_periodically is False, the polling is manually controlled by the acquisition script, else the polling is made by the polling period "polling".
     '''
-    polling = 200
     polling_infinite = -1
     # memorized = True means the previous entered set value is remembered and is only for Read_WRITE access. For example in GUI, the previous set value,instead of 0, will be shown at the set value field.
     # hw_memorized=True, means the set value is written at the initialization step. Some of the properties are remembered in the camera's memory, so no need to remember them.
@@ -211,6 +210,23 @@ class Basler(Device):
         doc='FrameStart for one image per trigger and AcquisitionStart for multiple images per trigger.'
     )
 
+    exposure = attribute(
+        name="exposure",
+        label="exposure",
+        dtype=float,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        hw_memorized=True,
+        unit="us",
+    )
+    gain = attribute(
+        name="gain",
+        label="gain",
+        dtype=float,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        hw_memorized=True,
+    )
     frames_per_trigger = attribute(
         label="frames per trigger",
         dtype=int,
@@ -310,14 +326,16 @@ class Basler(Device):
     )
 
     def read_polling_period(self):
-        return self.get_attribute_poll_period('is_new_image')
+        self._polling = self.get_attribute_poll_period('is_new_image')
+        return self._polling
 
     def write_polling_period(self, value):
-        if self._exposure/1000 > 0.9 * value * self._timeout_polling_ratio:
-            logging.info(
-                f'{value} ms is too short compared to the exposure time {self._exposure/1000} ms. Minimum value is {self._exposure/1000/0.9/self._timeout_polling_ratio}. Discard!')
-        else:
-            self.poll_attribute('is_new_image', value)
+        # if self._exposure/1000 > 0.9 * value * self._timeout_polling_ratio:
+        #     logging.info(
+        #         f'{value} ms is too short compared to the exposure time {self._exposure/1000} ms. Minimum value is {self._exposure/1000/0.9/self._timeout_polling_ratio}. Discard!')
+        # else:
+        self._polling = value
+        self.poll_attribute('is_new_image', value)
 
     image_number = attribute(
         label='image #',
@@ -331,25 +349,6 @@ class Basler(Device):
 
     def initialize_dynamic_attributes(self):
         '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
-        exposure = attribute(
-            name="exposure",
-            label="exposure",
-            dtype=float,
-            access=AttrWriteType.READ_WRITE,
-            memorized=self.is_memorized,
-            unit="us",
-            # min_value=self.camera.ExposureTimeAbs.Min,
-            # max_value=self.camera.ExposureTimeAbs.Max
-        )
-        gain = attribute(
-            name="gain",
-            label="gain",
-            dtype=float,
-            access=AttrWriteType.READ_WRITE,
-            memorized=self.is_memorized,
-            # min_value=self.camera.GainRaw.Min,
-            # max_value=self.camera.GainRaw.Max
-        )
         width = attribute(
             name="width",
             label="width of the image",
@@ -369,45 +368,43 @@ class Basler(Device):
             min_value=self.camera.Height.Min,
             max_value=self.camera.Height.Max,
         )
-        self.add_attribute(exposure)
-        self.add_attribute(gain)
         self.add_attribute(width)
         self.add_attribute(height)
         # if self.camera.DeviceModelName() in ['acA640-121gm']:
         self.remove_attribute('sensor_readout_mode')
 
-    def read_exposure(self, attr):
+    def read_exposure(self):
         if self._model_category == 1:
             self._exposure = self.camera.ExposureTime.Value
         else:
             self._exposure = self.camera.ExposureTimeAbs.Value
         return self._exposure
 
-    def write_exposure(self, attr):
-        if attr.get_write_value()/1000 > 0.9 * self._polling * self._timeout_polling_ratio:
-            self._polling = attr.get_write_value()/1000/0.9/self._timeout_polling_ratio
-            self.poll_attribute('is_new_image', int(self._polling))
-            logging.info(
-                f'Changed the image retrieve timeout to {self._polling} to match the long exposure time')
+    def write_exposure(self, value):
+        # if self._is_polling_periodically and attr.get_write_value()/1000 > 0.9 * self._polling * self._timeout_polling_ratio:
+        #     self._polling = attr.get_write_value()/1000/0.9/self._timeout_polling_ratio
+        #     self.poll_attribute('is_new_image', int(self._polling))
+        #     logging.info(
+        #         f'Changed the image retrieve timeout to {self._polling} to match the long exposure time')
         if self._model_category == 1:
-            self.camera.ExposureTime.Value = attr.get_write_value()
+            self.camera.ExposureTime.Value = value
         else:
-            self.camera.ExposureTimeAbs.Value = attr.get_write_value()
-        self._exposure = attr.get_write_value()
+            self.camera.ExposureTimeAbs.Value = value
+        self._exposure = value
 
-    def read_gain(self, attr):
+    def read_gain(self):
         if self._model_category == 1:
             self._gain = self.camera.Gain.Value
         else:
             self._gain = self.camera.GainRaw()
         return float(self._gain)
 
-    def write_gain(self, attr):
+    def write_gain(self, value):
         if self._model_category == 1:
-            self.camera.Gain.Value = float(attr.get_write_value())
+            self.camera.Gain.Value = float(value)
         else:
-            self.camera.GainRaw.Value = int(attr.get_write_value())
-        self._gain = attr.get_write_value()
+            self.camera.GainRaw.Value = int(value)
+        self._gain = value
 
     def read_width(self, attr):
         return self.camera.Width()
@@ -439,6 +436,7 @@ class Basler(Device):
         self._use_date = False
         self._lr_flip = False
         self._ud_flip = False
+        self._repetition = 1
         super().init_device()
         self.set_state(DevState.INIT)
         try:
@@ -453,11 +451,11 @@ class Basler(Device):
                     self._model_category = 1
                 else:
                     self._model_category = 0
-                self.read_exposure('')
+                self.read_exposure()
                 self.read_frames_per_trigger()
                 self._polling = self.get_attribute_poll_period('is_new_image')
                 if self._polling == 0:
-                    self._polling = self.polling
+                    self._polling = 200
                 self._timeout_polling_ratio = 0.75
                 self._is_new_image = False
                 self._image = np.zeros(
@@ -467,8 +465,6 @@ class Basler(Device):
                 # always use continuous mode. Although it seems this is the default, still set it here in case.
                 self.camera.AcquisitionMode.SetValue('Continuous')
                 self.camera.AcquisitionFrameRateEnable.SetValue(True)
-                # repetition is not a parameter in the camera itself
-                self._repetition = 1
                 self.set_change_event("image", True, False)
                 self.camera.MaxNumBuffer.SetValue(1000)
             print(
@@ -507,15 +503,14 @@ class Basler(Device):
                 return
 
     def read_is_polling_periodically(self):
-        if not self._is_polling_periodically:
-            self.disable_polling('is_new_image')
-        else:
-            self.enable_polling('is_new_image')
         return self._is_polling_periodically
 
     def write_is_polling_periodically(self, value):
         self._is_polling_periodically = value
-        self.read_is_polling_periodically()
+        if not self._is_polling_periodically:
+            self.disable_polling('is_new_image')
+        else:
+            self.enable_polling('is_new_image')
 
     def read_save_path(self):
         # if len(self._save_path) > 20:
@@ -687,8 +682,11 @@ class Basler(Device):
         self._is_new_image = False
         while self.camera.IsGrabbing():
             # the retrieve time out may need to be reconsidered.
+            time0 = time.perf_counter()
             grabResult = self.camera.RetrieveResult(
-                int(100), pylon.TimeoutHandling_Return)
+                int(self._polling*self._timeout_polling_ratio), pylon.TimeoutHandling_Return)
+            if self._debug:
+                logging.info(f'grab takes {time.perf_counter() - time0}')
             if grabResult and grabResult.GrabSucceeded():
                 if self.read_trigger_source().lower() != "off":
                     self.i += 1
@@ -747,9 +745,8 @@ class Basler(Device):
                         for path in parse_save_path:
                             os.makedirs(path, exist_ok=True)
                             data.save(os.path.join(path, self.image_basename))
-                            if self._debug:
-                                logging.info(
-                                    f"Image is save to {os.path.join(path, self.image_basename)}")
+                            logging.info(
+                                f"Image is save to {os.path.join(path, self.image_basename)}")
             return self._is_new_image
         # return False if there is no new image
         return self._is_new_image
@@ -770,7 +767,9 @@ class Basler(Device):
             logging.info(f'polling for {attr} is disabled')
 
     def enable_polling(self, attr):
-        if not self.is_attribute_polled(attr) and self._polling:
+        if not self.is_attribute_polled(attr):
+            if not self._polling:
+                self._polling = 200
             self.poll_attribute(attr, self._polling)
             logging.info(f'polling period of {attr} is set to {self._polling}')
 

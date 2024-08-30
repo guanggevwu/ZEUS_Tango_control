@@ -15,7 +15,7 @@ class FileReaderMenu(Menu):
         super().__init__()
         self.get_class_related_info()
         root.title(f"{self.class_name} menu")
-        self.menu_dict = {'start server': ['file_reader_server.py', self.instances, []],
+        self.menu_dict = {'start server': ['server.py', self.instances, []],
                           'start Taurus GUI': ['GUI.py', self.device_names, []]}
         frame1 = ttk.Frame(root, padding="3 3 12 12")
         frame1.grid(column=0, row=0, sticky=(N, W, E, S))
