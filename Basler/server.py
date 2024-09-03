@@ -98,7 +98,7 @@ class Basler(Device):
         dtype=float,
         unit='J',
         access=AttrWriteType.READ,
-        doc='Calibrated by QE150. E = (<I> - 0.965)*1.307.'
+        doc='Calibrated by QE195 E = sum(I)*37.6/(36.186*640*512).'
     )
 
     def read_energy(self):
@@ -693,9 +693,10 @@ class Basler(Device):
                     self._image = np.fliplr(self._image)
                 if self._ud_flip:
                     self._image = np.flipud(self._image)
-                self._energy = (np.mean(self._image))*0.674
-                self._flux = (self._image)/(611*508) * \
-                    0.674/(4.9/102)**2*0.815
+
+                ratio = 37.6/(36.186*640*512)
+                self._energy = (np.sum(self._image))*ratio
+                self._flux = (self._image)*ratio/(4.9/108)**2*0.815
                 self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
                                          10)[:10])*0.815
                 grabResult.Release()
