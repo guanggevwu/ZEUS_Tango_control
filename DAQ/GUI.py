@@ -199,7 +199,7 @@ class DaqGUI:
                 message='Please disconnect the selected device first!')
         else:
             self.selected_devices[device_name]['checkbutton'].destroy()
-            del self.selected_devices[device_name]['checkbutton']
+            del self.selected_devices[device_name]
         for idx, value in enumerate(self.selected_devices.values()):
             value['checkbutton'].grid(
                 column=idx % self.selected_device_per_row, row=self.device_row+int(idx/self.selected_device_per_row), sticky='W')

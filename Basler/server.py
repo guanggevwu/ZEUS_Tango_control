@@ -15,11 +15,13 @@ if True:
     from common.other import generate_basename
 # -----------------------------
 
-handlers = [logging.StreamHandler()]
-logging.basicConfig(handlers=handlers,
-                    format="%(asctime)s %(message)s", level=logging.INFO)
+class LoggerAdapter(logging.LoggerAdapter):
+    def __init__(self, prefix, logger):
+        super(LoggerAdapter, self).__init__(logger, {})
+        self.prefix = prefix
 
-
+    def process(self, msg, kwargs):
+        return '[%s] %s' % (self.prefix, msg), kwargs  
 class Basler(Device):
     '''
     is_polling_periodically attribute. If is_polling_periodically is False, the polling is manually controlled by the acquisition script, else the polling is made by the polling period "polling".
@@ -206,7 +208,7 @@ class Basler(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized=True,
+        # hw_memorized=True,
         doc='FrameStart for one image per trigger and AcquisitionStart for multiple images per trigger.'
     )
 
@@ -240,7 +242,6 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized=True,
         doc='triggers to be received before transferring the data'
     )
 
@@ -331,7 +332,7 @@ class Basler(Device):
 
     def write_polling_period(self, value):
         # if self._exposure/1000 > 0.9 * value * self._timeout_polling_ratio:
-        #     logging.info(
+        #     self.logger.info(
         #         f'{value} ms is too short compared to the exposure time {self._exposure/1000} ms. Minimum value is {self._exposure/1000/0.9/self._timeout_polling_ratio}. Discard!')
         # else:
         self._polling = value
@@ -384,7 +385,7 @@ class Basler(Device):
         # if self._is_polling_periodically and attr.get_write_value()/1000 > 0.9 * self._polling * self._timeout_polling_ratio:
         #     self._polling = attr.get_write_value()/1000/0.9/self._timeout_polling_ratio
         #     self.poll_attribute('is_new_image', int(self._polling))
-        #     logging.info(
+        #     self.logger.info(
         #         f'Changed the image retrieve timeout to {self._polling} to match the long exposure time')
         if self._model_category == 1:
             self.camera.ExposureTime.Value = value
@@ -440,6 +441,11 @@ class Basler(Device):
         self._repetition = 1
         super().init_device()
         self.set_state(DevState.INIT)
+        logger = logging.getLogger(self.__class__.__name__) 
+        self.logger = LoggerAdapter(self.friendly_name, logger)
+        handlers = [logging.StreamHandler()]
+        logging.basicConfig(handlers=handlers,
+                             format="%(asctime)s %(message)s", level=logging.INFO)
         try:
             self.device = self.get_camera_device()
             if self.device is not None:
@@ -495,7 +501,7 @@ class Basler(Device):
 
     def write_save_data(self, value):
         if self._save_data != value:
-            logging.info(f'save status is changed to {value}')
+            self.logger.info(f'save status is changed to {value}')
         self._save_data = value
         if value:
             try:
@@ -596,7 +602,7 @@ class Basler(Device):
             self.camera.TriggerMode.SetValue('Off')
             value = 'FrameStart'
         self.camera.TriggerSelector.SetValue(value)
-        logging.info(f'trigger source is changed to {value}')
+        self.logger.info(f'trigger selector is changed to {value}')
         if current_trigger_source != 'Off':
             self.write_trigger_source(current_trigger_source)
 
@@ -681,12 +687,12 @@ class Basler(Device):
             grabResult = self.camera.RetrieveResult(
                 int(self._polling*self._timeout_polling_ratio), pylon.TimeoutHandling_Return)
             if self._debug:
-                logging.info(f'grab takes {time.perf_counter() - time0}')
+                self.logger.info(f'grab takes {time.perf_counter() - time0}')
             if grabResult and grabResult.GrabSucceeded():
                 if self.read_trigger_source().lower() != "off":
                     self.i += 1
                     self._image_number += 1
-                    logging.info(
+                    self.logger.info(
                         f'{self.i}')
                 self._image = grabResult.Array
                 if self._lr_flip:
@@ -701,7 +707,7 @@ class Basler(Device):
                                          10)[:10])*0.815
                 grabResult.Release()
                 if self._debug:
-                    logging.info(
+                    self.logger.info(
                         f"{self._image_number} new. mean intensity: {np.mean(self._image)}")
 
                 self._is_new_image = True
@@ -729,7 +735,7 @@ class Basler(Device):
                                         path, f'{self.image_basename}')):
                                     os.remove(os.path.join(
                                         path, f'{self.image_basename}'))
-                                    logging.info(
+                                    self.logger.info(
                                         f"Removed previous saved image {self.image_basename}")
                                 should_save = False
                     self.time0 = self.time1
@@ -741,7 +747,7 @@ class Basler(Device):
                         for path in parse_save_path:
                             os.makedirs(path, exist_ok=True)
                             data.save(os.path.join(path, self.image_basename))
-                            logging.info(
+                            self.logger.info(
                                 f"Image is save to {os.path.join(path, self.image_basename)}")
             return self._is_new_image
         # return False if there is no new image
@@ -760,14 +766,14 @@ class Basler(Device):
     def disable_polling(self, attr):
         if self.is_attribute_polled(attr):
             self.stop_poll_attribute(attr)
-            logging.info(f'polling for {attr} is disabled')
+            self.logger.info(f'polling for {attr} is disabled')
 
     def enable_polling(self, attr):
         if not self.is_attribute_polled(attr):
             if not self._polling:
                 self._polling = 200
             self.poll_attribute(attr, self._polling)
-            logging.info(f'polling period of {attr} is set to {self._polling}')
+            self.logger.info(f'polling period of {attr} is set to {self._polling}')
 
     @command()
     def get_ready(self):
@@ -776,7 +782,7 @@ class Basler(Device):
         """
         if self.camera.TriggerMode.Value.lower() == 'off':
             self.camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
-            logging.info(
+            self.logger.info(
                 'Starting live mode')
             self.set_state(DevState.ON)
         else:
@@ -784,16 +790,16 @@ class Basler(Device):
             self._grab_number = 99999
             self.camera.StartGrabbingMax(
                 self._grab_number, pylon.GrabStrategy_OneByOne)
-            logging.info(
+            self.logger.info(
                 f'Ready to receive triggers from {self.read_trigger_source()}. Image retrieve will be stopped after receiving {self._grab_number} images')
 
     @command()
     def send_software_trigger(self):
         if self.camera.TriggerSource.Value != "Software":
-            logging.info(
+            self.logger.info(
                 f'Please set the "trigger source" to "software" to send software trigger. Abort!')
             return
-        logging.info("Sending software trigger....................")
+        self.logger.info("Sending software trigger....................")
         self.camera.TriggerSoftware.Execute()
         # if not self._save_data:
         #     self.enable_polling('is_new_image')
@@ -803,13 +809,13 @@ class Basler(Device):
     def relax(self):
         self.camera.StopGrabbing()
         self.set_state(DevState.ON)
-        logging.info("Grabbing stops")
+        self.logger.info("Grabbing stops")
 
     @command()
     def reset_number(self):
         self._image_number = 0
         self.set_state(DevState.ON)
-        logging.info("Reset image number")
+        self.logger.info("Reset image number")
 
 
 if __name__ == "__main__":

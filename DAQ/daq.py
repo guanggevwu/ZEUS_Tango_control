@@ -71,7 +71,7 @@ class Daq:
         if config_dict is None:
             config_dict = default_config_dict
         config_dict = {key: value for key,
-                       value in config_dict.items() if (key in [v['shortname'] for v in self.cam_info.values()]) or (key == 'all')}
+                       value in config_dict.items() if (key.lower() in [v['shortname'].lower() for v in self.cam_info.values()]) or (key == 'all')}
 
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
@@ -129,7 +129,7 @@ class Daq:
                 bs.trigger_source = "software"
                 time.sleep(0.5)
                 bs.send_software_trigger()
-                time.sleep(0.5)
+                time.sleep(1)
             if bs.is_new_image:
                 data, data_array = self.get_image(bs)
                 file_name = generate_basename(
