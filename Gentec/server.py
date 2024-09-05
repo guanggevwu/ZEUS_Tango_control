@@ -249,7 +249,7 @@ class GentecEO(Device):
                 self._save_data = value
             except FileNotFoundError:
                 logging.info(
-                    f"Folder creation failed! If you see this server start-up, it is usually fine since {self._save_path=} is not initialized yet!")
+                    f"Folder creation failed! If you see this at server start-up. It is usually fine since {self._save_path=} is not initialized yet!")
                 return
             self.get_existing_rows()
         else:
