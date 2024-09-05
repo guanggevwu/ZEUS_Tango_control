@@ -15,13 +15,16 @@ if True:
     from common.other import generate_basename
 # -----------------------------
 
+
 class LoggerAdapter(logging.LoggerAdapter):
     def __init__(self, prefix, logger):
         super(LoggerAdapter, self).__init__(logger, {})
         self.prefix = prefix
 
     def process(self, msg, kwargs):
-        return '[%s] %s' % (self.prefix, msg), kwargs  
+        return '[%s] %s' % (self.prefix, msg), kwargs
+
+
 class Basler(Device):
     '''
     is_polling_periodically attribute. If is_polling_periodically is False, the polling is manually controlled by the acquisition script, else the polling is made by the polling period "polling".
@@ -100,7 +103,7 @@ class Basler(Device):
         dtype=float,
         unit='J',
         access=AttrWriteType.READ,
-        doc='Calibrated by QE195 E = sum(I)*37.6/(36.186*640*512).'
+        doc='Calibrated by QE195 E = sum(I)*self.energy_intensity_coefficient.'
     )
 
     def read_energy(self):
@@ -441,11 +444,11 @@ class Basler(Device):
         self._repetition = 1
         super().init_device()
         self.set_state(DevState.INIT)
-        logger = logging.getLogger(self.__class__.__name__) 
+        logger = logging.getLogger(self.__class__.__name__)
         self.logger = LoggerAdapter(self.friendly_name, logger)
         handlers = [logging.StreamHandler()]
         logging.basicConfig(handlers=handlers,
-                             format="%(asctime)s %(message)s", level=logging.INFO)
+                            format="%(asctime)s %(message)s", level=logging.INFO)
         try:
             self.device = self.get_camera_device()
             if self.device is not None:
@@ -458,6 +461,15 @@ class Basler(Device):
                     self._model_category = 1
                 else:
                     self._model_category = 0
+                if self.friendly_name == "PW_Comp_In_NF":
+                    self.energy_intensity_coefficient = 36.7/(25.318*640*512)
+                    self.pixel_size = 4.9/108
+                if self.friendly_name == "MA3_NF":
+                    self.energy_intensity_coefficient = 36.7/(13.927*640*512)
+                    self.pixel_size = 20/632*2
+                else:
+                    self.energy_intensity_coefficient = 36.7/(25.318*640*512)
+                    self.pixel_size = 4.9/108
                 self.read_exposure()
                 self.read_frames_per_trigger()
                 self._polling = self.get_attribute_poll_period('is_new_image')
@@ -700,9 +712,10 @@ class Basler(Device):
                 if self._ud_flip:
                     self._image = np.flipud(self._image)
 
-                ratio = 37.6/(36.186*640*512)
-                self._energy = (np.sum(self._image))*ratio
-                self._flux = (self._image)*ratio/(4.9/108)**2*0.815
+                self._energy = (np.sum(self._image)) * \
+                    self.energy_intensity_coefficient
+                self._flux = (self._image) * \
+                    self.energy_intensity_coefficient/self.pixel_size**2*0.815
                 self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
                                          10)[:10])*0.815
                 grabResult.Release()
@@ -773,7 +786,8 @@ class Basler(Device):
             if not self._polling:
                 self._polling = 200
             self.poll_attribute(attr, self._polling)
-            self.logger.info(f'polling period of {attr} is set to {self._polling}')
+            self.logger.info(
+                f'polling period of {attr} is set to {self._polling}')
 
     @command()
     def get_ready(self):
