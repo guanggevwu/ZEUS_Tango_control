@@ -197,6 +197,24 @@ class Basler(Device):
     def write_ud_flip(self, value):
         self._ud_flip = value
 
+    rotate = attribute(
+        label='rotate',
+        dtype=int,
+        access=AttrWriteType.READ_WRITE,
+        memorized=True,
+        hw_memorized=True,
+        doc="Rotate the image counterclockwise. Accepted value is 90, 180, 270."
+    )
+
+    def read_rotate(self):
+        return self._rotate
+
+    def write_rotate(self, value):
+        if value in [0, 90, 180, 270]:
+            self._rotate = value
+        else:
+            raise ('Must be 0, 90, 180 or 270.')
+
     trigger_source = attribute(
         label="trigger source",
         dtype=str,
@@ -441,6 +459,7 @@ class Basler(Device):
         self._use_date = False
         self._lr_flip = False
         self._ud_flip = False
+        self._rotate = 0
         self._repetition = 1
         super().init_device()
         self.set_state(DevState.INIT)
@@ -711,7 +730,8 @@ class Basler(Device):
                     self._image = np.fliplr(self._image)
                 if self._ud_flip:
                     self._image = np.flipud(self._image)
-
+                if self._rotate:
+                    self._image = np.rot90(self._image, int(self._rotate/90))
                 self._energy = (np.sum(self._image)) * \
                     self.energy_intensity_coefficient
                 self._flux = (self._image) * \
