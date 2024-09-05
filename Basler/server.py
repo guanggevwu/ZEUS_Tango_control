@@ -717,7 +717,7 @@ class Basler(Device):
                 self._flux = (self._image) * \
                     self.energy_intensity_coefficient/self.pixel_size**2*0.815
                 self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
-                                         10)[:10])*0.815
+                                         10)[:10])
                 grabResult.Release()
                 if self._debug:
                     self.logger.info(
