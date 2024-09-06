@@ -9,11 +9,14 @@ if Tango polling period > Taurus polling period, Taurus GUI will use Tango polli
 To disable polling when using Taurus, set server polling to a large number.
 
 # the statement about self.push_change_event may be wrong. 20240813
-self.push_change_event will push changes to attr value but not to the Taurus GUI. For 2D image attr with taurus image module, push event will change GUI. Taurus GUI still uses the polling period defined by server or itself.
 
+self.push_change_event will push changes to attr value but not to the Taurus GUI. For 2D image attr with taurus image module, push event will change GUI. Taurus GUI still uses the polling period defined by server or itself.
 
 update the database server:
 add export PKG_CONFIG_PATH=/usr/local/tango/lib/pkgconfig to .bashrc and do a source ~/.bashrc
 
 20240903:
 The TA2 FF camera (all other cameras looked fine) instantly shutdown after show "readu to receive request". The solution is by disabling hw_memorized for trigger source temperarily. Then start the server, reset polling from Jive and restart the server and then change the hw_memorized back. The reason could be I updated the code and make most of the attribute not polling but the database is not updated properly.
+
+20440906:
+hw_memorized order is determined by the appearance order of the attribute (not the write_attribute function).

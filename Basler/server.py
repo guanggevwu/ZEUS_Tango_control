@@ -215,24 +215,6 @@ class Basler(Device):
         else:
             raise ('Must be 0, 90, 180 or 270.')
 
-    trigger_source = attribute(
-        label="trigger source",
-        dtype=str,
-        access=AttrWriteType.READ_WRITE,
-        memorized=is_memorized,
-        hw_memorized=True,
-        doc='off or software or external'
-    )
-
-    trigger_selector = attribute(
-        label="trigger selector",
-        dtype=str,
-        access=AttrWriteType.READ_WRITE,
-        memorized=is_memorized,
-        # hw_memorized=True,
-        doc='FrameStart for one image per trigger and AcquisitionStart for multiple images per trigger.'
-    )
-
     exposure = attribute(
         name="exposure",
         label="exposure",
@@ -302,7 +284,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        # hw_memorized=True,
+        hw_memorized=True,
     )
 
     binning_vertical = attribute(
@@ -310,13 +292,31 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        # hw_memorized=True,
+        hw_memorized=True,
     )
 
     sensor_readout_mode = attribute(
         label="sensor readout mode",
         dtype=str,
         access=AttrWriteType.READ,
+    )
+
+    trigger_source = attribute(
+        label="trigger source",
+        dtype=str,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        hw_memorized=True,
+        doc='off or software or external'
+    )
+
+    trigger_selector = attribute(
+        label="trigger selector",
+        dtype=str,
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        # hw_memorized=True,
+        doc='FrameStart for one image per trigger and AcquisitionStart for multiple images per trigger.'
     )
 
     is_new_image = attribute(
@@ -370,15 +370,18 @@ class Basler(Device):
         return self._image_number
 
     def initialize_dynamic_attributes(self):
-        '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
+        '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open.
+        The max width of the image is determined by the camera model and the binning value. So better remove the min max value constrain.
+        '''
+
         width = attribute(
             name="width",
             label="width of the image",
             dtype=int,
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
-            min_value=self.camera.Width.Min,
-            max_value=self.camera.Width.Max,
+            # min_value=self.camera.Width.Min,
+            # max_value=self.camera.Width.Max,
         )
 
         height = attribute(
@@ -387,8 +390,8 @@ class Basler(Device):
             dtype=int,
             access=AttrWriteType.READ_WRITE,
             memorized=self.is_memorized,
-            min_value=self.camera.Height.Min,
-            max_value=self.camera.Height.Max,
+            # min_value=self.camera.Height.Min,
+            # max_value=self.camera.Height.Max,
         )
         self.add_attribute(width)
         self.add_attribute(height)
@@ -604,17 +607,20 @@ class Basler(Device):
     #     return self.camera.ResultingFrameRateAbs()
 
     def read_binning_horizontal(self):
-        return self.camera.BinningHorizontal()
+        self._binning_horizontal = self.camera.BinningHorizontal()
+        return self._binning_horizontal
 
     def write_binning_horizontal(self, value):
         # To check limit. Use self.camera.BinningHorizontal.Min
+        self._binning_horizontal = value
         self.camera.BinningHorizontal.Value = value
 
     def read_binning_vertical(self):
+        self._binning_vertical = self.camera.BinningVertical()
         return self.camera.BinningVertical()
 
     def write_binning_vertical(self, value):
-
+        self._binning_vertical = value
         self.camera.BinningVertical.Value = value
 
     def read_sensor_readout_mode(self):
