@@ -740,8 +740,10 @@ class Basler(Device):
                     self._image = np.rot90(self._image, int(self._rotate/90))
                 self._energy = (np.sum(self._image)) * \
                     self.energy_intensity_coefficient
-                self._flux = (self._image) * \
-                    self.energy_intensity_coefficient/self.pixel_size**2*0.815
+                self.leak_cof = 0.815
+                self.clip_cof = 0.853
+                self._flux = (self._image) * self.energy_intensity_coefficient * \
+                    self.leak_cof*self.clip_cof/self.pixel_size**2
                 self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
                                          10)[:10])
                 grabResult.Release()
