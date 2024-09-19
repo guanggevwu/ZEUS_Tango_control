@@ -37,8 +37,8 @@ class Basler(Device):
     # The image attribute should not be polled periodically since images are large. They will be pushed when is_new_image attribute is True.
     image = attribute(
         label="image",
-        max_dim_x=4096,
-        max_dim_y=4096,
+        max_dim_x=10000,
+        max_dim_y=10000,
         dtype=((int,),),
         access=AttrWriteType.READ,
     )
@@ -54,8 +54,8 @@ class Basler(Device):
 
     flux = attribute(
         label="flux",
-        max_dim_x=4096,
-        max_dim_y=4096,
+        max_dim_x=10000,
+        max_dim_y=10000,
         dtype=((float,),),
         unit='J*cm**-2',
         access=AttrWriteType.READ,
@@ -245,6 +245,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
+        hw_memorized = True,
         doc='triggers to be received before transferring the data'
     )
 
@@ -277,22 +278,6 @@ class Basler(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-    )
-
-    binning_horizontal = attribute(
-        label="binning_horizontal",
-        dtype=int,
-        access=AttrWriteType.READ_WRITE,
-        memorized=is_memorized,
-        hw_memorized=True,
-    )
-
-    binning_vertical = attribute(
-        label="binning_vertical",
-        dtype=int,
-        access=AttrWriteType.READ_WRITE,
-        memorized=is_memorized,
-        hw_memorized=True,
     )
 
     sensor_readout_mode = attribute(
@@ -343,12 +328,13 @@ class Basler(Device):
         label='image polling',
         dtype=int,
         unit='ms',
+        hw_memorized=True,
         memorized=is_memorized,
         access=AttrWriteType.READ_WRITE,
     )
 
     def read_polling_period(self):
-        self._polling = self.get_attribute_poll_period('is_new_image')
+        # self._polling = self.get_attribute_poll_period('is_new_image')
         return self._polling
 
     def write_polling_period(self, value):
@@ -357,7 +343,8 @@ class Basler(Device):
         #         f'{value} ms is too short compared to the exposure time {self._exposure/1000} ms. Minimum value is {self._exposure/1000/0.9/self._timeout_polling_ratio}. Discard!')
         # else:
         self._polling = value
-        self.poll_attribute('is_new_image', value)
+        if self._is_polling_periodically:
+            self.poll_attribute('is_new_image', value)
 
     image_number = attribute(
         label='image #',
@@ -393,8 +380,29 @@ class Basler(Device):
             # min_value=self.camera.Height.Min,
             # max_value=self.camera.Height.Max,
         )
+
+        binning_horizontal = attribute(
+            name='binning_horizontal',
+            label="binning_horizontal",
+            dtype=int,
+            access=AttrWriteType.READ_WRITE,
+            memorized=True,
+            # hw_memorized=True,
+        )
+
+        binning_vertical = attribute(
+            name='binning_vertical',
+            label="binning_vertical",
+            dtype=int,
+            access=AttrWriteType.READ_WRITE,
+            memorized=True,
+            # hw_memorized=True,
+        )
         self.add_attribute(width)
         self.add_attribute(height)
+        if self._model!= 'a2A1920-51gcBAS':
+            self.add_attribute(binning_horizontal)
+            self.add_attribute(binning_vertical)
         # if self.camera.DeviceModelName() in ['acA640-121gm']:
         self.remove_attribute('sensor_readout_mode')
 
@@ -445,6 +453,23 @@ class Basler(Device):
         self.camera.StopGrabbing()
         self.camera.Height.Value = attr.get_write_value()
 
+    def read_binning_horizontal(self, attr):
+        self._binning_horizontal = self.camera.BinningHorizontal()
+        return self._binning_horizontal
+
+    def write_binning_horizontal(self, attr):
+        # To check limit. Use self.camera.BinningHorizontal.Min
+        self._binning_horizontal = attr.get_write_value()
+        self.camera.BinningHorizontal.Value = attr.get_write_value()
+
+    def read_binning_vertical(self, attr):
+        self._binning_vertical = self.camera.BinningVertical()
+        return self.camera.BinningVertical()
+
+    def write_binning_vertical(self, attr):
+        self._binning_vertical = attr.get_write_value()
+        self.camera.BinningVertical.Value = attr.get_write_value()
+
     def init_device(self):
         self.model_type = ['a2A1920-51gmBAS',
                            'a2A2590-22gmBAS', 'a2A5320-7gmPRO']
@@ -463,7 +488,8 @@ class Basler(Device):
         self._lr_flip = False
         self._ud_flip = False
         self._rotate = 0
-        self._repetition = 1
+        self._frames_per_trigger = 1
+        self._repetition = 50
         super().init_device()
         self.set_state(DevState.INIT)
         logger = logging.getLogger(self.__class__.__name__)
@@ -606,23 +632,6 @@ class Basler(Device):
     # def read_framerate(self):
     #     return self.camera.ResultingFrameRateAbs()
 
-    def read_binning_horizontal(self):
-        self._binning_horizontal = self.camera.BinningHorizontal()
-        return self._binning_horizontal
-
-    def write_binning_horizontal(self, value):
-        # To check limit. Use self.camera.BinningHorizontal.Min
-        self._binning_horizontal = value
-        self.camera.BinningHorizontal.Value = value
-
-    def read_binning_vertical(self):
-        self._binning_vertical = self.camera.BinningVertical()
-        return self.camera.BinningVertical()
-
-    def write_binning_vertical(self, value):
-        self._binning_vertical = value
-        self.camera.BinningVertical.Value = value
-
     def read_sensor_readout_mode(self):
         return self.camera.SensorReadoutMode.GetValue()
 
@@ -722,7 +731,7 @@ class Basler(Device):
             # the retrieve time out may need to be reconsidered.
             time0 = time.perf_counter()
             grabResult = self.camera.RetrieveResult(
-                int(self._polling*self._timeout_polling_ratio), pylon.TimeoutHandling_Return)
+                100, pylon.TimeoutHandling_Return)
             if self._debug:
                 self.logger.info(f'grab takes {time.perf_counter() - time0}')
             if grabResult and grabResult.GrabSucceeded():
@@ -829,7 +838,8 @@ class Basler(Device):
             self.set_state(DevState.ON)
         else:
             self.i = 0
-            self._grab_number = 99999
+            # Previous we use a very large number for _grab_number, but it caused some memory problem when we have many camera.
+            self._grab_number = self._repetition*self._frames_per_trigger
             self.camera.StartGrabbingMax(
                 self._grab_number, pylon.GrabStrategy_OneByOne)
             self.logger.info(

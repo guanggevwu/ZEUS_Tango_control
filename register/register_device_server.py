@@ -57,6 +57,14 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "basler_TA1-EspecH": {'server': 'Basler/TA1-EspecH', '_class': 'Basler', 'name': 'TA1/basler/TA1-EspecH'},
             "basler_TA1-EspecL": {'server': 'Basler/TA1-EspecL', '_class': 'Basler', 'name': 'TA1/basler/TA1-EspecL'},
             "basler_TA1-Shadowgraphy": {'server': 'Basler/TA1-Shadowgraphy', '_class': 'Basler', 'name': 'TA1/basler/TA1-Shadowgraphy'},
+            "basler_TA1-MagnetScreen": {'server': 'Basler/TA1-MagnetScreen', '_class': 'Basler', 'name': 'TA1/basler/TA1-MagnetScreen'},
+            "basler_TA1-SideView": {'server': 'Basler/TA1-SideView', '_class': 'Basler', 'name': 'TA1/basler/TA1-SideView'},
+            "basler_TA1-TopView": {'server': 'Basler/TA1-TopView', '_class': 'Basler', 'name': 'TA1/basler/TA1-TopView'},
+            "basler_TA1-Tape-Reflect": {'server': 'Basler/TA1-Tape-Reflect', '_class': 'Basler', 'name': 'TA1/basler/TA1-Tape-Reflect'},
+            "basler_TA1-WedgeReflect": {'server': 'Basler/TA1-WedgeReflect', '_class': 'Basler', 'name': 'TA1/basler/TA1-WedgeReflect'},
+            "basler_TA1-LYSO": {'server': 'Basler/TA1-LYSO', '_class': 'Basler', 'name': 'TA1/basler/TA1-LYSO'},
+            "basler_TA1-LYSO-spec": {'server': 'Basler/TA1-LYSO-spec', '_class': 'Basler', 'name': 'TA1/basler/TA1-LYSO-spec'},
+            "basler_TA1-DumpScreen": {'server': 'Basler/TA1-DumpScreen', '_class': 'Basler', 'name': 'TA1/basler/TA1-DumpScreen'},
             "basler_TA1_Gas_Cell_ft": {'server': 'Basler/TA1_Gas_Cell_ft', '_class': 'Basler', 'name': 'TA1/basler/TA1_Gas_Cell_ft'},
             "basler_TA1-Input_Ref.": {'server': 'Basler/TA1-Input_Ref.', '_class': 'Basler', 'name': 'TA1/basler/TA1-Input_Ref.'},
             "basler_TA1-Output_Ref.": {'server': 'Basler/TA1-Output_Ref.', '_class': 'Basler', 'name': 'TA1/basler/TA1-Output_Ref.'},
@@ -72,7 +80,10 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "waverunner_104mxi_1": {'server': 'LeCroy/old_scope', '_class': 'LeCroy', 'name': 'facility/lecroy/waverunner_104mxi_1'},
             "wavesurfer_3034z_1": {'server': 'LeCroy/wavesurfer_3034z_1', '_class': 'LeCroy', 'name': 'facility/lecroy/wavesurfer_3034z_1'},
             "dg535_test": {'server': 'DG535/testsr', '_class': 'DG535', 'name': 'test/dg535/1'},
-            "file_reader_1": {'server': 'FileReader/file_reader_1', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_1'}, }
+            "file_reader_1": {'server': 'FileReader/file_reader_1', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_1'}, 
+            "file_reader_2": {'server': 'FileReader/file_reader_2', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_2'}, 
+            "file_reader_3": {'server': 'FileReader/file_reader_3', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_3'}, 
+            }
 
 
 if __name__ == "__main__":

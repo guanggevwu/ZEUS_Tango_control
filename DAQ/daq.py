@@ -11,6 +11,8 @@ from PIL import ImageDraw
 import sys
 import atexit
 from config import default_config_dict
+import shutil
+import matplotlib.pyplot as plt
 
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -196,22 +198,29 @@ class Daq:
                 if info['shot_num'] > shot_limit:
                     info['is_completed'] = True
                 elif bs.is_new_image:
-                    data, data_array = self.get_image(bs)
-                    file_name = generate_basename(
-                        info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%e': 'Energy{energy:.3f}J', '%h': 'HotSpot{hot_spot:.4f}Jcm-2', '%f': 'tiff', 'device_proxy': bs})
-                    # the saving interval threshold has been enabled in server side.
-                    # if info['shot_num'] == 1 or (info['time_interval'] > interval_threshold):
-                    data.save(os.path.join(
-                        info['cam_dir'], file_name))
-                    logging.info("Shot {} taken for {} (size: {}) saved to {}".format(
-                        info['shot_num'], info['shortname'],  {data.size}, {os.path.join(
-                            info['cam_dir'], file_name)}))
+                    if 'basler' in bs.dev_name() or bs.data_dimension == 2:
+                        data, data_array = self.get_image(bs)
+                        file_name = generate_basename(
+                            info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%e': 'Energy{energy:.3f}J', '%h': 'HotSpot{hot_spot:.4f}Jcm-2', '%f': 'tiff', 'device_proxy': bs})
+                        # the saving interval threshold has been enabled in server side.
+                        # if info['shot_num'] == 1 or (info['time_interval'] > interval_threshold):
+                        data.save(os.path.join(
+                            info['cam_dir'], file_name))
+                        logging.info("Shot {} taken for {} (size: {}) saved to {}".format(
+                            info['shot_num'], info['shortname'],  {data.size}, {os.path.join(
+                                info['cam_dir'], file_name)}))
+                    elif 'file_reader' in bs.dev_name() or bs.data_dimension == 1:
+                        file_name = generate_basename(
+                            info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%f': 'csv', 'device_proxy': bs})
+                        shutil.copy(os.path.join(bs.folder_path, bs.current_file), os.path.join(
+                            info['cam_dir'], file_name))
+                        data_array = self.save_plot_data(bs.x, bs.y)
                     if stitch:
                         adjusted_image = self.stretch_image(data_array)
                         info['images_to_stitch'][f'shot{info["shot_num"]}'] = adjusted_image
                         if sum([1 for one_cam in self.cam_info.values() if f'shot{info["shot_num"]}' in one_cam['images_to_stitch']]) == len(self.cam_info):
                             stitch_save_path = os.path.join(
-                                self.dir, 'stitching', f'shot{info["shot_num"]}.tiff')
+                                self.dir, 'stitching', f'shot{info["shot_num"]}_{datetime.now().strftime("%H%M%S.%f")}.tiff')
                             large_image_p = self.stitch_images(
                                 f'shot{info["shot_num"]}')
                             large_image_p.save(stitch_save_path)
@@ -269,6 +278,16 @@ class Daq:
             del info['images_to_stitch'][image_name]
         # large_image_p.show()
         return large_image_p
+
+    def save_plot_data(self, x, y):
+        fig, ax = plt.subplots(1,1)
+        ax.plot(x, y)
+        # If we haven't already shown or saved the plot, then we need to
+        # draw the figure first...
+        fig.canvas.draw()
+        data = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+        data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+        return data[:,:,0]
 
     def termination(self, config_dict=None):
         logging.info('terminating...')

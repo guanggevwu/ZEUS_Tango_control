@@ -7,5 +7,5 @@ default_config_dict = {
     'PW_Comp_In'.lower(): {'format_pixel': "Mono12", "exposure": 5000, "gain": 136, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False, "saving_format": '%s_%t_%e_%h.%f'},
     'testcam': {'format_pixel': "Mono12", "exposure": 1000, "trigger_selector": "FrameStart", "trigger_source": "external", "is_polling_periodically": False, "saving_format": '%s_%t_%e_%h.%f'},
     'file_reader_1': {"is_polling_periodically": False, "saving_format": 'FileReader_%s.%f'},
-    'all': {}
+    'all': {"saving_format": '%s_%t.%f', "trigger_source": "external", "is_polling_periodically": False}
 }
