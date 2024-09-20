@@ -1,1 +1,5 @@
-{"selected_devices": {"test/basler/test": null}, "options": {"default_config": true, "save_config": true, "background_image": false, "stitch": true}, "save_path": "Z:\\user_data\\2024\\Qing_Zhang\\TA_data\\0920_run1"}
+{
+  "selected_devices": { "test/basler/test": null },
+  "options": null,
+  "save_path": "Z:\\user_data\\2024\\Qing_Zhang\\TA_data\\0920_run1"
+}
