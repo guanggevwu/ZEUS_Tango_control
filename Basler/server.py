@@ -245,7 +245,7 @@ class Basler(Device):
         dtype=int,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
-        hw_memorized = True,
+        hw_memorized=True,
         doc='triggers to be received before transferring the data'
     )
 
@@ -400,7 +400,7 @@ class Basler(Device):
         )
         self.add_attribute(width)
         self.add_attribute(height)
-        if self._model!= 'a2A1920-51gcBAS':
+        if self._model != 'a2A1920-51gcBAS':
             self.add_attribute(binning_horizontal)
             self.add_attribute(binning_vertical)
         # if self.camera.DeviceModelName() in ['acA640-121gm']:
@@ -839,7 +839,8 @@ class Basler(Device):
         else:
             self.i = 0
             # Previous we use a very large number for _grab_number, but it caused some memory problem when we have many camera.
-            self._grab_number = self._repetition*self._frames_per_trigger
+            self._grab_number = max(
+                [self._repetition*self._frames_per_trigger, 50])
             self.camera.StartGrabbingMax(
                 self._grab_number, pylon.GrabStrategy_OneByOne)
             self.logger.info(
@@ -863,9 +864,9 @@ class Basler(Device):
         self.set_state(DevState.ON)
         self.logger.info("Grabbing stops")
 
-    @command()
-    def reset_number(self):
-        self._image_number = 0
+    @command(dtype_in=int)
+    def reset_number(self, number=0):
+        self._image_number = number
         self.set_state(DevState.ON)
         self.logger.info("Reset image number")
 

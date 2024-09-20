@@ -10,6 +10,10 @@ def register_device(device):
                 setattr(dev_info, attr, reg_dict[device][attr])
         db.add_device(dev_info)
         print(f'{device} is added')
+        if "property" in reg_dict[device]:
+            db.put_device_property(
+                reg_dict[device]['name'], reg_dict[device]['property'])
+            print(f'Property added. {reg_dict[device]["property"]}')
     else:
         print("wrong device name")
 
@@ -43,7 +47,7 @@ db = tango.Database()
 # 'server', ServerName/Instance _class, class name in the code? 'name', domain/family/member?
 reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSupply', 'name': 'test/power_supply/1'},
             "power_supply_1": {'server': 'PowerSupply/testsr', '_class': 'PowerSupply', 'name': 'test/power_supply/2'},
-            "basler": {'server': 'Basler/testsr', '_class': 'Basler', 'name': 'test/basler/1'},
+            "basler_test": {'server': 'Basler/test', '_class': 'Basler', 'name': 'test/basler/test', 'property': {'friendly_name': 'test'}},
             "basler_SF2": {'server': 'Basler/MA2', '_class': 'Basler', 'name': 'laser/basler/SF2'},
             "basler_MA2-Input": {'server': 'Basler/MA2', '_class': 'Basler', 'name': 'laser/basler/MA2-Input'},
             "basler_PW_Comp_In_NF": {'server': 'Basler/PW_Comp_In_NF', '_class': 'Basler', 'name': 'laser/basler/PW_Comp_In_NF'},
@@ -80,9 +84,9 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "waverunner_104mxi_1": {'server': 'LeCroy/old_scope', '_class': 'LeCroy', 'name': 'facility/lecroy/waverunner_104mxi_1'},
             "wavesurfer_3034z_1": {'server': 'LeCroy/wavesurfer_3034z_1', '_class': 'LeCroy', 'name': 'facility/lecroy/wavesurfer_3034z_1'},
             "dg535_test": {'server': 'DG535/testsr', '_class': 'DG535', 'name': 'test/dg535/1'},
-            "file_reader_1": {'server': 'FileReader/file_reader_1', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_1'}, 
-            "file_reader_2": {'server': 'FileReader/file_reader_2', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_2'}, 
-            "file_reader_3": {'server': 'FileReader/file_reader_3', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_3'}, 
+            "file_reader_1": {'server': 'FileReader/file_reader_1', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_1'},
+            "file_reader_2": {'server': 'FileReader/file_reader_2', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_2'},
+            "file_reader_3": {'server': 'FileReader/file_reader_3', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_3'},
             }
 
 

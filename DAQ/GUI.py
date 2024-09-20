@@ -13,6 +13,7 @@ import signal
 import platform
 import atexit
 from threading import Thread, Event
+import json
 
 
 class DaqGUI:
@@ -25,10 +26,8 @@ class DaqGUI:
         elif platform.system() == 'Windows':
             self.python_path = os.path.join(
                 self.root_path, 'venv', 'Scripts', 'python.exe')
-        # self.selected_devices is a dictionary. Key is the device name, value is another dictionary. In the sub-dictionary, the keys are "checkbutton" and "server_pid".
-        self.selected_devices = dict()
         self.client_GUI = dict()
-        self.acquisition = {'status': False}
+        self.acquisition = {'status': False, 'is_completed': False}
 
         root.title(f"ZEUS DAQ GUI")
 
@@ -37,14 +36,17 @@ class DaqGUI:
 
         self.font_large = 20
         self.font_mid = 15
+        self.font_small = 12
         s.configure('Sty1.TLabelframe.Label',
                     foreground="blue", font=('Times', self.font_large))
         style_widgets = ['TButton', 'TLabel',
-                         'TCombobox', 'TCheckbutton']
+                         'TCombobox']
 
         for w in style_widgets:
             s.configure(f'Sty1.{w}',
                         font=('Helvetica', self.font_mid))
+        s.configure('Sty1.TCheckbutton', font=(
+            'Helvetica', self.font_small))
         s.configure('Sty2_offline.TButton', font=(
             'Helvetica', self.font_mid), background='#85929e')
         s.configure('Sty2_online.TButton', font=(
@@ -84,7 +86,6 @@ class DaqGUI:
             'text': 'Save backgrounds image before acquisition', 'init_status': True}, 'stitch': {'text': 'Stitch the images from multiple cameras and save a large image', 'init_status': True}, }
 
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
-            # checkbox_var = BooleanVar(value=value['init_status'])
             checkbox_var = BooleanVar(value=value['init_status'])
             checkbox = ttk.Checkbutton(self.frame2, text=value['text'],
                                        variable=checkbox_var, style='Sty1.TCheckbutton')
@@ -93,29 +94,75 @@ class DaqGUI:
             value['var'] = checkbox_var
 
         # ---------------------frame 3
+
         self.frame3 = ttk.Labelframe(
             root, text='Acquisition', padding=pad_widget, style='Sty1.TLabelframe')
         self.frame3.grid(column=0, row=2, sticky=(N, W, E, S))
         ttk.Label(self.frame3, text='Save path:', font=(
             'Helvetica', int(self.font_mid*0.75))).grid(
             column=0, row=0, sticky='W')
-        dt_string = datetime.now().strftime("%Y%m%d")
-        self.path_var = StringVar(
-            value=fr'Z:\user_data\2024\Qing_Zhang\TA_data\{dt_string}_run')
+        # dt_string = datetime.now().strftime("%Y%m%d")
+        self.path_var = StringVar()
         ttk.Entry(self.frame3, textvariable=self.path_var, font=(
             'Helvetica', int(self.font_mid*0.75)), width=60).grid(
-            column=1, row=0, sticky='W')
+            column=1, row=0, columnspan=3, sticky='W')
+
+        ttk.Label(self.frame3, text='Start', font=(
+            'Helvetica', int(self.font_mid*0.75))).grid(
+            column=0, row=1, sticky='W')
+        self.shot_start_var = IntVar(value=1)
+        ttk.Entry(self.frame3, textvariable=self.shot_start_var, font=(
+            'Helvetica', int(self.font_mid*0.75)), width=20).grid(
+            column=1, row=1, sticky='W')
+
+        ttk.Label(self.frame3, text='End', font=(
+            'Helvetica', int(self.font_mid*0.75))).grid(
+            column=2, row=1, sticky='W')
+        self.shot_end_var = IntVar(value=9999)
+        ttk.Entry(self.frame3, textvariable=self.shot_end_var, font=(
+            'Helvetica', int(self.font_mid*0.75)), width=20).grid(
+            column=3, row=1, sticky='W')
 
         self.acquisition['button'] = ttk.Button(
-            self.frame3, text='Start', command=self.thread_acquisition, style='Sty3_start.TButton')
+            self.frame3, text='Start', command=self.toggle_acquisition, style='Sty3_start.TButton')
         self.acquisition['button'].grid(
-            column=0, row=1, columnspan=2, sticky='WE')
+            column=0, row=2, columnspan=4, sticky='WE')
 
         self.pad_space(self.frame1)
         for child in self.frame2.winfo_children():
             child.grid_configure(padx=[self.font_mid, 0], pady=3)
         for child in self.frame3.winfo_children():
             child.grid_configure(padx=[self.font_mid, 0], pady=3)
+
+        self.init_settings()
+
+    def init_settings(self):
+        # self.selected_devices is a dictionary. Key is the device name, value is another dictionary. In the sub-dictionary, the keys are "checkbutton" and "server_pid".
+        self.init_file_path = os.path.join(
+            os.path.dirname(__file__), 'init.json')
+        self.class_name = ['Basler', 'FileReader']
+        self.device_names_in_db = []
+        for c in self.class_name:
+            self.device_names_in_db.extend(self.db.get_device_name('*', c))
+        if os.path.isfile(self.init_file_path) and os.stat(self.init_file_path).st_size:
+            with open(self.init_file_path) as jsonfile:
+                self.init_dict = json.load(jsonfile)
+                self.selected_devices = self.init_dict['selected_devices'] if 'selected_devices' in self.init_dict else dict(
+                )
+                self.selected_devices = {key: value for key, value in self.selected_devices.items(
+                ) if key in self.device_names_in_db}
+                self.options = self.init_dict['options'] if 'options' in self.init_dict else dict(
+                )
+                self.path_var.set(
+                    self.init_dict['save_path']) if "save_path" in self.init_dict else ''
+
+                for key, value in self.options.items():
+                    self.frame2_checkbutton_content[key]['var'].set(value)
+        else:
+            self.selected_devices = dict()
+            self.options = None
+        for key in self.selected_devices:
+            self.update_selected_devices(key, BooleanVar(value=True))
 
     def pad_space(self, frame):
         for child in frame.winfo_children():
@@ -125,7 +172,7 @@ class DaqGUI:
         # if not (hasattr(self, "window1") and self.window1.winfo_exists()):
         if not (hasattr(self, "window1") and self.window1.winfo_exists()):
             self.window1 = DeviceListWindow(
-                update_selected_devices=self.update_selected_devices, selected_devices=self.selected_devices, db=self.db)
+                update_selected_devices=self.update_selected_devices, selected_devices=self.selected_devices, device_names_in_db=self.device_names_in_db)
             self.window1.title("Device List")
         self.window1.attributes('-topmost', True)
         self.window1.attributes('-topmost', False)
@@ -183,6 +230,9 @@ class DaqGUI:
                 os.kill(value['server_pid'], signal.SIGTERM)
             if 'client_pid' in value:
                 os.kill(value['client_pid'], signal.SIGTERM)
+        with open(self.init_file_path, 'w') as jsonfile:
+            json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get()},
+                      jsonfile)
         logging.info("terminated!")
 
     def update_selected_devices(self, device_name, checkbox_var):
@@ -201,11 +251,12 @@ class DaqGUI:
             self.selected_devices[device_name]['checkbutton'].destroy()
             del self.selected_devices[device_name]
         for idx, value in enumerate(self.selected_devices.values()):
-            value['checkbutton'].grid(
-                column=idx % self.selected_device_per_row, row=self.device_row+int(idx/self.selected_device_per_row), sticky='W')
+            if value is not None:
+                value['checkbutton'].grid(
+                    column=idx % self.selected_device_per_row, row=self.device_row+int(idx/self.selected_device_per_row), sticky='W')
         self.pad_space(self.frame1)
 
-    def thread_acquisition(self):
+    def toggle_acquisition(self):
         if self.acquisition['status']:
             self.my_event.set()
             self.acquisition['status'] = False
@@ -214,20 +265,32 @@ class DaqGUI:
             logging.info("Stopped acquisition in thread")
         else:
             self.acquisition['status'] = True
+            self.acquisition['is_completed'] = False
             self.my_event = Event()
             Thread(target=self.start_acquisition).start()
             self.acquisition['button']['style'] = 'Sty3_stop.TButton'
             self.acquisition['button']['text'] = 'Stop'
             logging.info("Started acquisition in thread")
+            root.after(1000, self.check_acquisition_status)
+
+    def check_acquisition_status(self):
+        '''
+        If the acquisition is completed, at this moment, self.acquisition['status'] is always True, and we stop the thread. 
+        If the acquisition is not completed and we haven't manually stop it, then we keep checking self.acquisition['is_completed']. 
+        '''
+        if self.acquisition['is_completed']:
+            self.toggle_acquisition()
+        elif self.acquisition['status']:
+            root.after(1000, self.check_acquisition_status)
 
     def start_acquisition(self):
-        config_dict = None if self.frame2_checkbutton_content['default_config']['var'].get() else dict(
-        )
-        save_config = self.frame2_checkbutton_content['save_config']['var'].get(
-        )
-        if_background = self.frame2_checkbutton_content['background_image']['var'].get(
-        )
-        if_stitch = self.frame2_checkbutton_content['stitch']['var'].get(
+        self.options = {
+            "default_config": self.frame2_checkbutton_content['default_config']['var'].get(),
+            "save_config": self.frame2_checkbutton_content['save_config']['var'].get(),
+            "if_background": self.frame2_checkbutton_content['background_image']['var'].get(),
+            "if_stitch": self.frame2_checkbutton_content['stitch']['var'].get()
+        }
+        default_config = None if self.options["default_config"] else dict(
         )
         self.daq = Daq(self.selected_devices,
                        dir=self.path_var.get(), thread_event=self.my_event, check_exist=False)
@@ -247,27 +310,25 @@ class DaqGUI:
                         self.acquisition['button']['text'] = 'Start'
                         return
         self.daq.set_camera_configuration(
-            config_dict=config_dict, saving=save_config)
-        if if_background:
-            self.daq.take_background(stitch=if_stitch)
-        self.daq.acquisition(stitch=if_stitch)
+            config_dict=default_config, saving=self.options['save_config'])
+        if self.options['if_background']:
+            self.daq.take_background(stitch=self.options['if_stitch'])
+        self.daq.acquisition(
+            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['if_stitch'])
+        self.acquisition['is_completed'] = True
 
 
 class DeviceListWindow(Toplevel):
-    def __init__(self, update_selected_devices, selected_devices, db):
+    def __init__(self, update_selected_devices, selected_devices, device_names_in_db):
         self.update_selected_devices = update_selected_devices
         self.selected_devices = selected_devices
-        self.db = db
+        self.device_names_in_db = device_names_in_db
         super().__init__(master=root)
-        self.class_name = ['Basler', 'FileReader']
-        self.device_names = []
-        for c in self.class_name:
-            self.device_names.extend(self.db.get_device_name('*', c))
         newframe1 = ttk.Frame(self)
         newframe1.grid(column=0, row=0, columnspan=1, sticky=(N, W, E, S))
         item_each_row = 1
         checkboxes = dict()
-        for idx, device_name in enumerate(self.device_names):
+        for idx, device_name in enumerate(self.device_names_in_db):
             row, col = int(idx/item_each_row)+1, idx % item_each_row
             checkbox_var = BooleanVar(
                 value=True) if device_name in self.selected_devices else BooleanVar(value=False)

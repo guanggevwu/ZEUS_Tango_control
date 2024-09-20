@@ -177,7 +177,7 @@ class Daq:
             time.sleep(interval)
             logging.info(f"trigger {i} sent!")
 
-    def acquisition(self, stitch=True, shot_limit=float('inf'), interval_threshold=0):
+    def acquisition(self, stitch=True, shot_start=1, shot_end=float('inf'), interval_threshold=0):
         '''
         Main acquisition function. Use external trigger and save data.
         interval_threshold. The saving is triggered only when the interval is larger than the threshold.
@@ -185,8 +185,8 @@ class Daq:
         logging.info('Waiting for a trigger...')
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
-            bs.reset_number()
-            info['shot_num'] = 1
+            bs.reset_number(shot_start-1)
+            info['shot_num'] = shot_start
         while True:
             if self.thread_event is not None:
                 if self.thread_event.is_set():
@@ -195,7 +195,7 @@ class Daq:
                 bs = info['device_proxy']
                 # when there is a short limit, the acquisition stops after the requested image numbers are reached.
                 info['is_completed'] = False
-                if info['shot_num'] > shot_limit:
+                if info['shot_num'] > shot_end:
                     info['is_completed'] = True
                 elif bs.is_new_image:
                     if 'basler' in bs.dev_name() or bs.data_dimension == 2:
@@ -228,6 +228,7 @@ class Daq:
                                 f"Shot {info['shot_num']} taken for stitching (size: {large_image_p.size}) saved to {stitch_save_path}")
                     info['shot_num'] += 1
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
+                logging.info("All shots completed!")
                 return
 
     def imadjust(self, input, tol=0.01):
@@ -280,14 +281,14 @@ class Daq:
         return large_image_p
 
     def save_plot_data(self, x, y):
-        fig, ax = plt.subplots(1,1)
+        fig, ax = plt.subplots(1, 1)
         ax.plot(x, y)
         # If we haven't already shown or saved the plot, then we need to
         # draw the figure first...
         fig.canvas.draw()
         data = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
         data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))
-        return data[:,:,0]
+        return data[:, :, 0]
 
     def termination(self, config_dict=None):
         logging.info('terminating...')
