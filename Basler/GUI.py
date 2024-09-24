@@ -20,7 +20,7 @@ if True:
     from common.config import device_name_table, image_panel_config
 
 parser = TaurusArgparse(
-    description='GUI for Basler camera', device_default='test/basler/testcam', nargs_string='+', polling_default=3000)
+    description='GUI for Basler camera', device_default='test/basler/testcam', nargs_string='+', polling_default=1000)
 # parser.add_argument('-s', '--simple', action='store_true',
 #                     help="show image without shot number and command")
 args = parser.parse_args()
@@ -178,7 +178,8 @@ class BaslerGUI():
                 panel3_layout, d, 'user_defined_name')
             # because Basler uses 'image_number' and FileReader uses 'file_number'.
             if 'basler' in d:
-                self.add_readonly_label_widget(panel3_layout, d, 'image_number')
+                self.add_readonly_label_widget(
+                    panel3_layout, d, 'image_number')
             elif 'file_reader' in d:
                 self.add_readonly_label_widget(panel3_layout, d, 'file_number')
             self.add_command(panel3_layout, d)
@@ -220,6 +221,7 @@ def create_app():
     basler_app.gui.removePanel('Manual')
     basler_app.gui.show()
     basler_app.app.exec_()
+
 
 if __name__ == "__main__":
     create_app()
