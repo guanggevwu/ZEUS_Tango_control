@@ -509,14 +509,14 @@ class Basler(Device):
                     self._model_category = 1
                 else:
                     self._model_category = 0
+                self.clip_coe = 1
                 if self.friendly_name == "PW_Comp_In_NF":
                     self.energy_intensity_coefficient = 34.56/(30.351*640*512)
                     self.pixel_size = 4.9/108
                     self.clip_coe = 0.823
-                if self.friendly_name == "MA3_NF":
+                elif self.friendly_name == "MA3_NF":
                     self.energy_intensity_coefficient = 34.56/(42.788*640*512)
                     self.pixel_size = 20/632*2
-                    self.clip_coe = 1
                 else:
                     self.energy_intensity_coefficient = 34.56/(30.351*640*512)
                     self.pixel_size = 4.9/108
