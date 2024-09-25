@@ -512,12 +512,15 @@ class Basler(Device):
                 if self.friendly_name == "PW_Comp_In_NF":
                     self.energy_intensity_coefficient = 34.56/(30.351*640*512)
                     self.pixel_size = 4.9/108
+                    self.clip_coe = 0.823
                 if self.friendly_name == "MA3_NF":
                     self.energy_intensity_coefficient = 34.56/(42.788*640*512)
                     self.pixel_size = 20/632*2
+                    self.clip_coe = 1
                 else:
                     self.energy_intensity_coefficient = 34.56/(30.351*640*512)
                     self.pixel_size = 4.9/108
+                self.leak_coe = 0.815
                 self.read_exposure()
                 self.read_frames_per_trigger()
                 self._polling = self.get_attribute_poll_period('is_new_image')
@@ -749,8 +752,6 @@ class Basler(Device):
                     self._image = np.rot90(self._image, int(self._rotate/90))
                 self._energy = (np.sum(self._image)) * \
                     self.energy_intensity_coefficient
-                self.leak_coe = 0.815
-                self.clip_coe = 0.823
                 self._flux = (self._image) * self.energy_intensity_coefficient * \
                     self.leak_coe*self.clip_coe/self.pixel_size**2
                 self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
