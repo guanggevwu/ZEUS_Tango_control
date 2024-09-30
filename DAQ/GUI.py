@@ -151,7 +151,7 @@ class DaqGUI:
                 )
                 self.selected_devices = {key: value for key, value in self.selected_devices.items(
                 ) if key in self.device_names_in_db}
-                self.options = self.init_dict['options'] if 'options' in self.init_dict else dict(
+                self.options = self.init_dict['options'] if 'options' in self.init_dict and self.init_dict['options'] is not None else dict(
                 )
                 self.path_var.set(
                     self.init_dict['save_path']) if "save_path" in self.init_dict else ''
@@ -262,7 +262,7 @@ class DaqGUI:
             self.acquisition['status'] = False
             self.acquisition['button']['style'] = 'Sty3_start.TButton'
             self.acquisition['button']['text'] = 'Start'
-            logging.info("Stopped acquisition in thread")
+            logging.info("Stopped acquisition")
         else:
             self.acquisition['status'] = True
             self.acquisition['is_completed'] = False
@@ -271,17 +271,6 @@ class DaqGUI:
             self.acquisition['button']['style'] = 'Sty3_stop.TButton'
             self.acquisition['button']['text'] = 'Stop'
             logging.info("Started acquisition in thread")
-            root.after(1000, self.check_acquisition_status)
-
-    def check_acquisition_status(self):
-        '''
-        If the acquisition is completed, at this moment, self.acquisition['status'] is always True, and we stop the thread. 
-        If the acquisition is not completed and we haven't manually stop it, then we keep checking self.acquisition['is_completed']. 
-        '''
-        if self.acquisition['is_completed']:
-            self.toggle_acquisition()
-        elif self.acquisition['status']:
-            root.after(1000, self.check_acquisition_status)
 
     def start_acquisition(self):
         self.options = {
@@ -315,7 +304,8 @@ class DaqGUI:
             self.daq.take_background(stitch=self.options['if_stitch'])
         self.daq.acquisition(
             shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['if_stitch'])
-        self.acquisition['is_completed'] = True
+        if not self.my_event.is_set():
+            self.toggle_acquisition()
 
 
 class DeviceListWindow(Toplevel):

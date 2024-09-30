@@ -126,9 +126,14 @@ class BaslerGUI():
 
         for cmd in command_list:
             if cmd in self.attr_list[device_name]['commands']:
-                panel_w = TaurusCommandButton(
-                    command=cmd
-                )
+                if cmd == "reset_number":
+                    panel_w = TaurusCommandButton(
+                        command=cmd, parameters=[0]
+                    )
+                else:
+                    panel_w = TaurusCommandButton(
+                        command=cmd
+                    )
                 panel_w.setCustomText(cmd)
                 panel_w.setModel(device_name)
                 panel_layout.addWidget(panel_w)
