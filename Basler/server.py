@@ -10,6 +10,8 @@ import logging
 from PIL import Image
 import os
 import sys
+from scipy.ndimage import convolve
+
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from common.other import generate_basename
@@ -68,6 +70,15 @@ class Basler(Device):
         format='8.4f',
         access=AttrWriteType.READ,
         doc="Average of the 10 highest pixel values and then multiplied by 0.814."
+    )
+
+    hot_spot_new = attribute(
+        label="hot spot new",
+        dtype=float,
+        unit='J*cm**-2',
+        format='8.4f',
+        access=AttrWriteType.READ,
+        doc="Flat kernel is used. The kernel size is 7*7 for PW_Comp_In_NF camera and 5*5 for MA3_NF camera. The real size is about 0.22*0.22 cm2"
     )
 
     serial_number = device_property(dtype=str, default_value='')
@@ -483,6 +494,7 @@ class Basler(Device):
         self._image_number = 0
         self._energy = 0
         self._hot_spot = 0
+        self._hot_spot_new = 0
         self._read_time = 'N/A'
         self._use_date = False
         self._lr_flip = False
@@ -510,16 +522,18 @@ class Basler(Device):
                 else:
                     self._model_category = 0
                 self.clip_coe = 1
-                if self.friendly_name == "PW_Comp_In_NF":
+                self._calibration = 1
+                if self.friendly_name == "PW_Comp_In_NF" or self.friendly_name == 'test':
                     self.energy_intensity_coefficient = 34.56/(30.351*640*512)
                     self.pixel_size = 4.9/108
                     self.clip_coe = 0.823
+                    self.kernel = np.ones([7, 7])
                 elif self.friendly_name == "MA3_NF":
                     self.energy_intensity_coefficient = 34.56/(42.788*640*512)
                     self.pixel_size = 20/632*2
+                    self.kernel = np.ones([5, 5])
                 else:
-                    self.energy_intensity_coefficient = 34.56/(30.351*640*512)
-                    self.pixel_size = 4.9/108
+                    self._calibration = 0
                 self.leak_coe = 0.815
                 self.read_exposure()
                 self.read_frames_per_trigger()
@@ -750,12 +764,15 @@ class Basler(Device):
                     self._image = np.flipud(self._image)
                 if self._rotate:
                     self._image = np.rot90(self._image, int(self._rotate/90))
-                self._energy = (np.sum(self._image)) * \
-                    self.energy_intensity_coefficient
-                self._flux = (self._image) * self.energy_intensity_coefficient * \
-                    self.leak_coe*self.clip_coe/self.pixel_size**2
-                self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
-                                         10)[:10])
+                if self._calibration or not self._calibration:
+                    self._energy = (np.sum(self._image)) * \
+                        self.energy_intensity_coefficient
+                    self._flux = (self._image) * self.energy_intensity_coefficient * \
+                        self.leak_coe*self.clip_coe/self.pixel_size**2
+                    self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
+                                                           10)[:10])
+                    self._hot_spot_new = np.max(
+                        convolve(self._flux, self.kernel, mode='constant'))
                 grabResult.Release()
                 if self._debug:
                     self.logger.info(
@@ -772,6 +789,8 @@ class Basler(Device):
                     "energy", self.read_energy())
                 self.push_change_event(
                     "hot_spot", self.read_hot_spot())
+                self.push_change_event(
+                    "hot_spot_new", self.read_hot_spot_new())
                 # show image count while not in live mode
                 if self._save_data and self._save_path:
                     parse_save_path = self._save_path.split(';')
@@ -792,7 +811,7 @@ class Basler(Device):
                     self.time0 = self.time1
                     # generate file name after delete the old file name
                     self.image_basename = generate_basename(
-                        self._naming_format, {'%s': f'ImageNum{self._image_number}', '%t': f'Time{self._read_time}', '%e': f'Energy{self._energy:.3f}J', '%h': f'HotSpot{self._hot_spot:.4f}Jcm-2', '%f': 'tiff'})
+                        self._naming_format, {'%s': f'ImageNum{self._image_number}', '%t': f'Time{self._read_time}', '%e': f'Energy{self._energy:.3f}J', '%h': f'HotSpot{self._hot_spot:.4f}Jcm-2', '%k': f'HotSpotNew{self._hot_spot_new:.4f}Jcm-2', '%f': 'tiff'})
                     if should_save:
                         data = Image.fromarray(self._image)
                         for path in parse_save_path:
@@ -813,6 +832,9 @@ class Basler(Device):
 
     def read_hot_spot(self):
         return self._hot_spot
+
+    def read_hot_spot_new(self):
+        return self._hot_spot_new
 
     def disable_polling(self, attr):
         if self.is_attribute_polled(attr):
