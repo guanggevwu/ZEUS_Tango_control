@@ -11,6 +11,7 @@ from PIL import Image
 import os
 import sys
 from scipy.ndimage import convolve
+from PIL import Image, ImageDraw
 
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -771,8 +772,25 @@ class Basler(Device):
                         self.leak_coe*self.clip_coe/self.pixel_size**2
                     self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
                                                            10)[:10])
-                    self._hot_spot_new = np.max(
-                        convolve(self._flux, self.kernel, mode='constant'))
+                    convolved_image = convolve(
+                        self._flux, self.kernel, mode='constant')
+                    self._hot_spot_new = np.max(convolved_image)
+                    cy, cx = np.unravel_index(
+                        np.argmax(convolved_image), convolved_image.shape)
+                    dy, dx = self.kernel.shape
+                    min_value = np.min(self._flux)
+                    im_pil = Image.fromarray(self._flux)
+                    draw = ImageDraw.Draw(im_pil)
+                    enlarged_length = 4
+                    draw.rectangle([(max(0, int(cx-(dx+1+enlarged_length)/2)), max(int(cy-(dy+1+enlarged_length)/2), 0)), (min(int(cx+(dx+1+enlarged_length)/2),
+                                   convolved_image.shape[1]),  min(int(cy+(dy+1+enlarged_length)/2), convolved_image.shape[0]))], outline=min_value, width=3)
+                    self._flux = np.array(im_pil)
+                    # self._flux[max(int(cy+(dy+1)/2),0), max(int(cx-(dx+1)/2),0):min(int(cx+(dx+1)/2),convolved_image.shape[1])] = min_value
+                    # self._flux[max(int(cy-(dy+1)/2),0), max(int(cx-(dx+1)/2),0):min(int(cx+(dx+1)/2),convolved_image.shape[1])] = min_value
+                    # self._flux[max(int(cy-(dy+1)/2),0:int(cy+(dy+1)/2),
+                    #            int(cx-(dx+1)/2)] = min_value
+                    # self._flux[int(cy-(dy+1)/2):int(cy+(dy+1)/2),
+                    #            int(cx+(dx+1)/2)] = min_value
                 grabResult.Release()
                 if self._debug:
                     self.logger.info(

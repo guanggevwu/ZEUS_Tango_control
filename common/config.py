@@ -17,6 +17,6 @@ image_panel_config = {
     'testcam_basler_combination': {"combine_form_with_onshot": False},
     'laser/basler/PW_Comp_In_NF': {'image': 'flux', 'calibration': True},
     'laser/basler/MA3_NF': {'image': 'flux', 'calibration': True},
-    'test/basler/testcam': {'image': 'flux', 'calibration': True},
+    'test/basler/test': {'image': 'flux', 'calibration': True},
     'laser/basler/PW_Comp_In_FF': {'image': 'flux', 'calibration': True},
 }

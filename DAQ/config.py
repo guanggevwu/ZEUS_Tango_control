@@ -1,3 +1,4 @@
+# default setting for camera parameters
 # use lower case
 # seems case insensitive
 default_config_dict = {
