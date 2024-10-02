@@ -765,7 +765,7 @@ class Basler(Device):
                     self._image = np.flipud(self._image)
                 if self._rotate:
                     self._image = np.rot90(self._image, int(self._rotate/90))
-                if self._calibration or not self._calibration:
+                if self._calibration:
                     self._energy = (np.sum(self._image)) * \
                         self.energy_intensity_coefficient
                     self._flux = (self._image) * self.energy_intensity_coefficient * \
@@ -785,12 +785,6 @@ class Basler(Device):
                     draw.rectangle([(max(0, int(cx-(dx+1+enlarged_length)/2)), max(int(cy-(dy+1+enlarged_length)/2), 0)), (min(int(cx+(dx+1+enlarged_length)/2),
                                    convolved_image.shape[1]),  min(int(cy+(dy+1+enlarged_length)/2), convolved_image.shape[0]))], outline=min_value, width=3)
                     self._flux = np.array(im_pil)
-                    # self._flux[max(int(cy+(dy+1)/2),0), max(int(cx-(dx+1)/2),0):min(int(cx+(dx+1)/2),convolved_image.shape[1])] = min_value
-                    # self._flux[max(int(cy-(dy+1)/2),0), max(int(cx-(dx+1)/2),0):min(int(cx+(dx+1)/2),convolved_image.shape[1])] = min_value
-                    # self._flux[max(int(cy-(dy+1)/2),0:int(cy+(dy+1)/2),
-                    #            int(cx-(dx+1)/2)] = min_value
-                    # self._flux[int(cy-(dy+1)/2):int(cy+(dy+1)/2),
-                    #            int(cx+(dx+1)/2)] = min_value
                 grabResult.Release()
                 if self._debug:
                     self.logger.info(
