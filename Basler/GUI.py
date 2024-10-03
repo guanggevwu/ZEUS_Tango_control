@@ -75,6 +75,8 @@ class BaslerGUI():
                 panel1_shot_layout, device_name, 'energy')
             self.add_readonly_label_widget(
                 panel1_shot_layout, device_name, 'hot_spot')
+            self.add_readonly_label_widget(
+                panel1_shot_layout, device_name, 'hot_spot_new')
         if energy_meter:
             self.add_readonly_label_widget(
                 panel1_shot_layout, 'laser/gentec/Onshot', 'shot')
