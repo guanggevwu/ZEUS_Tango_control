@@ -18,5 +18,5 @@ image_panel_config = {
     'laser/basler/PW_Comp_In_NF': {'image': 'flux', 'calibration': True},
     'laser/basler/MA3_NF': {'image': 'flux', 'calibration': True},
     'test/basler/test': {'image': 'flux', 'calibration': True},
-    'laser/basler/PW_Comp_In_FF': {'image': 'flux', 'calibration': True},
+    'laser/basler/PW_Comp_In_FF': {'image': 'image', 'calibration': False},
 }

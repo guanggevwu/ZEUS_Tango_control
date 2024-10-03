@@ -522,25 +522,6 @@ class Basler(Device):
                     self._model_category = 1
                 else:
                     self._model_category = 0
-                self.clip_coe = 1
-                self.extra_para = 33.19/87.81
-                if self.friendly_name == "PW_Comp_In_NF" or self.friendly_name == 'test':
-                    self.energy_intensity_coefficient = 34.56 / \
-                        (30.351*640*512)*self.extra_para
-                    self.pixel_size = 4.9/108
-                    self.clip_coe = 0.823
-                    self.kernel = np.ones([7, 7])
-                elif self.friendly_name == "MA3_NF":
-                    self.energy_intensity_coefficient = 34.56/(42.788*640*512)
-                    self.pixel_size = 20/632*2
-                    self.kernel = np.ones([5, 5])
-                else:
-                    self.energy_intensity_coefficient = 34.56 / \
-                        (30.351*640*512)*self.extra_para
-                    self.pixel_size = 4.9/108
-                    self.clip_coe = 0.823
-                    self.kernel = np.ones([7, 7])
-                self.leak_coe = 0.815
                 self.read_exposure()
                 self.read_frames_per_trigger()
                 self._polling = self.get_attribute_poll_period('is_new_image')
@@ -557,6 +538,23 @@ class Basler(Device):
                 self.camera.AcquisitionFrameRateEnable.SetValue(True)
                 self.set_change_event("image", True, False)
                 self.camera.MaxNumBuffer.SetValue(1000)
+                self.clip_coe = 1
+                self.extra_para = 33.19/87.81
+                self.leak_coe = 0.815
+                self._calibration = 1
+                if self.friendly_name == "PW_Comp_In_NF" or self.friendly_name == 'test':
+                    self.energy_intensity_coefficient = 34.56 / \
+                        (30.351*640*512)*self.extra_para
+                    self.pixel_size = 4.9/108
+                    self.clip_coe = 0.823
+                    self.kernel = np.ones([7, 7])
+                elif self.friendly_name == "MA3_NF":
+                    self.energy_intensity_coefficient = 34.56/(42.788*640*512)
+                    self.pixel_size = 20/632*2
+                    self.kernel = np.ones([5, 5])
+                else:
+                    self._calibration = 0
+                    self._flux = np.zeros((2, 2))
             print(
                 f'Camera is connected. {self.device.GetUserDefinedName()}: {self.device.GetSerialNumber()}')
             self.set_state(DevState.ON)
@@ -770,26 +768,27 @@ class Basler(Device):
                     self._image = np.flipud(self._image)
                 if self._rotate:
                     self._image = np.rot90(self._image, int(self._rotate/90))
-                self._energy = (np.sum(self._image)) * \
-                    self.energy_intensity_coefficient
-                self._flux = (self._image) * self.energy_intensity_coefficient * \
-                    self.leak_coe*self.clip_coe/self.pixel_size**2
-                self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
-                                                       10)[:10])
-                convolved_image = convolve(
-                    self._flux, self.kernel, mode='constant')
-                self._hot_spot_new = np.max(
-                    convolved_image)/self.kernel.size
-                cy, cx = np.unravel_index(
-                    np.argmax(convolved_image), convolved_image.shape)
-                dy, dx = self.kernel.shape
-                min_value = np.min(self._flux)
-                im_pil = Image.fromarray(self._flux)
-                draw = ImageDraw.Draw(im_pil)
-                enlarged_length = 4
-                draw.rectangle([(max(0, int(cx-(dx+1+enlarged_length)/2)), max(int(cy-(dy+1+enlarged_length)/2), 0)), (min(int(cx+(dx+1+enlarged_length)/2),
-                                convolved_image.shape[1]),  min(int(cy+(dy+1+enlarged_length)/2), convolved_image.shape[0]))], outline=min_value, width=3)
-                self._flux = np.array(im_pil)
+                if self._calibration:
+                    self._energy = (np.sum(self._image)) * \
+                        self.energy_intensity_coefficient
+                    self._flux = (self._image) * self.energy_intensity_coefficient * \
+                        self.leak_coe*self.clip_coe/self.pixel_size**2
+                    self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
+                                                           10)[:10])
+                    convolved_image = convolve(
+                        self._flux, self.kernel, mode='constant')
+                    self._hot_spot_new = np.max(
+                        convolved_image)/self.kernel.size
+                    cy, cx = np.unravel_index(
+                        np.argmax(convolved_image), convolved_image.shape)
+                    dy, dx = self.kernel.shape
+                    min_value = np.min(self._flux)
+                    im_pil = Image.fromarray(self._flux)
+                    draw = ImageDraw.Draw(im_pil)
+                    enlarged_length = 4
+                    draw.rectangle([(max(0, int(cx-(dx+1+enlarged_length)/2)), max(int(cy-(dy+1+enlarged_length)/2), 0)), (min(int(cx+(dx+1+enlarged_length)/2),
+                                    convolved_image.shape[1]),  min(int(cy+(dy+1+enlarged_length)/2), convolved_image.shape[0]))], outline=min_value, width=3)
+                    self._flux = np.array(im_pil)
                 grabResult.Release()
                 if self._debug:
                     self.logger.info(
