@@ -276,8 +276,8 @@ class DaqGUI:
         self.options = {
             "default_config": self.frame2_checkbutton_content['default_config']['var'].get(),
             "save_config": self.frame2_checkbutton_content['save_config']['var'].get(),
-            "if_background": self.frame2_checkbutton_content['background_image']['var'].get(),
-            "if_stitch": self.frame2_checkbutton_content['stitch']['var'].get()
+            "background_image": self.frame2_checkbutton_content['background_image']['var'].get(),
+            "stitch": self.frame2_checkbutton_content['stitch']['var'].get()
         }
         default_config = None if self.options["default_config"] else dict(
         )
@@ -300,10 +300,10 @@ class DaqGUI:
                         return
         self.daq.set_camera_configuration(
             config_dict=default_config, saving=self.options['save_config'])
-        if self.options['if_background']:
-            self.daq.take_background(stitch=self.options['if_stitch'])
+        if self.options['background_image']:
+            self.daq.take_background(stitch=self.options['stitch'])
         self.daq.acquisition(
-            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['if_stitch'])
+            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'])
         if not self.my_event.is_set():
             self.toggle_acquisition()
 

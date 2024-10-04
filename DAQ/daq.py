@@ -13,6 +13,7 @@ import atexit
 from config import default_config_dict
 import shutil
 import matplotlib.pyplot as plt
+from threading import Thread
 
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -90,6 +91,7 @@ class Daq:
             for key, value in info['config_dict'].items():
                 if hasattr(bs, key):
                     setattr(bs, key, value)
+
             # if the saving_format is not set in the configuration
             if ('saving_format' not in info['config_dict']):
                 info['file_name'] = '%s.%f'
@@ -118,8 +120,9 @@ class Daq:
 
     def stretch_image(self, current_image):
         adjusted_image = self.imadjust(current_image)
-        adjusted_image = (adjusted_image - np.min(adjusted_image)) / \
-            (np.max(adjusted_image) - np.min(adjusted_image))*255
+        if np.max(adjusted_image) != np.min(adjusted_image):
+            adjusted_image = (adjusted_image - np.min(adjusted_image)) / \
+                (np.max(adjusted_image) - np.min(adjusted_image))*255
         return adjusted_image
 
     def take_background(self, stitch=True):
@@ -202,13 +205,9 @@ class Daq:
                         data, data_array = self.get_image(bs)
                         file_name = generate_basename(
                             info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%e': 'Energy{energy:.3f}J', '%h': 'HotSpot{hot_spot:.4f}Jcm-2', '%f': 'tiff', 'device_proxy': bs})
-                        # the saving interval threshold has been enabled in server side.
-                        # if info['shot_num'] == 1 or (info['time_interval'] > interval_threshold):
-                        data.save(os.path.join(
-                            info['cam_dir'], file_name))
-                        logging.info("Shot {} taken for {} (size: {}) saved to {}".format(
-                            info['shot_num'], info['shortname'],  {data.size}, {os.path.join(
-                                info['cam_dir'], file_name)}))
+                        freezed_shot_number = info["shot_num"]
+                        Thread(target=self.thread_saving,
+                               args=(data, info, file_name, freezed_shot_number)).start()
                     elif 'file_reader' in bs.dev_name() or bs.data_dimension == 1:
                         file_name = generate_basename(
                             info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%f': 'csv', 'device_proxy': bs})
@@ -230,6 +229,12 @@ class Daq:
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
                 logging.info("All shots completed!")
                 return
+
+    def thread_saving(self, data, info, file_name, freezed_shot_number):
+        data.save(os.path.join(info['cam_dir'], file_name))
+        logging.info("Shot {} taken for {} (size: {}) saved to {}".format(
+            freezed_shot_number, info['shortname'],  {data.size}, {os.path.join(
+                info['cam_dir'], file_name)}))
 
     def imadjust(self, input, tol=0.01):
         """
