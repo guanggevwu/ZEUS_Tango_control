@@ -87,6 +87,8 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "file_reader_1": {'server': 'FileReader/file_reader_1', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_1'},
             "file_reader_2": {'server': 'FileReader/file_reader_2', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_2'},
             "file_reader_3": {'server': 'FileReader/file_reader_3', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_3'},
+            "asyncio_device_1": {'server': 'AsyncioDevice/asyncio_device_1', '_class': 'AsyncioDevice', 'name': 'test/asyncio_device/asyncio_device_1'},
+
             }
 
 

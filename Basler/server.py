@@ -12,6 +12,8 @@ import os
 import sys
 from scipy.ndimage import convolve
 from PIL import Image, ImageDraw
+from threading import Thread
+from queue import Queue
 
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -64,17 +66,17 @@ class Basler(Device):
         access=AttrWriteType.READ,
     )
 
+    # hot_spot = attribute(
+    #     label="hot spot",
+    #     dtype=float,
+    #     unit='J*cm**-2',
+    #     format='8.4f',
+    #     access=AttrWriteType.READ,
+    #     doc="Average of the 10 highest pixel values and then multiplied by 0.814."
+    # )
+
     hot_spot = attribute(
         label="hot spot",
-        dtype=float,
-        unit='J*cm**-2',
-        format='8.4f',
-        access=AttrWriteType.READ,
-        doc="Average of the 10 highest pixel values and then multiplied by 0.814."
-    )
-
-    hot_spot_new = attribute(
-        label="hot spot new",
         dtype=float,
         unit='J*cm**-2',
         format='8.4f',
@@ -495,7 +497,6 @@ class Basler(Device):
         self._image_number = 0
         self._energy = 0
         self._hot_spot = 0
-        self._hot_spot_new = 0
         self._read_time = 'N/A'
         self._use_date = False
         self._lr_flip = False
@@ -547,14 +548,15 @@ class Basler(Device):
                         (30.351*640*512)*self.extra_para
                     self.pixel_size = 4.9/108
                     self.clip_coe = 0.823
-                    self.kernel = np.ones([7, 7])
+                    self.kernel = np.ones([7, 7])/49
                 elif self.friendly_name == "MA3_NF":
                     self.energy_intensity_coefficient = 34.56/(42.788*640*512)
                     self.pixel_size = 20/632*2
-                    self.kernel = np.ones([5, 5])
+                    self.kernel = np.ones([5, 5])/25
                 else:
                     self._calibration = 0
                     self._flux = np.zeros((2, 2))
+                self.q = Queue()
             print(
                 f'Camera is connected. {self.device.GetUserDefinedName()}: {self.device.GetSerialNumber()}')
             self.set_state(DevState.ON)
@@ -773,12 +775,10 @@ class Basler(Device):
                         self.energy_intensity_coefficient
                     self._flux = (self._image) * self.energy_intensity_coefficient * \
                         self.leak_coe*self.clip_coe/self.pixel_size**2
-                    self._hot_spot = np.mean(-np.partition(-self._flux.flatten(),
-                                                           10)[:10])
                     convolved_image = convolve(
                         self._flux, self.kernel, mode='constant')
-                    self._hot_spot_new = np.max(
-                        convolved_image)/self.kernel.size
+                    self._hot_spot = np.max(
+                        convolved_image)
                     cy, cx = np.unravel_index(
                         np.argmax(convolved_image), convolved_image.shape)
                     dy, dx = self.kernel.shape
@@ -805,8 +805,6 @@ class Basler(Device):
                     "energy", self.read_energy())
                 self.push_change_event(
                     "hot_spot", self.read_hot_spot())
-                self.push_change_event(
-                    "hot_spot_new", self.read_hot_spot_new())
                 # show image count while not in live mode
                 if self._save_data and self._save_path:
                     parse_save_path = self._save_path.split(';')
@@ -827,17 +825,24 @@ class Basler(Device):
                     self.time0 = self.time1
                     # generate file name after delete the old file name
                     self.image_basename = generate_basename(
-                        self._naming_format, {'%s': f'ImageNum{self._image_number}', '%t': f'Time{self._read_time}', '%e': f'Energy{self._energy:.3f}J', '%h': f'HotSpot{self._hot_spot:.4f}Jcm-2', '%k': f'HotSpotNew{self._hot_spot_new:.4f}Jcm-2', '%f': 'tiff'})
+                        self._naming_format, {'%s': f'ImageNum{self._image_number}', '%t': f'Time{self._read_time}', '%e': f'Energy{self._energy:.3f}J', '%h': f'HotSpot{self._hot_spot:.4f}Jcm-2', '%f': 'tiff'})
                     if should_save:
                         data = Image.fromarray(self._image)
+                        self.q.put(data)
                         for path in parse_save_path:
                             os.makedirs(path, exist_ok=True)
-                            data.save(os.path.join(path, self.image_basename))
-                            self.logger.info(
-                                f"Image is save to {os.path.join(path, self.image_basename)}")
+                            path_to_name = os.path.join(
+                                path, self.image_basename)
+                            Thread(target=self.save_image_to_file,
+                                   args=[self.q, path_to_name]).start()
             return self._is_new_image
         # return False if there is no new image
         return self._is_new_image
+
+    def save_image_to_file(self, q, path_to_name):
+        q.get().save(path_to_name)
+        self.logger.info(
+            f"Image is save to {path_to_name}")
 
     def read_image(self):
         # now read_image() is only triggered when it is a new image.
@@ -848,9 +853,6 @@ class Basler(Device):
 
     def read_hot_spot(self):
         return self._hot_spot
-
-    def read_hot_spot_new(self):
-        return self._hot_spot_new
 
     def disable_polling(self, attr):
         if self.is_attribute_polled(attr):
