@@ -539,18 +539,17 @@ class Basler(Device):
                 self.camera.AcquisitionFrameRateEnable.SetValue(True)
                 self.set_change_event("image", True, False)
                 self.camera.MaxNumBuffer.SetValue(1000)
-                self.clip_coe = 1
-                self.leak_coe = 0.756
+                self.leak_coe = 0.815
                 self._calibration = 1
                 if self.friendly_name == "PW_Comp_In_NF" or self.friendly_name == 'test':
-                    self.energy_intensity_coefficient = 60.56 / \
+                    self.clip_coe = 0.805
+                    self.energy_intensity_coefficient = 60.56 * self.clip_coe / \
                         (22.636*640*512)
                     self.pixel_size = 4.97/107
-                    self.clip_coe = 0.823
                     self.kernel = np.ones([7, 7])/49
                 elif self.friendly_name == "MA3_NF":
                     self.energy_intensity_coefficient = 60.56/(56.033*640*512)
-                    self.pixel_size = (20*20/(299*317))**0.5
+                    self.pixel_size = 20/316
                     self.kernel = np.ones([5, 5])/25
                 else:
                     self._calibration = 0
