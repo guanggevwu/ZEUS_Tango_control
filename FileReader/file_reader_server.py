@@ -11,6 +11,10 @@ from PIL import Image
 import os
 import sys
 import csv
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
+if True:
+    from Basler.server import Basler, LoggerAdapter
 # -----------------------------
 
 handlers = [logging.StreamHandler()]
@@ -20,17 +24,32 @@ logging.basicConfig(handlers=handlers,
 
 class FileReader(Device):
 
+    user_defined_name = attribute(
+        label="name",
+        dtype=str,
+        memorized=True,
+        hw_memorized=True,
+        access=AttrWriteType.READ_WRITE,
+    )
+
+    def read_user_defined_name(self):
+        return self._user_defined_name
+
+    def write_user_defined_name(self, value):
+        self._user_defined_name = value
+        self.logger = LoggerAdapter(value, self.logger_base)
+
     data_dimension = attribute(
         label='data dimension',
         dtype=int,
         memorized=True,
-        hw_memorized = True,
+        hw_memorized=True,
         access=AttrWriteType.READ_WRITE,
     )
 
     def read_data_dimension(self):
         return self._data_dimension
-    
+
     def write_data_dimension(self, value):
         self._data_dimension = value
         return self._data_dimension
@@ -42,6 +61,7 @@ class FileReader(Device):
         access=AttrWriteType.READ_WRITE,
         doc='0 for VISSpec csv file.'
     )
+
     def read_data_structure(self):
         return self._data_structure
 
@@ -97,7 +117,7 @@ class FileReader(Device):
 
     def write_file_extension(self, value):
         self._file_extension = value
-        
+
     folder_path = attribute(
         label="folder",
         dtype="str",
@@ -117,7 +137,6 @@ class FileReader(Device):
             self._file_number = len(self._file_list)
             logging.info(
                 f"{self._file_number} {self._file_extension} files are found in the {self._folder_path}")
-
 
     file_list = attribute(
         label="file list",
@@ -170,7 +189,7 @@ class FileReader(Device):
 
     def read_image(self):
         return self._image
-    
+
     x = attribute(
         label="data list",
         max_dim_x=1000000,
@@ -180,7 +199,7 @@ class FileReader(Device):
 
     def read_x(self):
         return self._x
-    
+
     y = attribute(
         label="data list",
         max_dim_x=1000000,
@@ -229,7 +248,7 @@ class FileReader(Device):
                         if row[0] == '[Data]':
                             start = True
             self._read_time = datetime.datetime.fromtimestamp(os.path.getmtime(
-                os.path.join(self._folder_path, self._current_file))).strftime("%m/%d %H:%M:%S:%f")
+                os.path.join(self._folder_path, self._current_file))).strftime("%H-%M-%S.%f")
             self._file_number += 1
             self.push_change_event("current_file", self.read_current_file())
             self.push_change_event("read_time",
@@ -263,10 +282,11 @@ class FileReader(Device):
 
     def write_is_debug(self, value):
         self._debug = value
-    # serial_number = device_property(dtype=str, default_value='')
-    # friendly_name = device_property(dtype=str, default_value='')
 
     def init_device(self):
+        self._user_defined_name = ''
+        self.logger_base = logging.getLogger(self.__class__.__name__)
+        self.logger = LoggerAdapter(self._user_defined_name, self.logger_base)
         self._data_dimension = 2
         self._data_structure = 0
         self._debug = False
@@ -302,10 +322,7 @@ class FileReader(Device):
             logging.info(
                 f'polling period of {attr} is set to {self._polling_period}')
 
-    @command()
-    def reset_number(self):
-        self._file_number = 0
-        logging.info("Reset image number")
+    reset_number = Basler.reset_number
 
     @command()
     def read_files(self):

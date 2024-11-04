@@ -49,6 +49,8 @@ class DaqGUI:
             'Helvetica', self.font_small))
         s.configure('Sty2_offline.TButton', font=(
             'Helvetica', self.font_mid), background='#85929e')
+        s.configure('Sty2_connecting.TButton', font=(
+            'Helvetica', self.font_mid), background='yellow')
         s.configure('Sty2_online.TButton', font=(
             'Helvetica', self.font_mid), background='#5dade2')
         s.configure('Sty2_client_offline.TButton', font=(
@@ -190,17 +192,50 @@ class DaqGUI:
             p = subprocess.Popen(
                 [f'{self.python_path}', f'{script_path}', device_instance])
             self.selected_devices[device_name]['server_pid'] = p.pid
-            self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_online.TButton'
+            self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_connecting.TButton'
+            logging.info(f'{device_name} starting connecting')
+            # Thread(target=self.check_device_server_status,
+            #        args=(device_name,)).start()
+            # self.check_device_server_status(device_name)
+            self.selected_devices[device_name]['connection_try_times'] = 0
+            root.after(
+                3000, lambda: self.check_device_server_status(device_name))
         else:
-            try:
-                os.kill(self.selected_devices[device_name]
-                        ['server_pid'], signal.SIGTERM)
-            except OSError:
-                logging.info(
-                    f"{self.selected_devices[device_name]['server_pid']}  doesn't exist")
-            del self.selected_devices[device_name]['server_pid']
-            self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_offline.TButton'
-            logging.info(f'{device_name} server is killed!')
+            self.kill_device_server(device_name)
+
+    def kill_device_server(self, device_name):
+        try:
+            os.kill(self.selected_devices[device_name]
+                    ['server_pid'], signal.SIGTERM)
+        except OSError:
+            logging.info(
+                f"{self.selected_devices[device_name]['server_pid']}  doesn't exist")
+        del self.selected_devices[device_name]['server_pid']
+        del self.selected_devices[device_name]['connection_try_times']
+        self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_offline.TButton'
+        logging.info(f'{device_name} server is killed!')
+
+    def check_device_server_status(self, device_name):
+        if 'connection_try_times' not in self.selected_devices[device_name]:
+            return
+        self.selected_devices[device_name]['connection_try_times'] += 1
+        try:
+            dp = tango.DeviceProxy(device_name)
+            dp.ping()
+            self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_online.TButton'
+            logging.info(f'{device_name} started successfully!')
+        except (tango.DevFailed, tango.ConnectionFailed) as e:
+            if self.selected_devices[device_name]['connection_try_times'] >= 5:
+                if type(e) is tango.DevFailed:
+                    logging.info(
+                        f'Type: {type(e)}. Check if {device_name} exists in the data base.')
+                elif type(e) is tango.ConnectionFailed:
+                    logging.info(
+                        f'Type: {type(e)}. Check if {device_name} server is started.')
+                self.kill_device_server(device_name)
+            else:
+                root.after(
+                    3000, lambda: self.check_device_server_status(device_name))
 
     def start_device_GUI(self):
         if 'client_pid' not in self.client_GUI:

@@ -38,9 +38,9 @@ class Daq:
                 bs = tango.DeviceProxy(c)
                 self.cam_info[c] = {}
                 self.cam_info[c]['device_proxy'] = bs
-                self.cam_info[c]['shortname'] = c.split('/')[-1]
+                self.cam_info[c]['user_defined_name'] = bs.user_defined_name
                 self.cam_info[c]['cam_dir'] = os.path.join(
-                    self.dir, self.cam_info[c]['shortname'])
+                    self.dir, self.cam_info[c]['user_defined_name'])
                 self.cam_info[c]['images_to_stitch'] = {}
                 if dir and check_exist and not Yes_for_all and os.path.exists(self.cam_info[c]['cam_dir']):
                     files_num = sum(
@@ -57,7 +57,7 @@ class Daq:
                             raise
                 if dir:
                     os.makedirs(os.path.join(
-                        self.dir, self.cam_info[c]['shortname']), exist_ok=True)
+                        self.dir, self.cam_info[c]['user_defined_name']), exist_ok=True)
                     os.makedirs(os.path.join(
                         self.dir, 'stitching'), exist_ok=True)
 
@@ -74,7 +74,7 @@ class Daq:
         if config_dict is None:
             config_dict = default_config_dict
         config_dict = {key: value for key,
-                       value in config_dict.items() if (key.lower() in [v['shortname'].lower() for v in self.cam_info.values()]) or (key == 'all')}
+                       value in config_dict.items() if (key.lower() in [v['user_defined_name'].lower() for v in self.cam_info.values()]) or (key == 'all')}
 
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
@@ -233,7 +233,7 @@ class Daq:
     def thread_saving(self, data, info, file_name, freezed_shot_number):
         data.save(os.path.join(info['cam_dir'], file_name))
         logging.info("Shot {} taken for {} (size: {}) saved to {}".format(
-            freezed_shot_number, info['shortname'],  {data.size}, {os.path.join(
+            freezed_shot_number, info['user_defined_name'],  {data.size}, {os.path.join(
                 info['cam_dir'], file_name)}))
 
     def imadjust(self, input, tol=0.01):
@@ -269,7 +269,7 @@ class Daq:
             "L", [(gap_x+tile_size_x)*self.col+gap_x, (gap_y+tile_size_y)*self.row+gap_y])
         # for cam_name, image in self.image_list[image_name].items():
         for idx, (c, info) in enumerate(self.cam_info.items()):
-            cam_name = info['shortname']
+            cam_name = info['user_defined_name']
             # idx = self.cam_info.index(cam_name)
             y_i, x_i = np.unravel_index(idx, (self.row, self.col))
             image_resized = Image.fromarray(

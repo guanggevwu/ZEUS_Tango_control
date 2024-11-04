@@ -772,7 +772,7 @@ class Basler(Device):
                     self._energy = (np.sum(self._image)) * \
                         self.energy_intensity_coefficient
                     self._flux = (self._image) * self.energy_intensity_coefficient * \
-                        self.leak_coe*self.clip_coe/self.pixel_size**2
+                        self.leak_coe/self.pixel_size**2
                     convolved_image = convolve(
                         self._flux, self.kernel, mode='constant')
                     self._hot_spot = np.max(
