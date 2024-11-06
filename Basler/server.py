@@ -40,6 +40,18 @@ class Basler(Device):
     is_memorized = True
 
     # The image attribute should not be polled periodically since images are large. They will be pushed when is_new_image attribute is True.
+    def grabbing_wrap(func):
+        def wrapper(*args, **kwargs):
+            is_grabbing = args[0].camera.IsGrabbing()
+            if is_grabbing:
+                args[0].camera.StopGrabbing()
+                args[0].logger.info(
+                    f"stop grabbing temporarily in {func.__name__}")
+            func(*args, **kwargs)
+            if is_grabbing:
+                args[0].get_ready()
+        return wrapper
+
     image = attribute(
         label="image",
         max_dim_x=10000,
@@ -294,21 +306,6 @@ class Basler(Device):
         memorized=is_memorized,
     )
 
-    sensor_readout_mode = attribute(
-        label="sensor readout mode",
-        dtype=str,
-        access=AttrWriteType.READ,
-    )
-
-    trigger_source = attribute(
-        label="trigger source",
-        dtype=str,
-        access=AttrWriteType.READ_WRITE,
-        memorized=is_memorized,
-        hw_memorized=True,
-        doc='off or software or external'
-    )
-
     trigger_selector = attribute(
         label="trigger selector",
         dtype=str,
@@ -380,9 +377,8 @@ class Basler(Device):
             label="width of the image",
             dtype=int,
             access=AttrWriteType.READ_WRITE,
-            memorized=self.is_memorized,
-            # min_value=self.camera.Width.Min,
-            # max_value=self.camera.Width.Max,
+            memorized=True,
+            hw_memorized=True,
         )
 
         height = attribute(
@@ -390,9 +386,8 @@ class Basler(Device):
             label="height of the image",
             dtype=int,
             access=AttrWriteType.READ_WRITE,
-            memorized=self.is_memorized,
-            # min_value=self.camera.Height.Min,
-            # max_value=self.camera.Height.Max,
+            memorized=True,
+            hw_memorized=True,
         )
 
         binning_horizontal = attribute(
@@ -401,7 +396,7 @@ class Basler(Device):
             dtype=int,
             access=AttrWriteType.READ_WRITE,
             memorized=True,
-            # hw_memorized=True,
+            hw_memorized=True,
         )
 
         binning_vertical = attribute(
@@ -410,15 +405,26 @@ class Basler(Device):
             dtype=int,
             access=AttrWriteType.READ_WRITE,
             memorized=True,
-            # hw_memorized=True,
+            hw_memorized=True,
         )
-        self.add_attribute(width)
-        self.add_attribute(height)
+
+        trigger_source = attribute(
+            name="trigger_source",
+            label="trigger source",
+            dtype=str,
+            access=AttrWriteType.READ_WRITE,
+            memorized=True,
+            hw_memorized=True,
+            doc='off or software or external'
+        )
         if self._model != 'a2A1920-51gcBAS':
             self.add_attribute(binning_horizontal)
             self.add_attribute(binning_vertical)
+        self.add_attribute(width)
+        self.add_attribute(height)
+        self.add_attribute(trigger_source)
+        # self.add_attribute("trigger_source")
         # if self.camera.DeviceModelName() in ['acA640-121gm']:
-        self.remove_attribute('sensor_readout_mode')
 
     def read_exposure(self):
         if self._model_category == 1:
@@ -456,21 +462,22 @@ class Basler(Device):
     def read_width(self, attr):
         return self.camera.Width()
 
+    @grabbing_wrap
     def write_width(self, attr):
-        self.camera.StopGrabbing()
         self.camera.Width.Value = attr.get_write_value()
 
     def read_height(self, attr):
         return self.camera.Height()
 
+    @grabbing_wrap
     def write_height(self, attr):
-        self.camera.StopGrabbing()
         self.camera.Height.Value = attr.get_write_value()
 
     def read_binning_horizontal(self, attr):
         self._binning_horizontal = self.camera.BinningHorizontal()
         return self._binning_horizontal
 
+    @grabbing_wrap
     def write_binning_horizontal(self, attr):
         # To check limit. Use self.camera.BinningHorizontal.Min
         self._binning_horizontal = attr.get_write_value()
@@ -480,6 +487,7 @@ class Basler(Device):
         self._binning_vertical = self.camera.BinningVertical()
         return self.camera.BinningVertical()
 
+    @grabbing_wrap
     def write_binning_vertical(self, attr):
         self._binning_vertical = attr.get_write_value()
         self.camera.BinningVertical.Value = attr.get_write_value()
@@ -555,10 +563,9 @@ class Basler(Device):
                     self._calibration = 0
                     self._flux = np.zeros((2, 2))
                 self.q = Queue()
-            print(
-                f'Camera is connected. {self.device.GetUserDefinedName()}: {self.device.GetSerialNumber()}')
-            self.set_state(DevState.ON)
-            # self.set_change_event('image', True)
+                print(
+                    f'Camera is connected. {self.device.GetUserDefinedName()}: {self.device.GetSerialNumber()}')
+                self.set_state(DevState.ON)
         except:
             print("Could not open camera with serial: {:s}".format(
                 self.serial_number))
@@ -653,15 +660,12 @@ class Basler(Device):
     # def read_framerate(self):
     #     return self.camera.ResultingFrameRateAbs()
 
-    def read_sensor_readout_mode(self):
-        return self.camera.SensorReadoutMode.GetValue()
-
     def read_trigger_selector(self):
         return self.camera.TriggerSelector.Value
 
     def write_trigger_selector(self, value):
         # somehow has to set trigger mode as off before changing trigger selector
-        current_trigger_source = self.read_trigger_source()
+        current_trigger_source = self.read_trigger_source('')
         if value.lower() == 'acquisitionstart':
             self.camera.TriggerMode.SetValue('Off')
             value = 'AcquisitionStart'
@@ -673,15 +677,19 @@ class Basler(Device):
         if current_trigger_source != 'Off':
             self.write_trigger_source(current_trigger_source)
 
-    def read_trigger_source(self):
+    def read_trigger_source(self, attr):
         # replace 'on' with 'Software' and 'Line1'
         if self.camera.TriggerMode.Value == 'Off':
             return 'Off'
         else:
             return self.camera.TriggerSource.Value
 
-    def write_trigger_source(self, value):
+    def write_trigger_source(self, attr):
         self.camera.StopGrabbing()
+        if hasattr(attr, 'get_write_value'):
+            value = attr.get_write_value()
+        else:
+            value = attr
         if value.lower() == 'off':
             self.camera.TriggerMode.SetValue('Off')
             self._is_polling_periodically = True
@@ -690,7 +698,8 @@ class Basler(Device):
             if value.lower() == 'external':
                 self.camera.TriggerSource.SetValue('Line1')
             else:
-                self.camera.TriggerSource.SetValue(value.capitalize())
+                self.camera.TriggerSource.SetValue(
+                    value.capitalize())
         self.get_ready()
 
     def read_frames_per_trigger(self):
@@ -700,28 +709,19 @@ class Basler(Device):
             self._frames_per_trigger = self.camera.AcquisitionFrameCount.Value
         return self._frames_per_trigger
 
+    @grabbing_wrap
     def write_frames_per_trigger(self, value):
-        is_grabbing = self.camera.IsGrabbing()
-        if is_grabbing:
-            self.camera.StopGrabbing()
         if self._model_category == 1:
             self.camera.AcquisitionBurstFrameCount.SetValue(value)
         else:
             self.camera.AcquisitionFrameCount.SetValue(value)
         self._frames_per_trigger = value
-        if is_grabbing:
-            self.get_ready()
 
     def read_repetition(self):
         return self._repetition
 
     def write_repetition(self, value):
-        is_grabbing = self.camera.IsGrabbing()
-        if is_grabbing:
-            self.camera.StopGrabbing()
         self._repetition = value
-        if is_grabbing:
-            self.get_ready()
 
     def read_fps(self):
         if self.camera.AcquisitionFrameRateEnable.Value:
@@ -756,7 +756,7 @@ class Basler(Device):
             if self._debug:
                 self.logger.info(f'grab takes {time.perf_counter() - time0}')
             if grabResult and grabResult.GrabSucceeded():
-                if self.read_trigger_source().lower() != "off":
+                if self.read_trigger_source("").lower() != "off":
                     self.i += 1
                     self._image_number += 1
                     self.logger.info(
@@ -827,20 +827,32 @@ class Basler(Device):
                     if should_save:
                         data = Image.fromarray(self._image)
                         self.q.put(data)
-                        for path in parse_save_path:
-                            os.makedirs(path, exist_ok=True)
-                            path_to_name = os.path.join(
-                                path, self.image_basename)
-                            Thread(target=self.save_image_to_file,
-                                   args=[self.q, path_to_name]).start()
+                        if self._calibration:
+                            self.q.put(im_pil)
+                        Thread(target=self.save_image_to_file,
+                               args=[self.q]).start()
             return self._is_new_image
         # return False if there is no new image
         return self._is_new_image
 
-    def save_image_to_file(self, q, path_to_name):
-        q.get().save(path_to_name)
-        self.logger.info(
-            f"Image is save to {path_to_name}")
+    def save_image_to_file(self, q):
+        parse_save_path = self._save_path.split(';')
+        for path in parse_save_path:
+            os.makedirs(path, exist_ok=True)
+            path_to_name = os.path.join(
+                path, self.image_basename)
+            q.get().save(path_to_name)
+            self.logger.info(
+                f"Image is save to {path_to_name}")
+            if self._calibration:
+                flux_path_string = "flux_image_with_hot_spot"
+                os.makedirs(os.path.join(
+                    path, flux_path_string), exist_ok=True)
+                parts = path_to_name.split(os.sep)
+                parts.insert(-1, flux_path_string)
+                q.get().save(os.path.join(*parts))
+                self.logger.info(
+                    f"Flux image with_hot_spot is save to {path_to_name}")
 
     def read_image(self):
         # now read_image() is only triggered when it is a new image.
@@ -874,7 +886,6 @@ class Basler(Device):
             self.camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
             self.logger.info(
                 'Starting live mode')
-            self.set_state(DevState.ON)
         else:
             self.i = 0
             # Previous we use a very large number for _grab_number, but it caused some memory problem when we have many camera.
@@ -883,7 +894,7 @@ class Basler(Device):
             self.camera.StartGrabbingMax(
                 self._grab_number, pylon.GrabStrategy_OneByOne)
             self.logger.info(
-                f'Ready to receive triggers from {self.read_trigger_source()}. Image retrieve will be stopped after receiving {self._grab_number} images')
+                f'Ready to receive triggers from {self.read_trigger_source("")}. Image retrieve will be stopped after receiving {self._grab_number} images')
 
     @command()
     def send_software_trigger(self):
@@ -893,20 +904,15 @@ class Basler(Device):
             return
         self.logger.info("Sending software trigger....................")
         self.camera.TriggerSoftware.Execute()
-        # if not self._save_data:
-        #     self.enable_polling('is_new_image')
-        self.set_state(DevState.ON)
 
     @command()
     def relax(self):
         self.camera.StopGrabbing()
-        self.set_state(DevState.ON)
         self.logger.info("Grabbing stops")
 
     @command(dtype_in=int)
     def reset_number(self, number=0):
         self._image_number = number
-        self.set_state(DevState.ON)
         self.logger.info("Reset image number")
 
 
