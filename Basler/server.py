@@ -78,22 +78,13 @@ class Basler(Device):
         access=AttrWriteType.READ,
     )
 
-    # hot_spot = attribute(
-    #     label="hot spot",
-    #     dtype=float,
-    #     unit='J*cm**-2',
-    #     format='8.4f',
-    #     access=AttrWriteType.READ,
-    #     doc="Average of the 10 highest pixel values and then multiplied by 0.814."
-    # )
-
     hot_spot = attribute(
         label="hot spot",
         dtype=float,
         unit='J*cm**-2',
         format='8.4f',
         access=AttrWriteType.READ,
-        doc="Flat kernel is used. The kernel size is 7*7 for PW_Comp_In_NF camera and 5*5 for MA3_NF camera. The real size is about 0.22*0.22 cm2"
+        doc="Flat kernel is used. The kernel size is 7*7 for PW_Comp_In_NF camera and 5*5 for MA3_NF camera. The real size is about 0.22*0.22 cm2. The energy per area is to show the read location data, thus the leak coefficient and clip coefficient (only for PW_Comp_In_NF) are considered."
     )
 
     serial_number = device_property(dtype=str, default_value='')
@@ -129,7 +120,7 @@ class Basler(Device):
         dtype=float,
         unit='J',
         access=AttrWriteType.READ,
-        doc='Calibrated by QE195 E = sum(I)*self.energy_intensity_coefficient.'
+        doc='Calibrated by QE195 E = sum(I)_from_current_image*Energy_reading_from_QE195_during_calibration/sum(I)_during_calibration. The energy value here is to mimic the reading from QE195, thus no clip coefficient and leak coefficient are considered.'
     )
 
     def read_energy(self):
@@ -549,13 +540,14 @@ class Basler(Device):
                 self.camera.MaxNumBuffer.SetValue(1000)
                 self.leak_coe = 0.815
                 self._calibration = 1
-                if self.friendly_name == "PW_Comp_In_NF" or self.friendly_name == 'test':
+                self.clip_coe = 1
+                if self.friendly_name == "PW_Comp_In_NF":
                     self.clip_coe = 0.805
-                    self.energy_intensity_coefficient = 60.56 * self.clip_coe / \
+                    self.energy_intensity_coefficient = 60.56 / \
                         (22.636*640*512)
                     self.pixel_size = 4.97/107
                     self.kernel = np.ones([7, 7])/49
-                elif self.friendly_name == "MA3_NF":
+                elif self.friendly_name == "MA3_NF" or self.friendly_name == 'test':
                     self.energy_intensity_coefficient = 60.56/(56.033*640*512)
                     self.pixel_size = 20/316
                     self.kernel = np.ones([5, 5])/25
@@ -771,7 +763,7 @@ class Basler(Device):
                 if self._calibration:
                     self._energy = (np.sum(self._image)) * \
                         self.energy_intensity_coefficient
-                    self._flux = (self._image) * self.energy_intensity_coefficient * \
+                    self._flux = (self._image) * self.energy_intensity_coefficient * self.clip_coe *\
                         self.leak_coe/self.pixel_size**2
                     convolved_image = convolve(
                         self._flux, self.kernel, mode='constant')
