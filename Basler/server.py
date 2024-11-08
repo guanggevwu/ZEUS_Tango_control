@@ -779,6 +779,7 @@ class Basler(Device):
                     draw.rectangle([(max(0, int(cx-(dx+1+enlarged_length)/2)), max(int(cy-(dy+1+enlarged_length)/2), 0)), (min(int(cx+(dx+1+enlarged_length)/2),
                                     convolved_image.shape[1]),  min(int(cy+(dy+1+enlarged_length)/2), convolved_image.shape[0]))], outline=min_value, width=3)
                     self._flux = np.array(im_pil)
+                    self.flux_path_string = "flux_image_with_hot_spot"
                 grabResult.Release()
                 if self._debug:
                     self.logger.info(
@@ -806,11 +807,16 @@ class Basler(Device):
                         if self.time_interval < self._save_interval:
                             for path in parse_save_path:
                                 if os.path.exists(os.path.join(
-                                        path, f'{self.image_basename}')):
+                                        path, self.image_basename)):
                                     os.remove(os.path.join(
-                                        path, f'{self.image_basename}'))
+                                        path, self.image_basename))
                                     self.logger.info(
                                         f"Removed previous saved image {self.image_basename}")
+                                if self._calibration:
+                                    if os.path.exists(os.path.join(
+                                            path, self.flux_path_string, self.image_basename)):
+                                        os.remove(os.path.join(
+                                            path, self.flux_path_string, self.image_basename))
                                 should_save = False
                     self.time0 = self.time1
                     # generate file name after delete the old file name
@@ -821,6 +827,7 @@ class Basler(Device):
                         self.q.put(data)
                         if self._calibration:
                             self.q.put(im_pil)
+                            # self.q.put(Image.fromarray(convolved_image))
                         Thread(target=self.save_image_to_file,
                                args=[self.q]).start()
             return self._is_new_image
@@ -837,14 +844,22 @@ class Basler(Device):
             self.logger.info(
                 f"Image is save to {path_to_name}")
             if self._calibration:
-                flux_path_string = "flux_image_with_hot_spot"
                 os.makedirs(os.path.join(
-                    path, flux_path_string), exist_ok=True)
+                    path, self.flux_path_string), exist_ok=True)
                 parts = path_to_name.split(os.sep)
-                parts.insert(-1, flux_path_string)
+                parts.insert(-1, self.flux_path_string)
                 q.get().save(os.path.join(*parts))
                 self.logger.info(
-                    f"Flux image with_hot_spot is save to {path_to_name}")
+                    f"{self.flux_path_string} is save to {path_to_name}")
+
+                # flux_path_string = "smoothed_flux_image"
+                # os.makedirs(os.path.join(
+                #     path, flux_path_string), exist_ok=True)
+                # parts = path_to_name.split(os.sep)
+                # parts.insert(-1, flux_path_string)
+                # q.get().save(os.path.join(*parts))
+                # self.logger.info(
+                #     f"f{flux_path_string} is save to {path_to_name}")
 
     def read_image(self):
         # now read_image() is only triggered when it is a new image.
