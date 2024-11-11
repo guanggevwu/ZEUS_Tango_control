@@ -14,6 +14,7 @@ from scipy.ndimage import convolve
 from PIL import Image, ImageDraw
 from threading import Thread
 from queue import Queue
+import csv
 
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -451,14 +452,16 @@ class Basler(Device):
         self._gain = value
 
     def read_width(self, attr):
-        return self.camera.Width()
+        self._width = self.camera.Width()
+        return self._width
 
     @grabbing_wrap
     def write_width(self, attr):
         self.camera.Width.Value = attr.get_write_value()
 
     def read_height(self, attr):
-        return self.camera.Height()
+        self._height = self.camera.Height()
+        return self._height
 
     @grabbing_wrap
     def write_height(self, attr):
@@ -542,13 +545,18 @@ class Basler(Device):
                 self._calibration = 1
                 self.clip_coe = 1
                 if self.friendly_name == "PW_Comp_In_NF":
+                    self.QE195_reading = 60.56
+                    self.mean_intensity_of_calibration_images = 22.636
                     self.clip_coe = 0.805
-                    self.energy_intensity_coefficient = 60.56 / \
-                        (22.636*640*512)
+                    self.energy_intensity_coefficient = self.QE195_reading / \
+                        (self.mean_intensity_of_calibration_image*640*512)
                     self.pixel_size = 4.97/107
                     self.kernel = np.ones([7, 7])/49
                 elif self.friendly_name == "MA3_NF" or self.friendly_name == 'test':
-                    self.energy_intensity_coefficient = 60.56/(56.033*640*512)
+                    self.QE195_reading = 60.56
+                    self.mean_intensity_of_calibration_images = 56.033
+                    self.energy_intensity_coefficient = self.QE195_reading / \
+                        (self.mean_intensity_of_calibration_images*640*512)
                     self.pixel_size = 20/316
                     self.kernel = np.ones([5, 5])/25
                 else:
@@ -623,6 +631,44 @@ class Basler(Device):
                     raise (f'error on save_path part {idx}')
         self._save_path = value
         self.push_change_event("save_path", self.read_save_path())
+
+    def get_settings(self):
+        if self._calibration:
+            self.csv_fieldnames = ['_read_time', '_exposure', '_gain', '_binning_horizontal', '_binning_vertical', '_width',
+                                   '_height', 'QE195_reading', 'mean_intensity_of_calibration_images', 'leak_coe', 'clip_coe', 'pixel_size']
+        else:
+            self.csv_fieldnames = ['_read_time', '_exposure', '_gain',
+                                   '_binning_horizontal', '_binning_vertical', '_width', '_height']
+        self.data_to_log = {}
+        for name in self.csv_fieldnames:
+            if hasattr(self, name):
+                self.data_to_log[name] = str(getattr(self, name))
+
+    def save_settings(self, save_path, data_to_log):
+        '''write the important camera parameters and calibration data.'''
+        logging_file_path = os.path.join(save_path, 'settings.csv')
+        to_do = 'w'
+        # if the file exists and the existing data is same as the current data, then skip. If the file exists but the data is different, append with 'a' mode. Else, overwrite with 'w' mode.
+        if os.path.isfile(logging_file_path):
+            with open(logging_file_path, newline='') as csvfile:
+                reader = csv.DictReader(csvfile)
+                try:
+                    *_, lastrow = reader
+                    if {key: value for key, value in lastrow.items() if key != '_read_time'} == {key: value for key, value in self.data_to_log.items() if key != '_read_time'}:
+                        to_do = False
+                        return
+                    else:
+                        to_do = 'a'
+                except ValueError:
+                    self.logger.info(
+                        f"Check the logging file at {logging_file_path}")
+        if to_do:
+            with open(logging_file_path, to_do, newline='') as csvfile:
+                writer = csv.DictWriter(
+                    csvfile, fieldnames=data_to_log.keys())
+                if to_do == 'w':
+                    writer.writeheader()
+                writer.writerow(data_to_log)
 
     def read_model(self):
         self._model = self.camera.GetDeviceInfo().GetModelName()
@@ -825,6 +871,8 @@ class Basler(Device):
                     if should_save:
                         data = Image.fromarray(self._image)
                         self.q.put(data)
+                        self.get_settings()
+                        self.q.put(self.data_to_log)
                         if self._calibration:
                             self.q.put(im_pil)
                             # self.q.put(Image.fromarray(convolved_image))
@@ -836,19 +884,24 @@ class Basler(Device):
 
     def save_image_to_file(self, q):
         parse_save_path = self._save_path.split(';')
+        image_to_save = q.get()
+        data_to_log = q.get()
+        if self._calibration:
+            flux_to_save = q.get()
         for path in parse_save_path:
             os.makedirs(path, exist_ok=True)
             path_to_name = os.path.join(
                 path, self.image_basename)
-            q.get().save(path_to_name)
+            image_to_save.save(path_to_name)
             self.logger.info(
                 f"Image is save to {path_to_name}")
+            self.save_settings(path, data_to_log)
             if self._calibration:
                 os.makedirs(os.path.join(
                     path, self.flux_path_string), exist_ok=True)
                 parts = path_to_name.split(os.sep)
                 parts.insert(-1, self.flux_path_string)
-                q.get().save(os.path.join(*parts))
+                flux_to_save.save(os.path.join(*parts))
                 self.logger.info(
                     f"{self.flux_path_string} is save to {path_to_name}")
 
