@@ -545,16 +545,16 @@ class Basler(Device):
                 self._calibration = 1
                 self.clip_coe = 1
                 if self.friendly_name == "PW_Comp_In_NF":
-                    self.QE195_reading = 60.56
-                    self.mean_intensity_of_calibration_images = 22.636
-                    self.clip_coe = 0.805
+                    self.QE195_reading = 27.53
+                    self.mean_intensity_of_calibration_images = 26.988
+                    self.clip_coe = 0.8455
                     self.energy_intensity_coefficient = self.QE195_reading / \
                         (self.mean_intensity_of_calibration_image*640*512)
                     self.pixel_size = 4.97/107
                     self.kernel = np.ones([7, 7])/49
                 elif self.friendly_name == "MA3_NF" or self.friendly_name == 'test':
-                    self.QE195_reading = 60.56
-                    self.mean_intensity_of_calibration_images = 56.033
+                    self.QE195_reading = 27.53
+                    self.mean_intensity_of_calibration_images = 24.540
                     self.energy_intensity_coefficient = self.QE195_reading / \
                         (self.mean_intensity_of_calibration_images*640*512)
                     self.pixel_size = 20/316
