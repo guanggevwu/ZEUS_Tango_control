@@ -20,7 +20,7 @@ if True:
     from common.config import device_name_table, image_panel_config
 
 parser = TaurusArgparse(
-    description='GUI for Basler camera', device_default='test/basler/testcam', nargs_string='+', polling_default=1000)
+    description='GUI for Basler camera', device_default='test/basler/test', nargs_string='+', polling_default=1000)
 # parser.add_argument('-s', '--simple', action='store_true',
 #                     help="show image without shot number and command")
 args = parser.parse_args()
@@ -147,6 +147,11 @@ class BaslerGUI():
 
         panel2_w1 = TaurusForm()
         form_model = self.attr_list[device_name]['model']
+        # re-order. Move trigger to front.
+        re_order_list = {'trigger_source': 12, 'filter_option': 4}
+        for key, value in re_order_list.items():
+            form_model.remove(device_name+'/'+key)
+            form_model.insert(value, device_name+'/'+key)
         if 'basler' in device_name.lower():
             form_model = [i for i in form_model if i.split(
                 '/')[-1] not in exclude]

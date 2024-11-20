@@ -409,9 +409,22 @@ class Basler(Device):
             hw_memorized=True,
             doc='off or software or external'
         )
+        filter_option = attribute(
+            name="filter_option",
+            label="filter option",
+            dtype=str,
+            access=AttrWriteType.READ_WRITE,
+            memorized=True,
+            hw_memorized=True,
+            doc='Filters used before PW_Comp_In camera. 0 is for customized parameters. Others uses previously calibrated parameters.'
+        )
+
         if self._model != 'a2A1920-51gcBAS':
             self.add_attribute(binning_horizontal)
             self.add_attribute(binning_vertical)
+        if self.friendly_name == "PW_Comp_In_NF" or self.friendly_name == "MA3_NF" or self.friendly_name == "test":
+            self.add_attribute(filter_option)
+            self._filter_option = "1"
         self.add_attribute(width)
         self.add_attribute(height)
         self.add_attribute(trigger_source)
@@ -486,9 +499,43 @@ class Basler(Device):
         self._binning_vertical = attr.get_write_value()
         self.camera.BinningVertical.Value = attr.get_write_value()
 
+    def read_filter_option(self, attr):
+        if self._filter_option == "0":
+            return "accepting user defined calibration parameters"
+        elif self._filter_option == "1":
+            return f"using {self.filter_option_details[self._filter_option]}"
+        else:
+            return "wrong input"
+
+    def write_filter_option(self, attr):
+        self._filter_option = attr.get_write_value()
+        # key: self._filter_option. Values: [0]Energy reading from QE195 [1] mean intensity [2]calculated clip coefficient for "PW_Comp_In_NF" [3] Energy reading from QE195 [4] mean intensity for camera MA3_NF.
+        if attr.get_write_value() in self.filter_option_details:
+            self._filter_option = attr.get_write_value()
+            if self.friendly_name == "PW_Comp_In_NF" or self.friendly_name == 'test':
+                self.QE195_reading = self.filter_option_details[self._filter_option][0]
+                self.mean_intensity_of_calibration_images = self.filter_option_details[
+                    self._filter_option][1]
+                self.clip_coe = self.filter_option_details[self._filter_option][2]
+                self.energy_intensity_coefficient = self.QE195_reading / \
+                    (self.mean_intensity_of_calibration_images*640*512)
+            elif self.friendly_name == "MA3_NF":
+                self.QE195_reading = self.filter_option_details[self._filter_option][3]
+                self.mean_intensity_of_calibration_images = self.filter_option_details[
+                    self._filter_option][4]
+                self.energy_intensity_coefficient = self.QE195_reading / \
+                    (self.mean_intensity_of_calibration_images*640*512)
+        elif attr.get_write_value() == "0":
+            self._filter_option = attr.get_write_value()
+        else:
+            raise (
+                f"Can't accept the filter option [{attr.get_write_value()}]")
+
     def init_device(self):
         self.model_type = ['a2A1920-51gmBAS',
                            'a2A2590-22gmBAS', 'a2A5320-7gmPRO']
+        self.filter_option_details = {
+            "1": [27.53, 26.988, 0.8455, 27.53, 24.540]}
         self.path_raw = ''
         self._is_polling_periodically = False
         self._debug = False
@@ -544,17 +591,14 @@ class Basler(Device):
                 self.leak_coe = 0.815
                 self._calibration = 1
                 self.clip_coe = 1
+                self.mean_intensity_of_calibration_images = 1
+                self.QE195_reading = 1
                 if self.friendly_name == "PW_Comp_In_NF":
-                    self.QE195_reading = 27.53
-                    self.mean_intensity_of_calibration_images = 26.988
-                    self.clip_coe = 0.8455
                     self.energy_intensity_coefficient = self.QE195_reading / \
                         (self.mean_intensity_of_calibration_images*640*512)
                     self.pixel_size = 4.97/107
                     self.kernel = np.ones([7, 7])/49
                 elif self.friendly_name == "MA3_NF" or self.friendly_name == 'test':
-                    self.QE195_reading = 27.53
-                    self.mean_intensity_of_calibration_images = 24.540
                     self.energy_intensity_coefficient = self.QE195_reading / \
                         (self.mean_intensity_of_calibration_images*640*512)
                     self.pixel_size = 20/316
