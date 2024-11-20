@@ -150,8 +150,9 @@ class BaslerGUI():
         # re-order. Move trigger to front.
         re_order_list = {'trigger_source': 12, 'filter_option': 4}
         for key, value in re_order_list.items():
-            form_model.remove(device_name+'/'+key)
-            form_model.insert(value, device_name+'/'+key)
+            if device_name+'/'+key in form_model:
+                form_model.remove(device_name+'/'+key)
+                form_model.insert(value, device_name+'/'+key)
         if 'basler' in device_name.lower():
             form_model = [i for i in form_model if i.split(
                 '/')[-1] not in exclude]
