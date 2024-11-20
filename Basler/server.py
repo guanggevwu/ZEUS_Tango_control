@@ -11,7 +11,7 @@ from PIL import Image
 import os
 import sys
 from scipy.ndimage import convolve
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 from threading import Thread
 from queue import Queue
 import csv
@@ -409,6 +409,7 @@ class Basler(Device):
             hw_memorized=True,
             doc='off or software or external'
         )
+
         filter_option = attribute(
             name="filter_option",
             label="filter option",
@@ -419,17 +420,42 @@ class Basler(Device):
             doc='Filters used before PW_Comp_In camera. 0 is for customized parameters. Others uses previously calibrated parameters.'
         )
 
+        image_with_MeV_mark = attribute(
+            name="image_with_MeV_mark",
+            label="image_with_MeV_mark",
+            max_dim_x=10000,
+            max_dim_y=10000,
+            dtype=((int,),),
+            access=AttrWriteType.READ,
+        )
+
         if self._model != 'a2A1920-51gcBAS':
             self.add_attribute(binning_horizontal)
             self.add_attribute(binning_vertical)
         if self.friendly_name == "PW_Comp_In_NF" or self.friendly_name == "MA3_NF" or self.friendly_name == "test":
             self.add_attribute(filter_option)
             self._filter_option = "1"
+        if self._has_MeV_mark:
+            self.add_attribute(image_with_MeV_mark)
         self.add_attribute(width)
         self.add_attribute(height)
         self.add_attribute(trigger_source)
         # self.add_attribute("trigger_source")
         # if self.camera.DeviceModelName() in ['acA640-121gm']:
+
+    def read_image_with_MeV_mark(self, attr):
+        return self._image_with_MeV_mark
+
+    def draw_dash_line(self, draw, start, end, period_length=4, ratio=0.5):
+        number = int(((end[0] - start[0])**2 +
+                     (end[1] - start[1])**2)**0.5/period_length)
+        arc = np.arctan2(end[1] - start[1], end[0] - start[0])
+        dx, dy = period_length*np.cos(arc), period_length*np.sin(arc)
+        for i in range(number):
+            line_start = (np.array(start)+[i*dx, i*dy]).astype(int)
+            line_end = (np.array(start) +
+                        [i*dx+dx*ratio, i*dy+dy*ratio]).astype(int)
+            draw.line([tuple(line_start), tuple(line_end)], fill=128, width=2)
 
     def read_exposure(self):
         if self._model_category == 1:
@@ -503,7 +529,7 @@ class Basler(Device):
         if self._filter_option == "0":
             return "accepting user defined calibration parameters"
         elif self._filter_option == "1":
-            return f"using {self.filter_option_details[self._filter_option]}"
+            return f"using OD 2+4, {self.filter_option_details[self._filter_option]}"
         else:
             return "wrong input"
 
@@ -606,6 +632,9 @@ class Basler(Device):
                 else:
                     self._calibration = 0
                     self._flux = np.zeros((2, 2))
+                self._has_MeV_mark = 0
+                if self.friendly_name == "TA1-EspecH" or self.friendly_name == 'test':
+                    self._has_MeV_mark = 1
                 self.q = Queue()
                 print(
                     f'Camera is connected. {self.device.GetUserDefinedName()}: {self.device.GetSerialNumber()}')
@@ -870,6 +899,23 @@ class Basler(Device):
                                     convolved_image.shape[1]),  min(int(cy+(dy+1+enlarged_length)/2), convolved_image.shape[0]))], outline=min_value, width=3)
                     self._flux = np.array(im_pil)
                     self.flux_path_string = "flux_image_with_hot_spot"
+                if self._has_MeV_mark:
+                    ek = np.array([400,   600,  800,  1000, 1200, 1400, 1600,
+                                  1800, 2000, 2500, 3000, 3300, 3500, 3800, 4000, 4300])
+                    ek_pixels = (72 - np.array([11.6, 23.5, 29.3, 34.1, 37.9, 42.9, 47.6,
+                                 51.4, 54.5, 60.3, 64.4, 66.3, 67.4, 68.8, 69.6, 70.8])) * 70 + 324
+                    ek_pixels = np.array([int(ek_pixels[i])
+                                         for i in range(len(ek_pixels))])
+                    im_pil = Image.fromarray(self._image)
+                    draw = ImageDraw.Draw(im_pil)
+                    font = ImageFont.truetype("arial.ttf", 20)
+                    for idx, (i, j) in enumerate(zip(ek, ek_pixels)):
+                        self.draw_dash_line(draw, [j, 0], [j, im_pil.size[0]])
+                        draw.text(
+                            (j-70, im_pil.size[1]-idx*50), str(i)+'MeV', font=font, fill=255)
+                    self._image_with_MeV_mark = np.array(im_pil)
+                    self.push_change_event(
+                        "image_with_MeV_mark", self._image_with_MeV_mark)
                 grabResult.Release()
                 if self._debug:
                     self.logger.info(
