@@ -24,6 +24,8 @@ logging.basicConfig(handlers=handlers,
 
 class FileReader(Device):
 
+    file_type = device_property(dtype=str, default_value='')
+
     user_defined_name = attribute(
         label="name",
         dtype=str,
@@ -39,27 +41,23 @@ class FileReader(Device):
         self._user_defined_name = value
         self.logger = LoggerAdapter(value, self.logger_base)
 
-    data_dimension = attribute(
-        label='data dimension',
-        dtype=int,
-        memorized=True,
-        hw_memorized=True,
-        access=AttrWriteType.READ_WRITE,
+    data_type = attribute(
+        label='data type',
+        dtype=str,
+        access=AttrWriteType.READ,
+        doc="image or xy"
     )
 
-    def read_data_dimension(self):
-        return self._data_dimension
-
-    def write_data_dimension(self, value):
-        self._data_dimension = value
-        return self._data_dimension
+    def read_data_type(self):
+        return self.file_type
 
     data_structure = attribute(
         label='data structure',
         dtype=int,
         memorized=True,
+        hw_memorized=True,
         access=AttrWriteType.READ_WRITE,
-        doc='0 for VISSpec csv file.'
+        doc='0 for VISSpec csv file. 1 for Lecroy scope csv file.'
     )
 
     def read_data_structure(self):
@@ -92,6 +90,7 @@ class FileReader(Device):
         dtype=int,
         unit='ms',
         memorized=True,
+        hw_memorized=True,
         access=AttrWriteType.READ_WRITE,
     )
 
@@ -146,9 +145,11 @@ class FileReader(Device):
     )
 
     def read_file_list(self):
-        file_folder = os.listdir(self._folder_path)
-        self._file_list = [i for i in file_folder if i.split(".")[-1] == self._file_extension and os.path.isfile(
-            os.path.join(self._folder_path, i))]
+        try:
+            file_folder = os.listdir(self._folder_path)
+        except FileNotFoundError:
+            return []
+        self._file_list = file_folder
         return self._file_list
 
     current_file = attribute(
@@ -179,35 +180,14 @@ class FileReader(Device):
     def read_read_time(self):
         return self._read_time
 
-    image = attribute(
-        label="image",
-        max_dim_x=10000,
-        max_dim_y=10000,
-        dtype=((int,),),
-        access=AttrWriteType.READ,
-    )
-
-    def read_image(self):
+    def read_image(self, attr):
         return self._image
 
-    x = attribute(
-        label="data list",
-        max_dim_x=1000000,
-        dtype=(float,),
-        access=AttrWriteType.READ,
-    )
 
-    def read_x(self):
+    def read_x(self, attr):
         return self._x
 
-    y = attribute(
-        label="data list",
-        max_dim_x=1000000,
-        dtype=(float,),
-        access=AttrWriteType.READ,
-    )
-
-    def read_y(self):
+    def read_y(self, attr):
         return self._y
 
     is_new_image = attribute(
@@ -227,26 +207,42 @@ class FileReader(Device):
             self.previous_list = self.previous_list + [new_files[0]]
             logging.info(f"Detected a new file {new_files[0]}.")
             self._current_file = new_files[0]
-            if self._data_dimension == 2:
-                image_PIL = Image.open(
-                    os.path.join(self._folder_path, self._current_file))
-                self._image = np.array(image_PIL)
-                self._format_pixel = str(self.mode_to_bpp[image_PIL.mode])
-                self.push_change_event("image", self.read_image())
-            elif self._data_structure == 0:
-                with open(os.path.join(self._folder_path, self._current_file), newline='') as csvfile:
-                    reader = csv.reader(csvfile)
-                    self._x, self._y = [], []
-                    start = False
-                    stop = False
-                    for row in reader:
-                        if row[0] == '[EndOfFile]':
-                            stop = True
-                        if start and not stop:
-                            self._x.append(float(row[0].split(';')[0]))
-                            self._y.append(float(row[0].split(';')[-1]))
-                        if row[0] == '[Data]':
-                            start = True
+            while True:
+                try:
+                    if self.file_type == "image":
+                        image_PIL = Image.open(
+                            os.path.join(self._folder_path, self._current_file))
+                        self._image = np.array(image_PIL)
+                        self._format_pixel = str(self.mode_to_bpp[image_PIL.mode])
+                        self.push_change_event("image", self._image)
+                    elif self._data_structure == 0:
+                        with open(os.path.join(self._folder_path, self._current_file), newline='') as csvfile:
+                            reader = csv.reader(csvfile)
+                            self._x, self._y = [], []
+                            start = False
+                            stop = False
+                            for row in reader:
+                                if row[0] == '[EndOfFile]':
+                                    stop = True
+                                if start and not stop:
+                                    self._x.append(float(row[0].split(';')[0]))
+                                    self._y.append(float(row[0].split(';')[-1]))
+                                if row[0] == '[Data]':
+                                    start = True
+                    elif self._data_structure == 1 and self._substring_of_display_channel in self._current_file:
+                        with open(os.path.join(self._folder_path, self._current_file), newline='') as csvfile:
+                            reader = csv.reader(csvfile)
+                            self._x, self._y = [], []
+                            for idx, row in enumerate(reader):
+                                if idx>5:
+                                    self._x.append(float(row[0]))
+                                    self._y.append(float(row[1]))
+                    break
+                except PermissionError:
+                    if os.path.isfile(os.path.join(self._folder_path, self._current_file)):
+                        self.logger.info(f"We encounterred an PermissionError reading {os.path.join(self._folder_path, self._current_file)}. However, this could be the new file was building.")
+                    self.logger.info("Will try in 0.5 second.")
+                    time.sleep(0.5)
             self._read_time = datetime.datetime.fromtimestamp(os.path.getmtime(
                 os.path.join(self._folder_path, self._current_file))).strftime("%H-%M-%S.%f")
             self._file_number += 1
@@ -255,7 +251,6 @@ class FileReader(Device):
                                    self.read_read_time())
             self.push_change_event("file_number",
                                    self.read_file_number())
-
             return True
         else:
             return False
@@ -283,11 +278,81 @@ class FileReader(Device):
     def write_is_debug(self, value):
         self._debug = value
 
+    def initialize_dynamic_attributes(self):
+    
+        image = attribute(
+            name="image",
+            label="image",
+            max_dim_x=10000,
+            max_dim_y=10000,
+            dtype=((int,),),
+            access=AttrWriteType.READ,
+        )
+
+        x = attribute(
+            name="x",
+            label="x",
+            max_dim_x=1000000,
+            dtype=(float,),
+            access=AttrWriteType.READ,
+        )
+
+
+        y = attribute(
+            name="y",
+            label="y",
+            max_dim_x=1000000,
+            dtype=(float,),
+            access=AttrWriteType.READ,
+        )
+
+        files_per_shot = attribute(
+            name="files_per_shot",
+            label="files per shot",
+            dtype=int,
+            memorized = True,
+            hw_memorized = True,
+            access=AttrWriteType.READ_WRITE,
+        )
+
+        substring_of_display_channel = attribute(
+            name="substring_of_display_channel",
+            label="substring",
+            dtype=str,
+            memorized = True,
+            hw_memorized = True,
+            access=AttrWriteType.READ_WRITE,
+            doc="substring in the name of the file that needs to be displayed"
+        )
+
+        if self.file_type == 'image':
+            self.add_attribute(image)
+        elif self.file_type == 'xy':
+            self.add_attribute(x)
+            self.add_attribute(y)
+            self.add_attribute(files_per_shot)
+            self.add_attribute(substring_of_display_channel)
+            self._files_per_shot = 1
+            self._substring_of_display_channel = "C1"
+
+    def read_files_per_shot(self, attr):
+        return self._files_per_shot
+    
+    def write_files_per_shot(self, attr):
+        self._files_per_shot = attr.get_write_value()
+
+    def read_substring_of_display_channel(self, attr):
+        return self._substring_of_display_channel
+    
+    def write_substring_of_display_channel(self, attr):
+        self._substring_of_display_channel = attr.get_write_value()
+
+
     def init_device(self):
+        super().init_device()
         self._user_defined_name = ''
         self.logger_base = logging.getLogger(self.__class__.__name__)
         self.logger = LoggerAdapter(self._user_defined_name, self.logger_base)
-        self._data_dimension = 2
         self._data_structure = 0
         self._debug = False
         self._is_polling_periodically = False
@@ -322,7 +387,10 @@ class FileReader(Device):
             logging.info(
                 f'polling period of {attr} is set to {self._polling_period}')
 
-    reset_number = Basler.reset_number
+    @command(dtype_in=int)
+    def reset_number(self, number=0):
+        self._file_number = number
+        self.logger.info("Reset file number")
 
     @command()
     def read_files(self):

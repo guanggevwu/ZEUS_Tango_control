@@ -314,8 +314,9 @@ class DaqGUI:
             "background_image": self.frame2_checkbutton_content['background_image']['var'].get(),
             "stitch": self.frame2_checkbutton_content['stitch']['var'].get()
         }
-        default_config = None if self.options["default_config"] else dict(
+        default_config = {} if self.options["default_config"] else dict(
         )
+        default_config.update({"all":{"repetition":self.shot_end_var.get()-self.shot_start_var.get()+1}})
         self.daq = Daq(self.selected_devices,
                        dir=self.path_var.get(), thread_event=self.my_event, check_exist=False)
         self.Yes_for_all = False

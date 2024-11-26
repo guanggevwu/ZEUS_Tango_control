@@ -57,7 +57,7 @@ class Basler(Device):
         label="image",
         max_dim_x=10000,
         max_dim_y=10000,
-        dtype=((int,),),
+        dtype=((np.uint16,),),
         access=AttrWriteType.READ,
     )
 
@@ -425,7 +425,7 @@ class Basler(Device):
             label="image_with_MeV_mark",
             max_dim_x=10000,
             max_dim_y=10000,
-            dtype=((int,),),
+            dtype=((np.uint16,),),
             access=AttrWriteType.READ,
         )
 
@@ -457,7 +457,7 @@ class Basler(Device):
             line_start = (np.array(start)+[i*dx, i*dy]).astype(int)
             line_end = (np.array(start) +
                         [i*dx+dx*ratio, i*dy+dy*ratio]).astype(int)
-            draw.line([tuple(line_start), tuple(line_end)], fill="gray", width=5)
+            draw.line([tuple(line_start), tuple(line_end)], fill=int(np.max(self._image)), width=5)
 
     def read_exposure(self):
         if self._model_category == 1:
@@ -914,8 +914,8 @@ class Basler(Device):
                     for idx, (i, j) in enumerate(zip(ek, ek_pixels)):
                         self.draw_dash_line(draw, [j, 0], [j, im_pil.size[0]])
                         draw.text(
-                            (j-70, im_pil.size[1]-idx*50), str(i)+'G', font=font, fill="gray")
-                    self._image_with_MeV_mark = np.array(im_pil).astype(np.uint8)
+                            (j-70, im_pil.size[1]-idx*50), str(i)+'G', font=font, fill=int(np.max(self._image)))
+                    self._image_with_MeV_mark = np.array(im_pil).astype(self._image.dtype)
                     self.push_change_event(
                         "image_with_MeV_mark", self._image_with_MeV_mark)
                 grabResult.Release()

@@ -70,20 +70,26 @@ class Daq:
         self.debug = debug
         atexit.register(self.termination)
 
-    def set_camera_configuration(self, config_dict=None, saving=True):
+    def set_camera_configuration(self, config_dict=None, saving=True, default_config_dict=default_config_dict):
+        default_config_dict = {key: value for key, value in default_config_dict.items() if (key in [v['user_defined_name'] for v in self.cam_info.values()]) or (key == 'all')}
         if config_dict is None:
-            config_dict = default_config_dict
-        config_dict = {key: value for key,
-                       value in config_dict.items() if (key.lower() in [v['user_defined_name'].lower() for v in self.cam_info.values()]) or (key == 'all')}
+            config_dict = {}
+        cam_list_with_all = set([i for i in config_dict] + [i for i in default_config_dict])
+        # filter the cameras that are not needed. 
+        combined_config = {}
+        for cam in cam_list_with_all:
+            from_config_dict = config_dict.get(cam, {})
+            from_default_config_dict = default_config_dict.get(cam, {})
+            from_config_dict.update(from_default_config_dict)
+            combined_config[cam] = from_config_dict
 
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
-            dev_short_name = bs.dev_name().split('/')[-1]
-            # if the device name is found in config_dict, use it. if not, use "all" instead. Else, pass an empty dict.
-            if dev_short_name.lower() in config_dict:
-                info['config_dict'] = config_dict[dev_short_name.lower()]
+            # if the device name is found in combined_config, use it. if not, use "all" instead. Else, pass an empty dict.
+            if bs.user_defined_name in combined_config:
+                info['config_dict'] = combined_config[bs.user_defined_name]
             elif 'all' in config_dict:
-                info['config_dict'] = config_dict['all']
+                info['config_dict'] = combined_config['all']
             else:
                 info['config_dict'] = dict()
             if 'basler' in bs.dev_name():
@@ -114,9 +120,12 @@ class Daq:
         bits = ''.join([i for i in bs.format_pixel if i.isdigit()])
         if int(bits) > 8:
             bits = '16'
-        current_image = bs.image.astype(f'uint{bits}')
-        data = Image.fromarray(current_image)
-        return data, current_image
+        data_PIL = Image.fromarray(bs.image.astype(f'uint{bits}'))
+        if hasattr(bs, "image_with_MeV_mark"):
+            data_array = bs.image_with_MeV_mark.astype(f'uint{bits}')
+        else:
+            data_array = bs.image.astype(f'uint{bits}')
+        return data_PIL, data_array
 
     def stretch_image(self, current_image):
         adjusted_image = self.imadjust(current_image)
@@ -186,6 +195,7 @@ class Daq:
         interval_threshold. The saving is triggered only when the interval is larger than the threshold.
         '''
         logging.info('Waiting for a trigger...')
+        xy_reader_count = 0
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
             bs.reset_number(shot_start-1)
@@ -201,20 +211,30 @@ class Daq:
                 if info['shot_num'] > shot_end:
                     info['is_completed'] = True
                 elif bs.is_new_image:
-                    if 'basler' in bs.dev_name() or bs.data_dimension == 2:
+                    if 'basler' in bs.dev_name() or bs.data_type == "image":
                         data, data_array = self.get_image(bs)
                         file_name = generate_basename(
                             info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%e': 'Energy{energy:.3f}J', '%h': 'HotSpot{hot_spot:.4f}Jcm-2', '%f': 'tiff', 'device_proxy': bs})
                         freezed_shot_number = info["shot_num"]
                         Thread(target=self.thread_saving,
                                args=(data, info, file_name, freezed_shot_number)).start()
-                    elif 'file_reader' in bs.dev_name() or bs.data_dimension == 1:
+                        add_number = 1
+                        stitch_local = True
+                    elif 'file_reader' in bs.dev_name() or bs.data_type == "xy":
                         file_name = generate_basename(
-                            info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%f': 'csv', 'device_proxy': bs})
+                            info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%o': '{current_file}', '%f': 'csv', 'device_proxy': bs})
                         shutil.copy(os.path.join(bs.folder_path, bs.current_file), os.path.join(
                             info['cam_dir'], file_name))
-                        data_array = self.save_plot_data(bs.x, bs.y)
-                    if stitch:
+                        xy_reader_count += 1
+                        if xy_reader_count == bs.files_per_shot:
+                            data_array = self.save_plot_data(bs.x, bs.y)
+                            add_number = 1
+                            xy_reader_count = 0
+                            stitch_local = True
+                        else:
+                            add_number = 0
+                            stitch_local = False
+                    if stitch and stitch_local:
                         adjusted_image = self.stretch_image(data_array)
                         info['images_to_stitch'][f'shot{info["shot_num"]}'] = adjusted_image
                         if sum([1 for one_cam in self.cam_info.values() if f'shot{info["shot_num"]}' in one_cam['images_to_stitch']]) == len(self.cam_info):
@@ -225,7 +245,7 @@ class Daq:
                             large_image_p.save(stitch_save_path)
                             logging.info(
                                 f"Shot {info['shot_num']} taken for stitching (size: {large_image_p.size}) saved to {stitch_save_path}")
-                    info['shot_num'] += 1
+                    info['shot_num'] += add_number
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
                 logging.info("All shots completed!")
                 return

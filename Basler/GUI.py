@@ -84,7 +84,7 @@ class BaslerGUI():
 
         # sets of widgets. Image in mid.
         # Check file_reader data dimension to determine use image or plot.
-        if 'file_reader' in device_name and self.attr_list[device_name]['dp'].data_dimension == 1:
+        if 'file_reader' in device_name and self.attr_list[device_name]['dp'].data_type == "xy":
             panel1_w1 = TaurusPlot()
             model = [(f'{device_name}/x', f'{device_name}/y')]
             panel1_w1.setModel(model)
