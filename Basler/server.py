@@ -438,7 +438,7 @@ class Basler(Device):
         if self._has_MeV_mark:
             self.add_attribute(image_with_MeV_mark)
             self._image_with_MeV_mark = np.zeros(
-                    (self.camera.Height.Value, self.camera.Width.Value))
+                (self.camera.Height.Value, self.camera.Width.Value))
         self.add_attribute(width)
         self.add_attribute(height)
         self.add_attribute(trigger_source)
@@ -457,7 +457,8 @@ class Basler(Device):
             line_start = (np.array(start)+[i*dx, i*dy]).astype(int)
             line_end = (np.array(start) +
                         [i*dx+dx*ratio, i*dy+dy*ratio]).astype(int)
-            draw.line([tuple(line_start), tuple(line_end)], fill=int(np.max(self._image)), width=5)
+            draw.line([tuple(line_start), tuple(line_end)],
+                      fill=int(np.max(self._image)), width=5)
 
     def read_exposure(self):
         if self._model_category == 1:
@@ -530,7 +531,7 @@ class Basler(Device):
     def read_filter_option(self, attr):
         if self._filter_option == "0":
             return "accepting user defined calibration parameters"
-        elif self._filter_option == "1":
+        elif self._filter_option in self.filter_option_details:
             return f"using OD 2+4, {self.filter_option_details[self._filter_option]}"
         else:
             return "wrong input"
@@ -563,7 +564,7 @@ class Basler(Device):
         self.model_type = ['a2A1920-51gmBAS',
                            'a2A2590-22gmBAS', 'a2A5320-7gmPRO']
         self.filter_option_details = {
-            "1": [27.53, 26.988, 0.8455, 27.53, 24.540]}
+            "1": [27.53, 26.988, 0.8455, 27.53, 24.540], "2": [23.24, 21.370, 0.827, 23.24, 20.641]}
         self.path_raw = ''
         self._is_polling_periodically = False
         self._debug = False
@@ -915,7 +916,8 @@ class Basler(Device):
                         self.draw_dash_line(draw, [j, 0], [j, im_pil.size[0]])
                         draw.text(
                             (j-70, im_pil.size[1]-idx*50), str(i)+'G', font=font, fill=int(np.max(self._image)))
-                    self._image_with_MeV_mark = np.array(im_pil).astype(self._image.dtype)
+                    self._image_with_MeV_mark = np.array(
+                        im_pil).astype(self._image.dtype)
                     self.push_change_event(
                         "image_with_MeV_mark", self._image_with_MeV_mark)
                 grabResult.Release()
