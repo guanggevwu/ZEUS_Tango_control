@@ -160,7 +160,7 @@ class BaslerGUI():
         panel2_layout.addWidget(panel2_w1)
 
         # change the text write widget to dropdown list and set auto apply
-        dropdown = {'trigger_source': (('Off', 'Off'), ('Software', 'Software'), ('External', 'Line1')), 'trigger_selector': (
+        dropdown = {'trigger_source': (('Off', 'Off'), ('Software', 'Software'), ('External', 'External')), 'trigger_selector': (
             ('AcquisitionStart', 'AcquisitionStart'), ('FrameStart', 'FrameStart')), }
         for idx, full_attr in enumerate(form_model):
             # change the bool write to auto apply.

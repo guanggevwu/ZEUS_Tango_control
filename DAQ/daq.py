@@ -25,7 +25,12 @@ logging.basicConfig(
 
 
 class Daq:
-    def __init__(self, select_cam_list, dir='', debug=False, check_exist=True, thread_event=None):
+    def __init__(self, select_cam_list, dir='', debug=False, check_exist=True, thread_event=None, GUI=None):
+        if GUI is None:
+            self.logger = logging.getLogger(__name__).info
+        else:
+            self.GUI = GUI
+            self.logger = GUI.insert_to_disabled
         self.cam_info = defaultdict(dict)
         self.dir = dir
         self.select_cam_list = select_cam_list
@@ -71,18 +76,25 @@ class Daq:
         atexit.register(self.termination)
 
     def set_camera_configuration(self, config_dict=None, saving=True, default_config_dict=default_config_dict):
-        default_config_dict = {key: value for key, value in default_config_dict.items() if (key in [v['user_defined_name'] for v in self.cam_info.values()]) or (key == 'all')}
         if config_dict is None:
             config_dict = {}
-        cam_list_with_all = set([i for i in config_dict] + [i for i in default_config_dict])
-        # filter the cameras that are not needed. 
+        # list of user defined names of the cameras
+        user_defined_name_list = [one_cam_dict['user_defined_name']
+                                  for one_cam_dict in self.cam_info.values()]
+        # retrieve selected camera configurations from the default configurations
         combined_config = {}
-        for cam in cam_list_with_all:
-            from_config_dict = config_dict.get(cam, {})
-            from_default_config_dict = default_config_dict.get(cam, {})
-            from_config_dict.update(from_default_config_dict)
-            combined_config[cam] = from_config_dict
-
+        # the overwrite priority is "specified camera in config_dict" > "all in config_dict" > "specified camera in default_config_dict" > "all in default_config_dict"
+        for cam in user_defined_name_list:
+            new_config = {}
+            if "all" in default_config_dict:
+                new_config.update(default_config_dict["all"])
+            if cam in default_config_dict:
+                new_config.update(default_config_dict.get(cam))
+            if "all" in config_dict:
+                new_config.update(config_dict["all"])
+            if cam in config_dict:
+                new_config.update(config_dict[cam])
+            combined_config[cam] = new_config
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
             # if the device name is found in combined_config, use it. if not, use "all" instead. Else, pass an empty dict.
@@ -95,7 +107,9 @@ class Daq:
             if 'basler' in bs.dev_name():
                 bs.relax()
             for key, value in info['config_dict'].items():
-                if hasattr(bs, key):
+                if hasattr(bs, key) and getattr(bs, key) != value:
+                    self.logger(
+                        f"{info['user_defined_name']}/{key} is changed from {getattr(bs, key)} to {value}")
                     setattr(bs, key, value)
 
             # if the saving_format is not set in the configuration
@@ -105,7 +119,7 @@ class Daq:
                 info['file_name'] = info['config_dict']['saving_format']
         if saving:
             Key_list = ['model', 'format_pixel', "exposure", "gain",
-                        "trigger_selector", "trigger_source", "is_polling_periodically"]
+                        "trigger_selector", "trigger_source"]
             full_configuration = dict()
             for c, info in self.cam_info.items():
                 if 'basler' in info['device_proxy'].dev_name():
@@ -150,15 +164,19 @@ class Daq:
                     info['file_name'], {'%s': f'Background', '%t': 'Time{read_time}', '%e': 'Energy{energy:.3f}J', '%h': 'HotSpot{hot_spot:.4f}Jcm-2', '%f': 'tiff', 'device_proxy': bs})
                 data.save(os.path.join(
                     info['cam_dir'], file_name))
-                logging.info(f"Background is saved {data.size}")
+                self.logger(
+                    f"Background for {info['user_defined_name']} is saved {data.size}")
                 if stitch:
                     adjusted_image = self.stretch_image(data_array)
                     info['images_to_stitch']['background'] = adjusted_image
                     if sum([1 for one_cam in self.cam_info.values() if 'background' in one_cam['images_to_stitch']]) == len(self.cam_info):
-                        self.stitch_images('background').save(
+                        back_image = self.stitch_images('background')
+                        back_image.save(
                             os.path.join(self.dir, 'stitching', f'background.tiff'))
+                        self.logger(
+                            f"Background for stitching {back_image.size} is saved.")
             else:
-                logging.info('error')
+                self.logger('Error when taking background image.')
             if 'basler' in bs.dev_name():
                 bs.trigger_source = trigger_source
 
@@ -189,13 +207,14 @@ class Daq:
             time.sleep(interval)
             logging.info(f"trigger {i} sent!")
 
-    def acquisition(self, stitch=True, shot_start=1, shot_end=float('inf'), interval_threshold=0):
+    def acquisition(self, stitch=True, shot_start=1, shot_end=float('inf')):
         '''
         Main acquisition function. Use external trigger and save data.
-        interval_threshold. The saving is triggered only when the interval is larger than the threshold.
         '''
-        logging.info('Waiting for a trigger...')
+        self.logger('Waiting for a trigger...')
         xy_reader_count = 0
+        if len(self.cam_info) < 2:
+            stitch = False
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
             bs.reset_number(shot_start-1)
@@ -243,18 +262,17 @@ class Daq:
                             large_image_p = self.stitch_images(
                                 f'shot{info["shot_num"]}')
                             large_image_p.save(stitch_save_path)
-                            logging.info(
-                                f"Shot {info['shot_num']} taken for stitching (size: {large_image_p.size}) saved to {stitch_save_path}")
+                            self.logger(
+                                f"Shot {info['shot_num']} for stitching {large_image_p.size} is saved.")
                     info['shot_num'] += add_number
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
-                logging.info("All shots completed!")
+                self.logger("All shots completed!")
                 return
 
     def thread_saving(self, data, info, file_name, freezed_shot_number):
         data.save(os.path.join(info['cam_dir'], file_name))
-        logging.info("Shot {} taken for {} (size: {}) saved to {}".format(
-            freezed_shot_number, info['user_defined_name'],  {data.size}, {os.path.join(
-                info['cam_dir'], file_name)}))
+        self.logger(
+            f"Shot {freezed_shot_number} for {info['user_defined_name']} {data.size} is saved.")
 
     def imadjust(self, input, tol=0.01):
         """
@@ -316,12 +334,10 @@ class Daq:
         return data[:, :, 0]
 
     def termination(self, config_dict=None):
-        logging.info('terminating...')
         if config_dict is None:
             config_dict = {'all': {"is_polling_periodically": True}}
         self.set_camera_configuration(
-            config_dict=config_dict, saving=False)
-
+            config_dict=config_dict, saving=False, default_config_dict={})
 
 # if __name__ == "__main__":
 #     dt_string = datetime.now().strftime("%Y%m%d")

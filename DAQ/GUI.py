@@ -15,6 +15,10 @@ import atexit
 from threading import Thread, Event
 import json
 
+logging.basicConfig(
+    format="%(asctime)s %(message)s",
+    level=logging.INFO)
+
 
 class DaqGUI:
     def __init__(self, root):
@@ -130,11 +134,23 @@ class DaqGUI:
         self.acquisition['button'].grid(
             column=0, row=2, columnspan=4, sticky='WE')
 
+        self.frame4 = ttk.Labelframe(
+            root, text='Logging', padding=pad_widget, style='Sty1.TLabelframe')
+        self.frame4.grid(column=0, row=3, sticky=(N, W, E, S))
+        self.t = Text(self.frame4, width=70, height=20, wrap=WORD)
+        self.t.grid(column=0, row=0, sticky=W)
+        self.t.logger = self.insert_to_disabled
+        self.insert_to_disabled("DAQ GUI is started.")
+        sb = ttk.Scrollbar(self.frame4,
+                           orient='vertical',
+                           command=self.t.yview)
+
+        sb.grid(column=1, row=0, sticky=NS)
+        self.t['yscrollcommand'] = sb.set
         self.pad_space(self.frame1)
-        for child in self.frame2.winfo_children():
-            child.grid_configure(padx=[self.font_mid, 0], pady=3)
-        for child in self.frame3.winfo_children():
-            child.grid_configure(padx=[self.font_mid, 0], pady=3)
+        self.pad_space(self.frame2)
+        self.pad_space(self.frame3)
+        self.pad_space(self.frame4)
 
         self.init_settings()
 
@@ -193,7 +209,7 @@ class DaqGUI:
                 [f'{self.python_path}', f'{script_path}', device_instance])
             self.selected_devices[device_name]['server_pid'] = p.pid
             self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_connecting.TButton'
-            logging.info(f'{device_name} starting connecting')
+            self.insert_to_disabled(f'Connecting {device_name}...')
             # Thread(target=self.check_device_server_status,
             #        args=(device_name,)).start()
             # self.check_device_server_status(device_name)
@@ -208,12 +224,12 @@ class DaqGUI:
             os.kill(self.selected_devices[device_name]
                     ['server_pid'], signal.SIGTERM)
         except OSError:
-            logging.info(
-                f"{self.selected_devices[device_name]['server_pid']}  doesn't exist")
+            self.insert_to_disabled(
+                f"{self.selected_devices[device_name]['server_pid']}  doesn't exist.")
         del self.selected_devices[device_name]['server_pid']
         del self.selected_devices[device_name]['connection_try_times']
         self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_offline.TButton'
-        logging.info(f'{device_name} server is killed!')
+        self.insert_to_disabled(f'{device_name} server is killed.')
 
     def check_device_server_status(self, device_name):
         if 'connection_try_times' not in self.selected_devices[device_name]:
@@ -223,14 +239,14 @@ class DaqGUI:
             dp = tango.DeviceProxy(device_name)
             dp.ping()
             self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_online.TButton'
-            logging.info(f'{device_name} started successfully!')
+            self.insert_to_disabled(f'{device_name} is connected.')
         except (tango.DevFailed, tango.ConnectionFailed) as e:
             if self.selected_devices[device_name]['connection_try_times'] >= 5:
                 if type(e) is tango.DevFailed:
-                    logging.info(
+                    self.insert_to_disabled(
                         f'Type: {type(e)}. Check if {device_name} exists in the data base.')
                 elif type(e) is tango.ConnectionFailed:
-                    logging.info(
+                    self.insert_to_disabled(
                         f'Type: {type(e)}. Check if {device_name} server is started.')
                 self.kill_device_server(device_name)
             else:
@@ -254,10 +270,11 @@ class DaqGUI:
             try:
                 os.kill(self.client_GUI['client_pid'], signal.SIGTERM)
             except OSError:
-                logging.info('GUI is killed somewhere else!')
+                self.insert_to_disabled(
+                    'GUI was already killed somewhere else. Ignore.')
             del self.client_GUI['client_pid']
             self.client_GUI['button']['style'] = 'Sty2_client_offline.TButton'
-            logging.info(f'Client GUI is killed!')
+            self.insert_to_disabled(f'Client GUI is killed.')
 
     def terminate(self):
         for key, value in self.selected_devices.items():
@@ -265,10 +282,8 @@ class DaqGUI:
                 os.kill(value['server_pid'], signal.SIGTERM)
             if 'client_pid' in value:
                 os.kill(value['client_pid'], signal.SIGTERM)
-        with open(self.init_file_path, 'w') as jsonfile:
-            json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get()},
-                      jsonfile)
-        logging.info("terminated!")
+        logging.info(
+            "Terminate. All processes are killed.")
 
     def update_selected_devices(self, device_name, checkbox_var):
         if checkbox_var.get():
@@ -297,7 +312,8 @@ class DaqGUI:
             self.acquisition['status'] = False
             self.acquisition['button']['style'] = 'Sty3_start.TButton'
             self.acquisition['button']['text'] = 'Start'
-            logging.info("Stopped acquisition")
+            self.daq.termination()
+            self.insert_to_disabled("Stopped acquisition.")
         else:
             self.acquisition['status'] = True
             self.acquisition['is_completed'] = False
@@ -305,7 +321,7 @@ class DaqGUI:
             Thread(target=self.start_acquisition).start()
             self.acquisition['button']['style'] = 'Sty3_stop.TButton'
             self.acquisition['button']['text'] = 'Stop'
-            logging.info("Started acquisition in thread")
+            self.insert_to_disabled("Started acquisition in a new thread.")
 
     def start_acquisition(self):
         self.options = {
@@ -314,11 +330,17 @@ class DaqGUI:
             "background_image": self.frame2_checkbutton_content['background_image']['var'].get(),
             "stitch": self.frame2_checkbutton_content['stitch']['var'].get()
         }
+        with open(self.init_file_path, 'w') as jsonfile:
+            json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get()},
+                      jsonfile)
         default_config = {} if self.options["default_config"] else dict(
         )
-        default_config.update({"all":{"repetition":self.shot_end_var.get()-self.shot_start_var.get()+1}})
+        default_config.update(
+            {"all": {"repetition": self.shot_end_var.get()-self.shot_start_var.get()+1}})
         self.daq = Daq(self.selected_devices,
-                       dir=self.path_var.get(), thread_event=self.my_event, check_exist=False)
+                       dir=self.path_var.get(), thread_event=self.my_event, check_exist=False, GUI=self)
+        '''
+        # dont confirm at the moment. Maybe add it back after adding the file format setting.
         self.Yes_for_all = False
         for c in self.selected_devices:
             cam_dir = os.path.join(
@@ -334,6 +356,7 @@ class DaqGUI:
                         self.acquisition['button']['style'] = 'Sty3_start.TButton'
                         self.acquisition['button']['text'] = 'Start'
                         return
+        '''
         self.daq.set_camera_configuration(
             config_dict=default_config, saving=self.options['save_config'])
         if self.options['background_image']:
@@ -342,6 +365,14 @@ class DaqGUI:
             shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'])
         if not self.my_event.is_set():
             self.toggle_acquisition()
+
+    def insert_to_disabled(self, text):
+        time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+        logging.info(text)
+        self.t['state'] = 'normal'
+        self.t.insert(END, f'{time}, {text}\n')
+        self.t.see("end")
+        self.t['state'] = 'disabled'
 
 
 class DeviceListWindow(Toplevel):

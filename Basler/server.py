@@ -795,6 +795,8 @@ class Basler(Device):
         # replace 'on' with 'Software' and 'Line1'
         if self.camera.TriggerMode.Value == 'Off':
             return 'Off'
+        elif self.camera.TriggerSource.Value == "Line1":
+            return "External"
         else:
             return self.camera.TriggerSource.Value
 
