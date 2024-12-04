@@ -137,7 +137,8 @@ class DaqGUI:
         self.frame4 = ttk.Labelframe(
             root, text='Logging', padding=pad_widget, style='Sty1.TLabelframe')
         self.frame4.grid(column=0, row=3, sticky=(N, W, E, S))
-        self.t = Text(self.frame4, width=70, height=20, wrap=WORD)
+        self.t = Text(self.frame4, width=70, height=20, font=(
+            'Helvetica', int(self.font_mid*0.75)), wrap=WORD)
         self.t.grid(column=0, row=0, sticky=W)
         self.t.logger = self.insert_to_disabled
         self.insert_to_disabled("DAQ GUI is started.")
