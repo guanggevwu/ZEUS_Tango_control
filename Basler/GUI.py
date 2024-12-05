@@ -1,3 +1,5 @@
+import os
+import sys
 from taurus.qt.qtgui.application import TaurusApplication
 from taurus.qt.qtgui.taurusgui import TaurusGui
 from taurus.external.qt import Qt
@@ -8,11 +10,10 @@ from taurus.qt.qtgui.input import TaurusValueComboBox, TaurusValueCheckBox
 from taurus.qt.qtgui.button import TaurusCommandButton
 from taurus.qt.qtgui.display import TaurusLabel
 from taurus_pyqtgraph import TaurusPlot
+from taurus import tauruscustomsettings
+tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'zeus.png')
 
-import sys
-import json
-import os
-import tango
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class

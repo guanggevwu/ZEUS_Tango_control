@@ -7,12 +7,12 @@ from taurus import Device, changeDefaultPollingPeriod
 from taurus.qt.qtgui.panel import TaurusForm
 from taurus.qt.qtgui.input import TaurusValueComboBox
 from taurus import tauruscustomsettings
-import sys
 import os
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
     from common.TaurusGUI_Argparse import TaurusArgparse
+tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'zeus.png')import sys
 
 parser = TaurusArgparse(
     description='GUI for Gentec-EO devices', device_default='test/gentec/1')

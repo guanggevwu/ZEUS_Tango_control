@@ -14,6 +14,7 @@ import platform
 import atexit
 from threading import Thread, Event
 import json
+from PIL import Image, ImageTk
 
 logging.basicConfig(
     format="%(asctime)s %(message)s",
@@ -401,7 +402,12 @@ class DeviceListWindow(Toplevel):
 
 
 if __name__ == '__main__':
+    import ctypes
+    myappid = 'zeus.daq'  # arbitrary string
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     root = Tk()
+    root.iconbitmap(os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'title.ico'))
     dummy = DaqGUI(root)
     atexit.register(dummy.terminate)
     root.mainloop()

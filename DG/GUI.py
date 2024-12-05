@@ -10,6 +10,9 @@ from taurus.qt.qtgui.button import TaurusCommandButton
 
 import sys
 import os
+from taurus import tauruscustomsettings
+tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'zeus.png')
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
