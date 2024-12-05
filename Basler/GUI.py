@@ -11,8 +11,10 @@ from taurus.qt.qtgui.button import TaurusCommandButton
 from taurus.qt.qtgui.display import TaurusLabel
 from taurus_pyqtgraph import TaurusPlot
 from taurus import tauruscustomsettings
-tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'zeus.png')
+import platform
+if platform.system() == 'Windows':
+    tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'zeus.png')
 
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
