@@ -107,10 +107,13 @@ class Daq:
             if 'basler' in bs.dev_name():
                 bs.relax()
             for key, value in info['config_dict'].items():
-                if hasattr(bs, key) and getattr(bs, key) != value:
-                    self.logger(
-                        f"{info['user_defined_name']}/{key} is changed from {getattr(bs, key)} to {value}")
-                    setattr(bs, key, value)
+                if hasattr(bs, key):
+                    if key == "trigger_source":
+                        setattr(bs, key, value)
+                    elif getattr(bs, key) != value:
+                        self.logger(
+                            f"{info['user_defined_name']}/{key} is changed from {getattr(bs, key)} to {value}")
+                        setattr(bs, key, value)
 
             # if the saving_format is not set in the configuration
             if ('saving_format' not in info['config_dict']):

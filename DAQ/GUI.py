@@ -385,7 +385,7 @@ class DeviceListWindow(Toplevel):
         super().__init__(master=root)
         newframe1 = ttk.Frame(self)
         newframe1.grid(column=0, row=0, columnspan=1, sticky=(N, W, E, S))
-        item_each_row = 1
+        item_each_row = 3
         checkboxes = dict()
         for idx, device_name in enumerate(self.device_names_in_db):
             row, col = int(idx/item_each_row)+1, idx % item_each_row
