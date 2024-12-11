@@ -11,6 +11,7 @@ from PIL import Image
 import os
 import sys
 import csv
+import platform
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 if True:
@@ -25,6 +26,15 @@ logging.basicConfig(handlers=handlers,
 class FileReader(Device):
 
     file_type = device_property(dtype=str, default_value='')
+
+    host_computer = attribute(
+        label="host computer",
+        dtype="str",
+        access=AttrWriteType.READ,
+    )
+
+    def read_host_computer(self):
+        return self._host_computer
 
     user_defined_name = attribute(
         label="name",
@@ -183,7 +193,6 @@ class FileReader(Device):
     def read_image(self, attr):
         return self._image
 
-
     def read_x(self, attr):
         return self._x
 
@@ -213,7 +222,8 @@ class FileReader(Device):
                         image_PIL = Image.open(
                             os.path.join(self._folder_path, self._current_file))
                         self._image = np.array(image_PIL)
-                        self._format_pixel = str(self.mode_to_bpp[image_PIL.mode])
+                        self._format_pixel = str(
+                            self.mode_to_bpp[image_PIL.mode])
                         self.push_change_event("image", self._image)
                     elif self._data_structure == 0:
                         with open(os.path.join(self._folder_path, self._current_file), newline='') as csvfile:
@@ -226,7 +236,8 @@ class FileReader(Device):
                                     stop = True
                                 if start and not stop:
                                     self._x.append(float(row[0].split(';')[0]))
-                                    self._y.append(float(row[0].split(';')[-1]))
+                                    self._y.append(
+                                        float(row[0].split(';')[-1]))
                                 if row[0] == '[Data]':
                                     start = True
                     elif self._data_structure == 1 and self._substring_of_display_channel in self._current_file:
@@ -234,13 +245,14 @@ class FileReader(Device):
                             reader = csv.reader(csvfile)
                             self._x, self._y = [], []
                             for idx, row in enumerate(reader):
-                                if idx>5:
+                                if idx > 5:
                                     self._x.append(float(row[0]))
                                     self._y.append(float(row[1]))
                     break
                 except PermissionError:
                     if os.path.isfile(os.path.join(self._folder_path, self._current_file)):
-                        self.logger.info(f"We encounterred an PermissionError reading {os.path.join(self._folder_path, self._current_file)}. However, this could be the new file was building.")
+                        self.logger.info(
+                            f"We encounterred an PermissionError reading {os.path.join(self._folder_path, self._current_file)}. However, this could be the new file was building.")
                     self.logger.info("Will try in 0.5 second.")
                     time.sleep(0.5)
             self._read_time = datetime.datetime.fromtimestamp(os.path.getmtime(
@@ -279,7 +291,7 @@ class FileReader(Device):
         self._debug = value
 
     def initialize_dynamic_attributes(self):
-    
+
         image = attribute(
             name="image",
             label="image",
@@ -297,7 +309,6 @@ class FileReader(Device):
             access=AttrWriteType.READ,
         )
 
-
         y = attribute(
             name="y",
             label="y",
@@ -310,8 +321,8 @@ class FileReader(Device):
             name="files_per_shot",
             label="files per shot",
             dtype=int,
-            memorized = True,
-            hw_memorized = True,
+            memorized=True,
+            hw_memorized=True,
             access=AttrWriteType.READ_WRITE,
         )
 
@@ -319,8 +330,8 @@ class FileReader(Device):
             name="substring_of_display_channel",
             label="substring",
             dtype=str,
-            memorized = True,
-            hw_memorized = True,
+            memorized=True,
+            hw_memorized=True,
             access=AttrWriteType.READ_WRITE,
             doc="substring in the name of the file that needs to be displayed"
         )
@@ -337,18 +348,19 @@ class FileReader(Device):
 
     def read_files_per_shot(self, attr):
         return self._files_per_shot
-    
+
     def write_files_per_shot(self, attr):
         self._files_per_shot = attr.get_write_value()
 
     def read_substring_of_display_channel(self, attr):
         return self._substring_of_display_channel
-    
+
     def write_substring_of_display_channel(self, attr):
         self._substring_of_display_channel = attr.get_write_value()
 
-
     def init_device(self):
+        self._host_computer = platform.node()
+
         super().init_device()
         self._user_defined_name = ''
         self.logger_base = logging.getLogger(self.__class__.__name__)

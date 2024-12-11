@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 from threading import Thread
 from queue import Queue
 import csv
+import platform
 
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -60,6 +61,15 @@ class Basler(Device):
         dtype=((np.uint16,),),
         access=AttrWriteType.READ,
     )
+
+    host_computer = attribute(
+        label="host computer",
+        dtype="str",
+        access=AttrWriteType.READ,
+    )
+
+    def read_host_computer(self):
+        return self._host_computer
 
     read_time = attribute(
         label="read time",
@@ -561,6 +571,7 @@ class Basler(Device):
                 f"Can't accept the filter option [{attr.get_write_value()}]")
 
     def init_device(self):
+        self._host_computer = platform.node()
         self.model_type = ['a2A1920-51gmBAS',
                            'a2A2590-22gmBAS', 'a2A5320-7gmPRO']
         self.filter_option_details = {

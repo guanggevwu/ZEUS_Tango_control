@@ -9,7 +9,7 @@ import logging
 import os
 import csv
 import time
-
+import platform
 # -----------------------------
 
 handlers = [logging.StreamHandler()]
@@ -25,6 +25,15 @@ class LeCroy(Device):
 
     IP_address = device_property(dtype=str, default_value='')
     friendly_name = device_property(dtype=str, default_value='')
+
+    host_computer = attribute(
+        label="host computer",
+        dtype="str",
+        access=AttrWriteType.READ,
+    )
+
+    def read_host_computer(self):
+        return self._host_computer
 
     def create_func(self, channel_number, x_or_y):
         def func(*args, **kwargs):
@@ -56,6 +65,7 @@ class LeCroy(Device):
                                          access=AttrWriteType.READ))
 
     def init_device(self):
+        self._host_computer = platform.node()
         # def the read attribute method here at the beginning
         for arg1, arg2 in self.channel_info:
             setattr(

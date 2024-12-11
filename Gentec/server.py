@@ -12,6 +12,7 @@ import serial
 import time
 import serial.tools.list_ports
 import numpy as np
+import platform
 # -----------------------------
 
 handlers = [logging.StreamHandler()]
@@ -39,6 +40,15 @@ class GentecEO(Device):
             filtered_ports = [
                 p for p in filtered_ports if p.serial_number == '27869B461E002000']
         return filtered_ports[0]
+
+    host_computer = attribute(
+        label="host computer",
+        dtype="str",
+        access=AttrWriteType.READ,
+    )
+
+    def read_host_computer(self):
+        return self._host_computer
 
     model = attribute(
         label="model",
@@ -664,6 +674,7 @@ class GentecEO(Device):
         '''
         save_data is initialized before save_path during the initialization caused by hw_memorized. self.write_save_data(True) will not set self._save to True because self._save_path is an empty string at that moment. Introducing self._try_save_data will save the intended status and can be used later in write_save_path function.
         '''
+        self._host_computer = platform.node()
         self._debug = 0
         self._historical_data = [['pulse #', 'time', 'value']]
         self._historical_data_number = []

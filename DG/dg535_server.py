@@ -2,17 +2,10 @@
 # -*- coding: utf-8 -*-
 from tango import AttrWriteType, DevState
 from tango.server import Device, attribute, command, device_property
-import time
-import datetime
 import logging
-import os
-import csv
 import pyvisa
+import platform
 
-import time
-import serial.tools.list_ports
-# -----------------------------
-import inspect
 handlers = [logging.StreamHandler()]
 logging.basicConfig(handlers=handlers,
                     format="%(asctime)s %(message)s", level=logging.INFO)
@@ -34,6 +27,15 @@ class DG535(Device):
 
     def read_name_attr(self):
         return self.friendly_name
+
+    host_computer = attribute(
+        label="host computer",
+        dtype="str",
+        access=AttrWriteType.READ,
+    )
+
+    def read_host_computer(self):
+        return self._host_computer
 
     trigger = attribute(
         label="trigger",
@@ -182,6 +184,7 @@ class DG535(Device):
                                          access=AttrWriteType.READ_WRITE))
 
     def init_device(self):
+        self._host_computer = platform.node()
         try:
             rm = pyvisa.ResourceManager()
             self.device = rm.open_resource(f'GPIB0::{self.address}::INSTR')
