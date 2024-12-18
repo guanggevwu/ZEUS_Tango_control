@@ -19,6 +19,15 @@ class LaserWarningSign(Device):
 
     friendly_name = device_property(dtype=str, default_value='')
 
+    host_computer = attribute(
+        label="host computer",
+        dtype="str",
+        access=AttrWriteType.READ,
+    )
+
+    def read_host_computer(self):
+        return self._host_computer
+
     # add to init
     source_path = attribute(
         label="Data source path",

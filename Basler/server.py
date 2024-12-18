@@ -764,6 +764,7 @@ class Basler(Device):
     def read_format_pixel(self):
         return self.camera.PixelFormat.Value
 
+    @grabbing_wrap
     def write_format_pixel(self, value):
         if type(value) == str:
             self.camera.PixelFormat.Value = value
