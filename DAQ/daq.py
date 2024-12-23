@@ -210,10 +210,16 @@ class Daq:
             time.sleep(interval)
             logging.info(f"trigger {i} sent!")
 
-    def acquisition(self, stitch=True, shot_start=1, shot_end=float('inf')):
+    def acquisition(self, stitch=True, shot_start=1, shot_end=float('inf'), scan_table=None):
         '''
         Main acquisition function. Use external trigger and save data.
         '''
+        scan_tango_device = {}
+        if scan_table is not None:
+            for regulator, value in scan_table.items():
+                scan_tango_device[regulator] = tango.DeviceProxy(regulator)
+                if shot_start<=len(scan_table[regulator]):
+                    self.set_scan_value(scan_tango_device[regulator], scan_table[regulator], shot_start)
         self.logger('Waiting for a trigger...')
         xy_reader_count = 0
         if len(self.cam_info) < 2:
@@ -252,6 +258,7 @@ class Daq:
                             data_array = self.save_plot_data(bs.x, bs.y)
                             add_number = 1
                             xy_reader_count = 0
+                            # For scope, it saves multiple files per shot. stitch_local set to True only every bs.files_per_shot.
                             stitch_local = True
                         else:
                             add_number = 0
@@ -259,6 +266,7 @@ class Daq:
                     if stitch and stitch_local:
                         adjusted_image = self.stretch_image(data_array)
                         info['images_to_stitch'][f'shot{info["shot_num"]}'] = adjusted_image
+                        # check if the images to stitch are all available.
                         if sum([1 for one_cam in self.cam_info.values() if f'shot{info["shot_num"]}' in one_cam['images_to_stitch']]) == len(self.cam_info):
                             stitch_save_path = os.path.join(
                                 self.dir, 'stitching', f'shot{info["shot_num"]}_{datetime.now().strftime("%H%M%S.%f")}.tiff')
@@ -268,9 +276,22 @@ class Daq:
                             self.logger(
                                 f"Shot {info['shot_num']} for stitching {large_image_p.size} is saved.")
                     info['shot_num'] += add_number
+                    # head to next scan point when all cameras completed a shot.
+                    if all([i['shot_num']>=info['shot_num'] for i in self.cam_info.values()]):
+                        self.logger(f"shot {info['shot_num']-1} is completed.")
+                        if scan_table is not None:
+                            for scan_device, dp in scan_tango_device.items():
+                                self.set_scan_value(dp, scan_table[scan_device], info['shot_num'])                        
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
                 self.logger("All shots completed!")
                 return
+
+    def set_scan_value(self, device_proxy, value_list, shot_number):
+        if shot_number<= len(value_list) and value_list[shot_number-1]:
+            device_proxy.pressure_psi = float(value_list[shot_number-1])
+            self.logger(f'{device_proxy.dev_name().split("/")[-1]} pressure set to {value_list[shot_number-1]}')
+        else:
+            self.logger(f'{device_proxy.dev_name().split("/")[-1]} pressure, empty scan value. It is {device_proxy.pressure_psi} psi.')
 
     def thread_saving(self, data, info, file_name, freezed_shot_number):
         data.save(os.path.join(info['cam_dir'], file_name))

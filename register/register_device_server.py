@@ -85,11 +85,11 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "wavesurfer_3034z_1": {'server': 'LeCroy/wavesurfer_3034z_1', '_class': 'LeCroy', 'name': 'facility/lecroy/wavesurfer_3034z_1'},
             "dg535_test": {'server': 'DG535/testsr', '_class': 'DG535', 'name': 'test/dg535/1'},
             "file_reader_1": {'server': 'FileReader/file_reader_1', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_1'},
-            "file_reader_2": {'server': 'FileReader/image_reader_2', '_class': 'FileReader', 'name': 'facility/file_reader/image_reader_2','property': {'file_type': 'image'}},
-            "file_reader_3": {'server': 'FileReader/xy_reader', '_class': 'FileReader', 'name': 'facility/file_reader/xy_reader','property': {'file_type': 'xy'}},
-            "file_reader_4": {'server': 'FileReader/TA1-wr9254', '_class': 'FileReader', 'name': 'facility/file_reader/TA1-wr9254','property': {'file_type': 'xy'}},
+            "file_reader_2": {'server': 'FileReader/image_reader_2', '_class': 'FileReader', 'name': 'facility/file_reader/image_reader_2', 'property': {'file_type': 'image'}},
+            "file_reader_3": {'server': 'FileReader/xy_reader', '_class': 'FileReader', 'name': 'facility/file_reader/xy_reader', 'property': {'file_type': 'xy'}},
+            "file_reader_4": {'server': 'FileReader/TA1-wr9254', '_class': 'FileReader', 'name': 'facility/file_reader/TA1-wr9254', 'property': {'file_type': 'xy'}},
             "asyncio_device_1": {'server': 'AsyncioDevice/asyncio_device_1', '_class': 'AsyncioDevice', 'name': 'test/asyncio_device/asyncio_device_1'},
-
+            "TA1_regulator_1": {'server': 'GXRegulator/TA1_regulator_1', '_class': 'FileReader', 'name': 'TA1/gx_regulator/TA1_regulator_1', 'property': {'high_voltage_channel': '0', 'low_voltage_channel': '1'}},
             }
 
 

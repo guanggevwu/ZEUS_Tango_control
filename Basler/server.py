@@ -7,7 +7,6 @@ import numpy as np
 import time
 import datetime
 import logging
-from PIL import Image
 import os
 import sys
 from scipy.ndimage import convolve
