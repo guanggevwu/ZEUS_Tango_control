@@ -1,4 +1,5 @@
 init.json
+scan_table.csv
 elliptec/*
 .vscode
 *tmp_data*

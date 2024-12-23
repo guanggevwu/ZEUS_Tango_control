@@ -14,7 +14,7 @@ from config import default_config_dict
 import shutil
 import matplotlib.pyplot as plt
 from threading import Thread
-
+import csv
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from common.other import generate_basename
@@ -214,12 +214,19 @@ class Daq:
         '''
         Main acquisition function. Use external trigger and save data.
         '''
-        scan_tango_device = {}
+        # set scan value
+        self.scan_tango_device = {}
         if scan_table is not None:
-            for regulator, value in scan_table.items():
-                scan_tango_device[regulator] = tango.DeviceProxy(regulator)
-                if shot_start<=len(scan_table[regulator]):
-                    self.set_scan_value(scan_tango_device[regulator], scan_table[regulator], shot_start)
+            self.scan_table = scan_table
+            for regulator, value in self.scan_table.items():
+                os.makedirs(os.path.join(self.dir, 'scan_list'), exist_ok=True)
+                self.scan_tango_device[regulator] = tango.DeviceProxy(regulator)
+                if shot_start <= len(value):
+                    self.set_scan_value(
+                        self.scan_tango_device[regulator], value, shot_start)
+            self.save_scan_list(shot_start, add_header=True)
+
+        # acquisition
         self.logger('Waiting for a trigger...')
         xy_reader_count = 0
         if len(self.cam_info) < 2:
@@ -277,21 +284,33 @@ class Daq:
                                 f"Shot {info['shot_num']} for stitching {large_image_p.size} is saved.")
                     info['shot_num'] += add_number
                     # head to next scan point when all cameras completed a shot.
-                    if all([i['shot_num']>=info['shot_num'] for i in self.cam_info.values()]):
+                    if all([i['shot_num'] >= info['shot_num'] for i in self.cam_info.values()]):
                         self.logger(f"shot {info['shot_num']-1} is completed.")
-                        if scan_table is not None:
-                            for scan_device, dp in scan_tango_device.items():
-                                self.set_scan_value(dp, scan_table[scan_device], info['shot_num'])                        
+                        if self.scan_table is not None:
+                            for scan_device, dp in self.scan_tango_device.items():
+                                self.set_scan_value(
+                                    dp, self.scan_table[scan_device], info['shot_num'])
+                            self.save_scan_list(info['shot_num'])
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
                 self.logger("All shots completed!")
                 return
 
     def set_scan_value(self, device_proxy, value_list, shot_number):
-        if shot_number<= len(value_list) and value_list[shot_number-1]:
+        if shot_number <= len(value_list) and value_list[shot_number-1]:
             device_proxy.pressure_psi = float(value_list[shot_number-1])
-            self.logger(f'{device_proxy.dev_name().split("/")[-1]} pressure set to {value_list[shot_number-1]}')
+            self.logger(
+                f'{device_proxy.dev_name().split("/")[-1]} pressure set to {value_list[shot_number-1]}')
         else:
-            self.logger(f'{device_proxy.dev_name().split("/")[-1]} pressure, empty scan value. It is {device_proxy.pressure_psi} psi.')
+            self.logger(
+                f'{device_proxy.dev_name().split("/")[-1]} pressure, empty scan value. It is {device_proxy.pressure_psi} psi.')
+
+    def save_scan_list(self, shot_number, add_header=False):
+        with open(os.path.join(self.dir, 'scan_list', 'pressure.csv'), 'a') as csvfile:
+            writer = csv.writer(csvfile)
+            if add_header:
+                writer.writerow(['shot_number', 'time'] +
+                                [i+'(psi)' for i in list(self.scan_table.keys())])
+            writer.writerow([shot_number, datetime.now().strftime("%H:%M:%S.%f")]+[i.pressure_psi for i in self.scan_tango_device.values()])
 
     def thread_saving(self, data, info, file_name, freezed_shot_number):
         data.save(os.path.join(info['cam_dir'], file_name))
