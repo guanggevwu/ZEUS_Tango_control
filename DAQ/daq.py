@@ -220,7 +220,8 @@ class Daq:
             self.scan_table = scan_table
             for regulator, value in self.scan_table.items():
                 os.makedirs(os.path.join(self.dir, 'scan_list'), exist_ok=True)
-                self.scan_tango_device[regulator] = tango.DeviceProxy(regulator)
+                self.scan_tango_device[regulator] = tango.DeviceProxy(
+                    regulator)
                 if shot_start <= len(value):
                     self.set_scan_value(
                         self.scan_tango_device[regulator], value, shot_start)
@@ -286,7 +287,7 @@ class Daq:
                     # head to next scan point when all cameras completed a shot.
                     if all([i['shot_num'] >= info['shot_num'] for i in self.cam_info.values()]):
                         self.logger(f"shot {info['shot_num']-1} is completed.")
-                        if self.scan_table is not None:
+                        if scan_table is not None:
                             for scan_device, dp in self.scan_tango_device.items():
                                 self.set_scan_value(
                                     dp, self.scan_table[scan_device], info['shot_num'])
@@ -310,7 +311,8 @@ class Daq:
             if add_header:
                 writer.writerow(['shot_number', 'time'] +
                                 [i+'(psi)' for i in list(self.scan_table.keys())])
-            writer.writerow([shot_number, datetime.now().strftime("%H:%M:%S.%f")]+[i.pressure_psi for i in self.scan_tango_device.values()])
+            writer.writerow([shot_number, datetime.now().strftime(
+                "%H:%M:%S.%f")]+[i.pressure_psi for i in self.scan_tango_device.values()])
 
     def thread_saving(self, data, info, file_name, freezed_shot_number):
         data.save(os.path.join(info['cam_dir'], file_name))
