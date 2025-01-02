@@ -69,7 +69,8 @@ class DaqGUI:
         s.configure('Sty3_stop.TButton', font=(
             'Helvetica', self.font_mid), background='red')
         s.configure("Treeview", font=('Helvetica', self.font_mid))
-        s.configure('Treeview.Heading', font=('Helvetica', self.font_small), background="PowderBlue")
+        s.configure('Treeview.Heading', font=(
+            'Helvetica', self.font_small), background="PowderBlue")
         # frame1 = ttk.Frame(root, padding="3 3 12 12")
         # frame1.grid(column=0, row=0, sticky=(N, W, E, S))
         # root.columnconfigure(0, weight=1)
@@ -146,7 +147,6 @@ class DaqGUI:
         self.t = Text(self.frame4, width=70, height=20, font=(
             'Helvetica', int(self.font_mid*0.75)), wrap=WORD)
         self.t.grid(column=0, row=0, sticky=W)
-        self.t.logger = self.insert_to_disabled
         self.insert_to_disabled("DAQ GUI is started.")
         sb = ttk.Scrollbar(self.frame4,
                            orient='vertical',
@@ -194,7 +194,6 @@ class DaqGUI:
             child.grid_configure(padx=[self.font_mid, 0], pady=3)
 
     def open_device_list(self):
-        # if not (hasattr(self, "window1") and self.window1.winfo_exists()):
         if not (hasattr(self, "window1") and self.window1.winfo_exists()):
             self.window1 = DeviceListWindow(
                 update_selected_devices=self.update_selected_devices, selected_devices=self.selected_devices, device_names_in_db=self.device_names_in_db)
@@ -204,11 +203,14 @@ class DaqGUI:
 
     def open_scan_list(self):
         if not (hasattr(self, "window2") and self.window2.winfo_exists()):
-            self.window2 = ScanWindow(db=self.db)
+            if not hasattr(self, 'current_shot_number'):
+                self.current_shot_number = 0
+            self.window2 = ScanWindow(
+                db=self.db, current_shot_number=self.current_shot_number)
             self.window2.title("Scan List")
         self.window2.attributes('-topmost', True)
         self.window2.attributes('-topmost', False)
-                
+
     def connect_to_device(self, device_name):
         if 'server_pid' not in self.selected_devices[device_name]:
             device_class = self.db.get_device_info(
@@ -375,7 +377,8 @@ class DaqGUI:
             config_dict=default_config, saving=self.options['save_config'])
         if self.options['background_image']:
             self.daq.take_background(stitch=self.options['stitch'])
-        scan_table = self.window2.scan_table if hasattr(self, 'window2') else None
+        scan_table = self.window2.scan_table if hasattr(
+            self, 'window2') else None
         self.daq.acquisition(
             shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], scan_table=scan_table)
         if not self.my_event.is_set():
@@ -413,14 +416,17 @@ class DeviceListWindow(Toplevel):
         for child in newframe1.winfo_children():
             child.grid_configure(padx=[0, 0], pady=5)
 
+
 class ScanWindow(Toplevel):
-    def __init__(self, db):
+    def __init__(self, db, current_shot_number):
         super().__init__(master=root)
         self.db = db
+        self.current_shot_number = current_shot_number
         self.item_each_row = 2
         self.scannable_list = self.db.get_device_name('*', "GXRegulator")
         self.scan_table = defaultdict(list)
-        self.scan_table_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'GX_regulator', 'scan_table.csv')
+        self.scan_table_file = os.path.join(os.path.dirname(
+            os.path.dirname(__file__)), 'GX_regulator', 'scan_table.csv')
         with open(self.scan_table_file, 'a+') as csvfile:
             csvfile.seek(0)
             reader = csv.DictReader(csvfile)
@@ -432,11 +438,12 @@ class ScanWindow(Toplevel):
                     self.scan_table[h].append(row[h])
 
         for idx, device_name in enumerate(self.scannable_list):
-            self.scannable_list_row, col = int(idx/self.item_each_row), idx % self.item_each_row
+            self.scannable_list_row, col = int(
+                idx/self.item_each_row), idx % self.item_each_row
             checkbox_var = BooleanVar(
                 value=True) if device_name in self.scan_table else BooleanVar(value=False)
             checkbox = ttk.Checkbutton(self, text=device_name.split('/')[-1], command=lambda device_name=device_name, checkbox_var=checkbox_var: self.add_device_to_scan(device_name, checkbox_var),
-                                        variable=checkbox_var, style='Sty1.TCheckbutton')
+                                       variable=checkbox_var, style='Sty1.TCheckbutton')
             checkbox.grid(
                 column=col, row=self.scannable_list_row)
 
@@ -444,11 +451,14 @@ class ScanWindow(Toplevel):
         self.update_add_section()
         # self.add_button = ttk.Button(self, text='Add to list', command=self.add_data_to_list)
         # self.add_button.grid(row=len(self.scan_table)+1, column=len(self.scannable_list)+1, columnspan=2)
-        remove_selected_button = ttk.Button(self, text='Remove selected', command=self.remove_selected, style="Sty3_stop.TButton")
-        remove_selected_button.grid(row=21, column=0, columnspan=int(self.item_each_row/2))      
-        clear_button = ttk.Button(self, text='Clear all', command=self.clear_list, style='Sty2_offline.TButton')
-        clear_button.grid(row=21, column=int(self.item_each_row/2), columnspan=int(self.item_each_row/2))        
-  
+        remove_selected_button = ttk.Button(
+            self, text='Remove selected', command=self.remove_selected, style="Sty3_stop.TButton")
+        remove_selected_button.grid(
+            row=21, column=0, columnspan=int(self.item_each_row/2))
+        clear_button = ttk.Button(
+            self, text='Clear all', command=self.clear_list, style='Sty2_offline.TButton')
+        clear_button.grid(row=21, column=int(
+            self.item_each_row/2), columnspan=int(self.item_each_row/2))
 
         for child in self.winfo_children():
             child.grid_configure(padx=[0, 5], pady=5)
@@ -460,7 +470,7 @@ class ScanWindow(Toplevel):
         else:
             del self.scan_table[device_name]
             # remove a row of data if they are all none. Maybe not because sometimes we want some empty scan?
-        self.scan_table = dict(sorted(self.scan_table.items()))  
+        self.scan_table = dict(sorted(self.scan_table.items()))
         self.update_tree()
         self.update_add_section()
         self.save_scan_table_to_file()
@@ -482,7 +492,8 @@ class ScanWindow(Toplevel):
     def remove_selected(self):
         selected_item = self.tree.selection()
         for key, value in self.scan_table.items():
-            self.scan_table[key] = [v for idx, v in enumerate(value) if idx not in [int(s)-1 for s in selected_item]]
+            self.scan_table[key] = [v for idx, v in enumerate(
+                value) if idx not in [int(s)-1 for s in selected_item]]
         self.update_tree()
         self.save_scan_table_to_file()
 
@@ -490,8 +501,9 @@ class ScanWindow(Toplevel):
         with open(self.scan_table_file, 'w') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(list(self.scan_table.keys()))
-            writer.writerows([[value[idx] for value in self.scan_table.values()] for idx in range(len(list(self.scan_table.values())[0]))])
-            
+            writer.writerows([[value[idx] for value in self.scan_table.values()]
+                             for idx in range(len(list(self.scan_table.values())[0]))])
+
     def update_tree(self):
         '''Render the tree widget'''
         if hasattr(self, 'tree'):
@@ -505,9 +517,15 @@ class ScanWindow(Toplevel):
         for key, value in self.scan_table.items():
             for idx, v in enumerate(value):
                 if not self.tree.exists(str(idx+1)):
-                    self.tree.insert('', 'end', str(idx+1), text=f'#{idx+1}')
+                    # assign a tag for each row so that we can change the tag configuration (for example change background color) in the future.
+                    self.tree.insert('', 'end', str(idx+1),
+                                     text=f'#{idx+1}', tags=(f'#{idx+1}'))
                 self.tree.set(str(idx+1), key, v)
-        self.tree.grid(column=0, columnspan=self.item_each_row, row=self.scannable_list_row+1, rowspan=len(self.scan_table)+1)
+        if hasattr(self, 'current_shot_number') and self.current_shot_number:
+            self.tree.tag_configure(
+                f'#{self.current_shot_number}', background='yellow')
+        self.tree.grid(column=0, columnspan=self.item_each_row,
+                       row=self.scannable_list_row+1, rowspan=len(self.scan_table)+1)
 
     def update_add_section(self):
         '''Render add new row section'''
@@ -516,18 +534,24 @@ class ScanWindow(Toplevel):
                 self.add_section_widget[i]['label'].grid_forget()
                 self.add_section_widget[i]['entry'].grid_forget()
         self.add_section_widget = defaultdict(dict)
-        for idx, i in enumerate(self.scan_table) :
-            self.add_section_widget[i]['label'] = ttk.Label(self, text=i, font=('Helvetica', 12))
-            self.add_section_widget[i]['label'].grid(row=idx+self.scannable_list_row+1, column=len(self.scannable_list)+1)
+        for idx, i in enumerate(self.scan_table):
+            self.add_section_widget[i]['label'] = ttk.Label(
+                self, text=i.split('/')[-1], font=('Helvetica', 12))
+            self.add_section_widget[i]['label'].grid(
+                row=idx+self.scannable_list_row+1, column=len(self.scannable_list)+1)
             self.add_section_widget[i]['label'].grid_configure(padx=[20, 0])
             self.add_section_widget[i]['var'] = StringVar()
-            self.add_section_widget[i]['entry'] = ttk.Entry(self, textvariable=self.add_section_widget[i]['var'])
-            self.add_section_widget[i]['entry'].grid(row=idx+self.scannable_list_row+1, column=len(self.scannable_list)+2)
+            self.add_section_widget[i]['entry'] = ttk.Entry(
+                self, textvariable=self.add_section_widget[i]['var'])
+            self.add_section_widget[i]['entry'].grid(
+                row=idx+self.scannable_list_row+1, column=len(self.scannable_list)+2)
             self.add_section_widget[i]['entry'].grid_configure(padx=[0, 20])
 
         if not hasattr(self, 'add_button'):
-            self.add_button = ttk.Button(self, text='Add to list', command=self.add_data_to_list, style="Sty3_start.TButton")
-        self.add_button.grid(row=self.scannable_list_row+len(self.scan_table)+1, column=len(self.scannable_list)+1, columnspan=2)
+            self.add_button = ttk.Button(
+                self, text='Add to list', command=self.add_data_to_list, style="Sty3_start.TButton")
+        self.add_button.grid(row=self.scannable_list_row+len(self.scan_table) +
+                             1, column=len(self.scannable_list)+1, columnspan=2)
 
 
 if __name__ == '__main__':

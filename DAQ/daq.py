@@ -29,6 +29,7 @@ class Daq:
         if GUI is None:
             self.logger = logging.getLogger(__name__).info
         else:
+            # call the GUI logger
             self.GUI = GUI
             self.logger = GUI.insert_to_disabled
         self.cam_info = defaultdict(dict)
@@ -301,6 +302,13 @@ class Daq:
             device_proxy.pressure_psi = float(value_list[shot_number-1])
             self.logger(
                 f'{device_proxy.dev_name().split("/")[-1]} pressure set to {value_list[shot_number-1]}')
+            if hasattr(self.GUI, 'window2') and self.GUI.window2.winfo_exists():
+                self.GUI.window2.tree.tag_configure(
+                    f'#{shot_number}', background='yellow')
+                if shot_number > 1:
+                    self.GUI.window2.tree.tag_configure(
+                        f'#{shot_number-1}', background='white')
+            self.GUI.current_shot_number = shot_number
         else:
             self.logger(
                 f'{device_proxy.dev_name().split("/")[-1]} pressure, empty scan value. It is {device_proxy.pressure_psi} psi.')
