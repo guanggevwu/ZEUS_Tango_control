@@ -1,6 +1,5 @@
 device_name_table = {
-    'TA1_basler_combination1': ['TA1/basler/TA1-Ebeam', 'TA1/basler/TA1-EspecH', 'TA1/basler/TA1-EspecL', 'TA1/basler/TA1-Shadowgraphy'],
-    'TA2_basler_combination1': ['TA2/basler/TA2-NearField', 'TA2/basler/TA2-FarField'],
+    'TA1_gxregulator_combination': ['TA1/gx_regulator/TA1_regulator_1', 'TA1/gx_regulator/TA1_regulator_2'],
     'PW_Comp_In_basler_combination': ['laser/basler/MA3_NF', 'laser/basler/PW_Comp_In_NF',  'laser/basler/PW_Comp_In_FF'],
     'testcam_basler_combination': ['test/basler/testcam', 'facility/file_reader/file_reader_1']
 }

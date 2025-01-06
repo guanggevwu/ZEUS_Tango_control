@@ -90,6 +90,7 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "file_reader_4": {'server': 'FileReader/TA1-wr9254', '_class': 'FileReader', 'name': 'facility/file_reader/TA1-wr9254', 'property': {'file_type': 'xy'}},
             "asyncio_device_1": {'server': 'AsyncioDevice/asyncio_device_1', '_class': 'AsyncioDevice', 'name': 'test/asyncio_device/asyncio_device_1'},
             "TA1_regulator_1": {'server': 'GXRegulator/TA1_regulator_1', '_class': 'FileReader', 'name': 'TA1/gx_regulator/TA1_regulator_1', 'property': {'high_voltage_channel': '0', 'low_voltage_channel': '1'}},
+            "TA1_regulator_2": {'server': 'GXRegulator/TA1_regulator_2', '_class': 'FileReader', 'name': 'TA1/gx_regulator/TA1_regulator_2', 'property': {'high_voltage_channel': '2', 'low_voltage_channel': '3'}},
             }
 
 
