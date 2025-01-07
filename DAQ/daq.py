@@ -109,13 +109,16 @@ class Daq:
                 bs.relax()
             for key, value in info['config_dict'].items():
                 if hasattr(bs, key):
-                    if key == "trigger_source":
-                        setattr(bs, key, value)
-                    elif getattr(bs, key) != value:
+                    try:
+                        if key == "trigger_source":
+                            setattr(bs, key, value)
+                        elif getattr(bs, key) != value:
+                            setattr(bs, key, value)
+                            self.logger(
+                                f"{info['user_defined_name']}/{key} is changed from {getattr(bs, key)} to {value}")
+                    except:
                         self.logger(
-                            f"{info['user_defined_name']}/{key} is changed from {getattr(bs, key)} to {value}")
-                        setattr(bs, key, value)
-
+                                f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}")
             # if the saving_format is not set in the configuration
             if ('saving_format' not in info['config_dict']):
                 info['file_name'] = '%s.%f'
@@ -216,16 +219,17 @@ class Daq:
         Main acquisition function. Use external trigger and save data.
         '''
         # set scan value
-        self.scan_tango_device = {}
+        # self.scan_attr_proxies is a dictionary. Its key is a string device/attr and its value is the attribute proxy
+        self.scan_attr_proxies = {}
         if scan_table is not None:
             self.scan_table = scan_table
-            for regulator, value in self.scan_table.items():
+            for device_attr_name, value in self.scan_table.items():
                 os.makedirs(os.path.join(self.dir, 'scan_list'), exist_ok=True)
-                self.scan_tango_device[regulator] = tango.DeviceProxy(
-                    regulator)
+                self.scan_attr_proxies[device_attr_name] = tango.AttributeProxy(
+                    device_attr_name)
                 if shot_start <= len(value):
                     self.set_scan_value(
-                        self.scan_tango_device[regulator], value, shot_start)
+                        self.scan_attr_proxies[device_attr_name], value, shot_start)
             self.save_scan_list(shot_start, add_header=True)
 
         # acquisition
@@ -289,19 +293,19 @@ class Daq:
                     if all([i['shot_num'] >= info['shot_num'] for i in self.cam_info.values()]):
                         self.logger(f"shot {info['shot_num']-1} is completed.")
                         if scan_table is not None:
-                            for scan_device, dp in self.scan_tango_device.items():
+                            for device_attr_name, ap in self.scan_attr_proxies.items():
                                 self.set_scan_value(
-                                    dp, self.scan_table[scan_device], info['shot_num'])
+                                    ap, self.scan_table[device_attr_name], info['shot_num'])
                             self.save_scan_list(info['shot_num'])
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
                 self.logger("All shots completed!")
                 return
 
-    def set_scan_value(self, device_proxy, value_list, shot_number):
+    def set_scan_value(self, attr_proxy, value_list, shot_number):
         if shot_number <= len(value_list) and value_list[shot_number-1]:
-            device_proxy.pressure_psi = float(value_list[shot_number-1])
+            attr_proxy.write(float(value_list[shot_number-1]))
             self.logger(
-                f'{device_proxy.dev_name().split("/")[-1]} pressure set to {value_list[shot_number-1]}')
+                f'{attr_proxy.get_device_proxy().dev_name().split("/")[-1]}/{attr_proxy.name()}: {value_list[shot_number-1]}')
             if hasattr(self.GUI, 'window2') and self.GUI.window2.winfo_exists():
                 self.GUI.window2.tree.tag_configure(
                     f'#{shot_number}', background='yellow')
@@ -311,7 +315,7 @@ class Daq:
             self.GUI.current_shot_number = shot_number
         else:
             self.logger(
-                f'{device_proxy.dev_name().split("/")[-1]} pressure, empty scan value. It is {device_proxy.pressure_psi} psi.')
+                f'{attr_proxy.get_device_proxy.dev_name().split("/")[-1]}/{attr_proxy.name()}: empty scan value. It was {attr_proxy.read().value} {attr_proxy.get_config().unit}.')
 
     def save_scan_list(self, shot_number, add_header=False):
         with open(os.path.join(self.dir, 'scan_list', 'pressure.csv'), 'a') as csvfile:
@@ -320,7 +324,7 @@ class Daq:
                 writer.writerow(['shot_number', 'time'] +
                                 [i+'(psi)' for i in list(self.scan_table.keys())])
             writer.writerow([shot_number, datetime.now().strftime(
-                "%H:%M:%S.%f")]+[i.pressure_psi for i in self.scan_tango_device.values()])
+                "%H:%M:%S.%f")]+[i.read().value for i in self.scan_attr_proxies.values()])
 
     def thread_saving(self, data, info, file_name, freezed_shot_number):
         data.save(os.path.join(info['cam_dir'], file_name))

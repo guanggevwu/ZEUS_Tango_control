@@ -423,7 +423,10 @@ class ScanWindow(Toplevel):
         self.db = db
         self.current_shot_number = current_shot_number
         self.item_each_row = 2
-        self.scannable_list = self.db.get_device_name('*', "GXRegulator")
+        # getting scannable device from db and manually specify the attr name
+        self.scannable_list = [
+            i+'/pressure_psi' for i in self.db.get_device_name('*', "GXRegulator")]
+        # scan_table format: key is the device/attr string, value is the scan value list.
         self.scan_table = defaultdict(list)
         self.scan_table_file = os.path.join(os.path.dirname(
             os.path.dirname(__file__)), 'GX_regulator', 'scan_table.csv')
@@ -437,12 +440,12 @@ class ScanWindow(Toplevel):
                 for h in header:
                     self.scan_table[h].append(row[h])
 
-        for idx, device_name in enumerate(self.scannable_list):
+        for idx, device_attr_name in enumerate(self.scannable_list):
             self.scannable_list_row, col = int(
                 idx/self.item_each_row), idx % self.item_each_row
             checkbox_var = BooleanVar(
-                value=True) if device_name in self.scan_table else BooleanVar(value=False)
-            checkbox = ttk.Checkbutton(self, text=device_name.split('/')[-1], command=lambda device_name=device_name, checkbox_var=checkbox_var: self.add_device_to_scan(device_name, checkbox_var),
+                value=True) if device_attr_name in self.scan_table else BooleanVar(value=False)
+            checkbox = ttk.Checkbutton(self, text='/'.join(device_attr_name.split('/')[2:]), command=lambda device_attr_name=device_attr_name, checkbox_var=checkbox_var: self.add_device_to_scan(device_attr_name, checkbox_var),
                                        variable=checkbox_var, style='Sty1.TCheckbutton')
             checkbox.grid(
                 column=col, row=self.scannable_list_row)
@@ -463,12 +466,12 @@ class ScanWindow(Toplevel):
         for child in self.winfo_children():
             child.grid_configure(padx=[0, 5], pady=5)
 
-    def add_device_to_scan(self, device_name, checkbox_var):
+    def add_device_to_scan(self, device_attr_name, checkbox_var):
         '''Button command: check or uncheck the devices'''
         if checkbox_var.get():
-            self.scan_table[device_name] = ['']*self.scan_number
+            self.scan_table[device_attr_name] = ['']*self.scan_number
         else:
-            del self.scan_table[device_name]
+            del self.scan_table[device_attr_name]
             # remove a row of data if they are all none. Maybe not because sometimes we want some empty scan?
         self.scan_table = dict(sorted(self.scan_table.items()))
         self.update_tree()
@@ -513,7 +516,7 @@ class ScanWindow(Toplevel):
         self.tree['columns'] = list(self.scan_table.keys())
         for i in self.scan_table:
             self.tree.column(i, width=150, anchor='center')
-            self.tree.heading(i, text=i)
+            self.tree.heading(i, text='/'.join(i.split('/')[-2:]))
         for key, value in self.scan_table.items():
             for idx, v in enumerate(value):
                 if not self.tree.exists(str(idx+1)):
@@ -536,7 +539,7 @@ class ScanWindow(Toplevel):
         self.add_section_widget = defaultdict(dict)
         for idx, i in enumerate(self.scan_table):
             self.add_section_widget[i]['label'] = ttk.Label(
-                self, text=i.split('/')[-1], font=('Helvetica', 12))
+                self, text='/'.join(i.split('/')[-2:]), font=('Helvetica', 12))
             self.add_section_widget[i]['label'].grid(
                 row=idx+self.scannable_list_row+1, column=len(self.scannable_list)+1)
             self.add_section_widget[i]['label'].grid_configure(padx=[20, 0])
