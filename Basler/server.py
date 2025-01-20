@@ -720,10 +720,10 @@ class Basler(Device):
 
     def get_settings(self):
         if self._calibration:
-            self.csv_fieldnames = ['_read_time', '_exposure', '_gain', '_binning_horizontal', '_binning_vertical', '_width',
+            self.csv_fieldnames = ['_read_time', '_image_number', '_energy', '_hot_spot', '_exposure', '_gain', '_binning_horizontal', '_binning_vertical', '_width',
                                    '_height', 'QE195_reading', 'mean_intensity_of_calibration_images', 'leak_coe', 'clip_coe', 'pixel_size']
         else:
-            self.csv_fieldnames = ['_read_time', '_exposure', '_gain',
+            self.csv_fieldnames = ['_read_time','_image_number',  '_exposure', '_gain',
                                    '_binning_horizontal', '_binning_vertical', '_width', '_height']
         self.data_to_log = {}
         for name in self.csv_fieldnames:
@@ -732,29 +732,21 @@ class Basler(Device):
 
     def save_settings(self, save_path, data_to_log):
         '''write the important camera parameters and calibration data.'''
-        logging_file_path = os.path.join(save_path, 'settings.csv')
+        logging_file_path = os.path.join(save_path, 'logging.csv')
         to_do = 'w'
         # if the file exists and the existing data is same as the current data, then skip. If the file exists but the data is different, append with 'a' mode. Else, overwrite with 'w' mode.
         if os.path.isfile(logging_file_path):
-            with open(logging_file_path, newline='') as csvfile:
-                reader = csv.DictReader(csvfile)
-                try:
-                    *_, lastrow = reader
-                    if {key: value for key, value in lastrow.items() if key != '_read_time'} == {key: value for key, value in self.data_to_log.items() if key != '_read_time'}:
-                        to_do = False
-                        return
-                    else:
-                        to_do = 'a'
-                except ValueError:
-                    self.logger.info(
-                        f"Check the logging file at {logging_file_path}")
-        if to_do:
+            to_do = 'a'
+        try:
             with open(logging_file_path, to_do, newline='') as csvfile:
                 writer = csv.DictWriter(
                     csvfile, fieldnames=data_to_log.keys())
                 if to_do == 'w':
                     writer.writeheader()
                 writer.writerow(data_to_log)
+        except ValueError:
+            self.logger.info(
+                f"Check the logging file at {logging_file_path}")
 
     def read_model(self):
         self._model = self.camera.GetDeviceInfo().GetModelName()
@@ -963,6 +955,16 @@ class Basler(Device):
                                         path, self.image_basename)):
                                     os.remove(os.path.join(
                                         path, self.image_basename))
+                                    try:
+                                        with open(os.path.join(path, 'logging.csv'),"r+") as f:
+                                            current_position = previous_position = f.tell()
+                                            while f.readline():
+                                                previous_position = current_position
+                                                current_position = f.tell()
+                                            f.truncate(previous_position)
+                                    except ValueError:
+                                        self.logger.info(
+                                            f"Check the logging file at {os.path.join(path, 'logging.csv')}")
                                     self.logger.info(
                                         f"Removed previous saved image {self.image_basename}")
                                 if self._calibration:
