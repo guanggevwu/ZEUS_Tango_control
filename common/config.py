@@ -1,6 +1,7 @@
+# the key of this table, i.e., the name of the combination needs to include its class name.
 device_name_table = {
     'TA1_gxregulator_combination': ['TA1/gx_regulator/TA1_regulator_1', 'TA1/gx_regulator/TA1_regulator_2'],
-    'PW_Comp_In_basler_combination': ['laser/basler/MA3_NF', 'laser/basler/PW_Comp_In_NF',  'laser/basler/PW_Comp_In_FF'],
+    '3PW_basler_combination': ['laser/basler/3PW_Screen', 'laser/basler/3PW_Grating-4_NF',  'laser/basler/3PW_Grating-4_FF'],
     'testcam_basler_combination': ['test/basler/testcam', 'facility/file_reader/file_reader_1']
 }
 # For most of the combination cases , the instance name is same as the last part of the device name. For non-combination cases, the instance name is searched by class name  and thus no problem here.
@@ -12,11 +13,11 @@ instance_table = dict({key: [i.split(
 image_panel_config = {
     'TA1_basler_combination1': {"image_number": False, 'command': False, "combine_form_with_onshot": True},
     'TA2_basler_combination1': {"image_number": False, 'command': False, "combine_form_with_onshot": True},
-    'PW_Comp_In_basler_combination': {'image': 'flux', 'calibration': True},
+    '3PW_basler_combination': {'image': 'flux', 'calibration': True},
     'testcam_basler_combination': {"combine_form_with_onshot": False},
-    'laser/basler/PW_Comp_In_NF': {'image': 'flux', 'calibration': True},
-    'laser/basler/MA3_NF': {'image': 'flux', 'calibration': True},
-    'test/basler/test': {'image': 'image_with_MeV_mark', 'calibration': False},
-    'laser/basler/PW_Comp_In_FF': {'image': 'image', 'calibration': False},
+    'laser/basler/3PW_Grating-4_NF': {'image': 'flux', 'calibration': True},
+    'laser/basler/3PW_Screen': {'image': 'flux', 'calibration': True},
+    'test/basler/test': {'image': 'image_with_MeV_mark', 'calibration': True},
+    'laser/basler/3PW_Grating-4_FF': {'image': 'image', 'calibration': False},
     'TA1/basler/TA1-EspecH': {'image': 'image_with_MeV_mark'},
 }

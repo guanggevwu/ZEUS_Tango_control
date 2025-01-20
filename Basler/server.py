@@ -94,7 +94,7 @@ class Basler(Device):
         unit='J*cm**-2',
         format='8.4f',
         access=AttrWriteType.READ,
-        doc="Flat kernel is used. The kernel size is 7*7 for PW_Comp_In_NF camera and 5*5 for MA3_NF camera. The real size is about 0.22*0.22 cm2. The energy per area is to show the read location data, thus the leak coefficient and clip coefficient (only for PW_Comp_In_NF) are considered."
+        doc="Flat kernel is used. The kernel size is 7*7 for 3PW_Grating-4_NF camera and 5*5 for 3PW_Screen camera. The real size is about 0.22*0.22 cm2. The energy per area is to show the read location data, thus the leak coefficient and clip coefficient (only for 3PW_Grating-4_NF) are considered."
     )
 
     serial_number = device_property(dtype=str, default_value='')
@@ -441,7 +441,7 @@ class Basler(Device):
         if self._model != 'a2A1920-51gcBAS':
             self.add_attribute(binning_horizontal)
             self.add_attribute(binning_vertical)
-        if self.friendly_name == "PW_Comp_In_NF" or self.friendly_name == "MA3_NF" or self.friendly_name == "test":
+        if self.friendly_name == "3PW_Grating-4_NF" or self.friendly_name == "3PW_Screen" or self.friendly_name == "test":
             self.add_attribute(filter_option)
             self._filter_option = "1"
         if self._has_MeV_mark:
@@ -547,17 +547,17 @@ class Basler(Device):
 
     def write_filter_option(self, attr):
         self._filter_option = attr.get_write_value()
-        # key: self._filter_option. Values: [0]Energy reading from QE195 [1] mean intensity [2]calculated clip coefficient for "PW_Comp_In_NF" [3] Energy reading from QE195 [4] mean intensity for camera MA3_NF.
+        # key: self._filter_option. Values: [0]Energy reading from QE195 [1] mean intensity [2]calculated clip coefficient for "3PW_Grating-4_NF" [3] Energy reading from QE195 [4] mean intensity for camera 3PW_Screen.
         if attr.get_write_value() in self.filter_option_details:
             self._filter_option = attr.get_write_value()
-            if self.friendly_name == "PW_Comp_In_NF" or self.friendly_name == 'test':
+            if self.friendly_name == "3PW_Grating-4_NF" or self.friendly_name == 'test':
                 self.QE195_reading = self.filter_option_details[self._filter_option][0]
                 self.mean_intensity_of_calibration_images = self.filter_option_details[
                     self._filter_option][1]
                 self.clip_coe = self.filter_option_details[self._filter_option][2]
                 self.energy_intensity_coefficient = self.QE195_reading / \
                     (self.mean_intensity_of_calibration_images*640*512)
-            elif self.friendly_name == "MA3_NF":
+            elif self.friendly_name == "3PW_Screen":
                 self.QE195_reading = self.filter_option_details[self._filter_option][3]
                 self.mean_intensity_of_calibration_images = self.filter_option_details[
                     self._filter_option][4]
@@ -632,12 +632,12 @@ class Basler(Device):
                 self.clip_coe = 1
                 self.mean_intensity_of_calibration_images = 1
                 self.QE195_reading = 1
-                if self.friendly_name == "PW_Comp_In_NF":
+                if self.friendly_name == "3PW_Grating-4_NF":
                     self.energy_intensity_coefficient = self.QE195_reading / \
                         (self.mean_intensity_of_calibration_images*640*512)
                     self.pixel_size = 4.97/107
                     self.kernel = np.ones([7, 7])/49
-                elif self.friendly_name == "MA3_NF" or self.friendly_name == 'test':
+                elif self.friendly_name == "3PW_Screen" or self.friendly_name == 'test':
                     self.energy_intensity_coefficient = self.QE195_reading / \
                         (self.mean_intensity_of_calibration_images*640*512)
                     self.pixel_size = 20/316

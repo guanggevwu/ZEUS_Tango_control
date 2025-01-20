@@ -115,6 +115,9 @@ class BaslerGUI():
         panel1_w1.model, panel1_w1.bgRole = device_name + \
             '/' + f'{attr_name}#label', ''
         panel1_w2.model = device_name + '/' + attr_name
+        if attr_name in ["energy", "hot_spot"]:
+            panel1_w1.setFont(Qt.QFont("Sans Serif", 20))
+            panel1_w2.setFont(Qt.QFont("Sans Serif", 20))
         panel_layout.addWidget(panel1_w1)
         panel_layout.addWidget(panel1_w2)
         layout.addWidget(panel)
