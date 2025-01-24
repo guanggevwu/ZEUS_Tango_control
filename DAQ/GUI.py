@@ -562,8 +562,8 @@ if __name__ == '__main__':
         myappid = 'zeus.daq'  # arbitrary string
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     root = Tk()
-    root.iconbitmap(os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'title.ico'))
+    root.iconphoto(True, PhotoImage(file=os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'title.png')))
     dummy = DaqGUI(root)
     atexit.register(dummy.terminate)
     root.mainloop()

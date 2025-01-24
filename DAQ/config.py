@@ -8,5 +8,5 @@ default_config_dict = {
     'test': {'format_pixel': "Mono8", "exposure": 1000, "saving_format": '%s_%t_%e_%h.%f'},
     'file_reader_1': {"saving_format": 'FileReader_%s.%f'},
     'scope': {"saving_format": '%s_%t_%o'},
-    'all': {"saving_format": '%s_%t.%f', "trigger_selector": "FrameStart", "trigger_source": "External", "is_polling_periodically": False}
+    'all': {'format_pixel': "Mono12","saving_format": '%s_%t.%f', "trigger_selector": "FrameStart", "trigger_source": "External", "is_polling_periodically": False}
 }
