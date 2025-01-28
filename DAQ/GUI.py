@@ -425,11 +425,12 @@ class ScanWindow(Toplevel):
         self.item_each_row = 2
         # getting scannable device from db and manually specify the attr name
         self.scannable_list = [
-            i+'/pressure_psi' for i in self.db.get_device_name('*', "GXRegulator")]
+            i+'/pressure_psi' for i in self.db.get_device_name('*', "GXRegulator")] + [
+            i+f'/ax{axis}_position' for i in self.db.get_device_name('*', "ESP301") for axis in ['1', '2', '3']]
         # scan_table format: key is the device/attr string, value is the scan value list.
         self.scan_table = defaultdict(list)
-        self.scan_table_file = os.path.join(os.path.dirname(
-            os.path.dirname(__file__)), 'GX_regulator', 'scan_table.csv')
+        self.scan_table_file = os.path.join(
+            os.path.dirname(__file__), 'scan_table.csv')
         with open(self.scan_table_file, 'a+') as csvfile:
             csvfile.seek(0)
             reader = csv.DictReader(csvfile)

@@ -118,7 +118,7 @@ class Daq:
                                 f"{info['user_defined_name']}/{key} is changed from {getattr(bs, key)} to {value}")
                     except:
                         self.logger(
-                                f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}")
+                            f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}")
             # if the saving_format is not set in the configuration
             if ('saving_format' not in info['config_dict']):
                 info['file_name'] = '%s.%f'
@@ -318,11 +318,11 @@ class Daq:
                 f'{attr_proxy.get_device_proxy.dev_name().split("/")[-1]}/{attr_proxy.name()}: empty scan value. It was {attr_proxy.read().value} {attr_proxy.get_config().unit}.')
 
     def save_scan_list(self, shot_number, add_header=False):
-        with open(os.path.join(self.dir, 'scan_list', 'pressure.csv'), 'a') as csvfile:
+        with open(os.path.join(self.dir, 'scan_list', 'scan.csv'), 'a') as csvfile:
             writer = csv.writer(csvfile)
             if add_header:
                 writer.writerow(['shot_number', 'time'] +
-                                [i+'(psi)' for i in list(self.scan_table.keys())])
+                                [f'{key} ({value.get_config().unit})' for key, value in self.scan_attr_proxies.items()])
             writer.writerow([shot_number, datetime.now().strftime(
                 "%H:%M:%S.%f")]+[i.read().value for i in self.scan_attr_proxies.values()])
 

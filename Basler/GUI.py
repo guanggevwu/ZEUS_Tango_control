@@ -6,7 +6,7 @@ from taurus.external.qt import Qt
 from taurus import Device, changeDefaultPollingPeriod
 from taurus.qt.qtgui.extra_guiqwt import TaurusImageDialog
 from taurus.qt.qtgui.panel import TaurusForm
-from taurus.qt.qtgui.input import TaurusValueComboBox, TaurusValueCheckBox
+from taurus.qt.qtgui.input import TaurusValueComboBox, TaurusValueCheckBox, TaurusValueLineEdit
 from taurus.qt.qtgui.button import TaurusCommandButton
 from taurus.qt.qtgui.display import TaurusLabel
 from taurus_pyqtgraph import TaurusPlot
@@ -59,29 +59,27 @@ class BaslerGUI():
     def create_image_panel(self, device_name, image='image', image_number=True, energy_meter=False, calibration=False, command=True):
         '''create TaurusForm panel'''
         # panel 1
-        panel1 = Qt.QWidget()
-        panel1_layout = Qt.QVBoxLayout()
-        panel1.setLayout(panel1_layout)
+        panel1, panel1_layout = self.create_blank_panel('v')
 
         panel1_shot = Qt.QWidget()
         panel1_shot_layout = Qt.QHBoxLayout()
         panel1_shot.setLayout(panel1_shot_layout)
         if image_number:
             if 'basler' in device_name:
-                self.add_readonly_label_widget(
+                self.add_label_widget(
                     panel1_shot_layout, device_name, 'image_number')
             elif 'file_reader' in device_name:
-                self.add_readonly_label_widget(
+                self.add_label_widget(
                     panel1_shot_layout, device_name, 'file_number')
         if calibration:
-            self.add_readonly_label_widget(
+            self.add_label_widget(
                 panel1_shot_layout, device_name, 'energy')
-            self.add_readonly_label_widget(
+            self.add_label_widget(
                 panel1_shot_layout, device_name, 'hot_spot')
         if energy_meter:
-            self.add_readonly_label_widget(
+            self.add_label_widget(
                 panel1_shot_layout, 'laser/gentec/Onshot', 'shot')
-            self.add_readonly_label_widget(
+            self.add_label_widget(
                 panel1_shot_layout, 'laser/gentec/Onshot', 'main_value')
         panel1_layout.addWidget(panel1_shot)
 
@@ -102,30 +100,39 @@ class BaslerGUI():
 
         self.gui.createPanel(panel1, panel1_w1_name)
 
-    def add_readonly_label_widget(self, layout, device_name, attr_name, check_exist=False):
+    def add_label_widget(self, layout, device_name, attr_name, check_exist=False):
         # if check_exist:
         #     try:
         #         Device(device_name).ping()
         #     except:
         #         return
-        panel = Qt.QWidget()
-        panel_layout = Qt.QHBoxLayout()
-        panel.setLayout(panel_layout)
-        panel1_w1, panel1_w2 = TaurusLabel(), TaurusLabel()
-        panel1_w1.model, panel1_w1.bgRole = device_name + \
+        panel, panel_layout = self.create_blank_panel('h')
+        panel_widget = []
+        panel_widget.append(TaurusLabel())
+        panel_widget.append(TaurusLabel())
+        panel_widget[0].model, panel_widget[0].bgRole = device_name + \
             '/' + f'{attr_name}#label', ''
-        panel1_w2.model = device_name + '/' + attr_name
+        panel_widget[1].model = device_name + \
+            '/' + attr_name + '#rvalue.magnitude'
+        panel_layout.addWidget(panel_widget[0])
+        panel_layout.addWidget(panel_widget[1])
+        if self.attr_list[device_name]['dp'].get_attribute_config(attr_name).writable_attr_name != 'None':
+            panel_widget.append(TaurusValueLineEdit())
+            panel_widget[-1].model = device_name + \
+                '/' + attr_name + '#wvalue.magnitude'
+            panel_layout.addWidget(panel_widget[-1])
+        if self.attr_list[device_name]['dp'].get_attribute_config(attr_name).unit:
+            panel_widget.append(TaurusLabel())
+            panel_widget[-1].model, panel_widget[-1].bgRole = device_name + \
+                '/' + attr_name + '#rvalue.units', ''
+            panel_layout.addWidget(panel_widget[-1])
         if attr_name in ["energy", "hot_spot"]:
-            panel1_w1.setFont(Qt.QFont("Sans Serif", 16))
-            panel1_w2.setFont(Qt.QFont("Sans Serif", 16))
-        panel_layout.addWidget(panel1_w1)
-        panel_layout.addWidget(panel1_w2)
+            for i in panel_widget:
+                i.setFont(Qt.QFont("Sans Serif", 16))
         layout.addWidget(panel)
 
     def add_command(self, layout, device_name, command_list=None):
-        panel = Qt.QWidget()
-        panel_layout = Qt.QHBoxLayout()
-        panel.setLayout(panel_layout)
+        panel, panel_layout = self.create_blank_panel('h')
         if command_list is None:
             command_list = [
                 i.cmd_name for i in self.attr_list[device_name]['dp'].command_list_query()[3:]]
@@ -146,11 +153,7 @@ class BaslerGUI():
         layout.addWidget(panel)
 
     def create_form_panel(self, device_name, exclude=['image', 'flux', 'energy', 'hot_spot']):
-
-        panel2 = Qt.QWidget()
-        panel2_layout = Qt.QVBoxLayout()
-        panel2.setLayout(panel2_layout)
-
+        panel2, panel2_layout = self.create_blank_panel('v')
         panel2_w1 = TaurusForm()
         form_model = self.attr_list[device_name]['model']
         # re-order. Move trigger to front.
@@ -180,27 +183,34 @@ class BaslerGUI():
         self.gui.createPanel(panel2, f'{device_name}_paramters')
 
     def combined_panel(self, device_list, combine_form_with_onshot=False):
-        panel3 = Qt.QWidget()
-        panel3_layout = Qt.QVBoxLayout()
-        panel3.setLayout(panel3_layout)
+        panel3, panel3_layout = self.create_blank_panel('v')
         if combine_form_with_onshot:
-            self.add_readonly_label_widget(
+            self.add_label_widget(
                 panel3_layout, 'laser/gentec/Onshot', 'name_attr', check_exist=True)
-            self.add_readonly_label_widget(
+            self.add_label_widget(
                 panel3_layout, 'laser/gentec/Onshot', 'shot', check_exist=True)
-            self.add_readonly_label_widget(
+            self.add_label_widget(
                 panel3_layout, 'laser/gentec/Onshot', 'main_value', check_exist=True)
         for d in device_list:
-            self.add_readonly_label_widget(
+            self.add_label_widget(
                 panel3_layout, d, 'user_defined_name')
             # because Basler uses 'image_number' and FileReader uses 'file_number'.
             if 'basler' in d:
-                self.add_readonly_label_widget(
+                self.add_label_widget(
                     panel3_layout, d, 'image_number')
             elif 'file_reader' in d:
-                self.add_readonly_label_widget(panel3_layout, d, 'file_number')
+                self.add_label_widget(panel3_layout, d, 'file_number')
             self.add_command(panel3_layout, d)
         self.gui.createPanel(panel3, f'{len(device_list)} devices')
+
+    def create_blank_panel(self, VorH='V'):
+        panel = Qt.QWidget()
+        if VorH.lower() == "v":
+            panel_layout = Qt.QVBoxLayout()
+        else:
+            panel_layout = Qt.QHBoxLayout()
+        panel.setLayout(panel_layout)
+        return panel, panel_layout
 
 
 def create_app():
