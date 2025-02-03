@@ -12,6 +12,7 @@ import os
 import sys
 import csv
 import platform
+import sif_parser
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 if True:
@@ -219,11 +220,17 @@ class FileReader(Device):
             while True:
                 try:
                     if self.file_type == "image":
-                        image_PIL = Image.open(
-                            os.path.join(self._folder_path, self._current_file))
-                        self._image = np.array(image_PIL)
-                        self._format_pixel = str(
-                            self.mode_to_bpp[image_PIL.mode])
+                        if self._file_extension == 'sif':
+                            # read file 
+                            self._image, info = sif_parser.np_open(os.path.join(self._folder_path, self._current_file))
+                            self._image = np.squeeze(self._image)
+                            self._format_pixel = '16'
+                        else:
+                            image_PIL = Image.open(
+                                os.path.join(self._folder_path, self._current_file))
+                            self._image = np.array(image_PIL)                                                                                                                                   
+                            self._format_pixel = str(
+                                self.mode_to_bpp[image_PIL.mode])
                         self.push_change_event("image", self._image)
                     elif self._data_structure == 0:
                         with open(os.path.join(self._folder_path, self._current_file), newline='') as csvfile:
@@ -254,6 +261,8 @@ class FileReader(Device):
                         self.logger.info(
                             f"We encounterred an PermissionError reading {os.path.join(self._folder_path, self._current_file)}. However, this could be the new file was building.")
                     self.logger.info("Will try in 0.5 second.")
+                    time.sleep(0.5)
+                except ValueError:
                     time.sleep(0.5)
             self._read_time = datetime.datetime.fromtimestamp(os.path.getmtime(
                 os.path.join(self._folder_path, self._current_file))).strftime("%H-%M-%S.%f")

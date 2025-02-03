@@ -110,12 +110,13 @@ class Daq:
             for key, value in info['config_dict'].items():
                 if hasattr(bs, key):
                     try:
+                        old_value = getattr(bs, key)
                         if key == "trigger_source":
                             setattr(bs, key, value)
-                        elif getattr(bs, key) != value:
+                        elif old_value != value:
                             setattr(bs, key, value)
                             self.logger(
-                                f"{info['user_defined_name']}/{key} is changed from {getattr(bs, key)} to {value}")
+                                f"{info['user_defined_name']}/{key} is changed from {old_value} to {value}")
                     except:
                         self.logger(
                             f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}")
