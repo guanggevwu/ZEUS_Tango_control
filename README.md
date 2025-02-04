@@ -57,6 +57,20 @@ python path/to/menu.py
 - To use a computer as a client, select the name of the device and "start Taurus GUI".
 - To shut down the device server or the client, click the 'X' button.
 
+## Data acquisition
+
+Usually we use data acquisition scrip to visualize the data from multiple devices and save them to a designated folder.
+Run "Python .DAQ/GUI.py" to start the GUI.
+A few buttons on the interface.
+
+- "Select" button. Select the devices that we would like to acquire the data from.
+- Device name buttons. Start the device server. Blue background of the button indicates the devices are started successfully.
+- "GUI" button. Start a Taurus GUI for the selected devices.
+- "Scan" button. Select the scannable devices and their parameters vs. shot number.
+- "Start" button. Start acquisition. For most image devices (cameras), this will disable automatic polling.
+
+It is possible to run "Python .DAQ/GUI.py" in a second computer to start a second Taurus GUI. Just don't start the device servers again or "Start".
+
 ## Basler camera
 
 The example code shows how to obtain one image by triggerring a Basler camera with a software trigger.
