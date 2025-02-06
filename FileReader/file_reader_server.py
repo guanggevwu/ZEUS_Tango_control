@@ -242,9 +242,19 @@ class FileReader(Device):
                                 if row[0] == '[EndOfFile]':
                                     stop = True
                                 if start and not stop:
-                                    self._x.append(float(row[0].split(';')[0]))
-                                    self._y.append(
-                                        float(row[0].split(';')[-1]))
+                                    # if the delimiter is not the default ',', then the row has only one element and I need to split the row manually.
+                                    if len(row) == 1:
+                                        if not hasattr(self, 'delimiter'):
+                                            potential_delimiters = [';',' ']
+                                            for d in potential_delimiters:
+                                                if d in row[0]:
+                                                    self.delimiter = d
+                                        self._x.append(float(row[0].split(self.delimiter)[0]))
+                                        self._y.append(
+                                            float(row[0].split(self.delimiter)[-1]))
+                                    else:
+                                        self._x.append(float(row[0]))
+                                        self._y.append(float(row[1]))
                                 if row[0] == '[Data]':
                                     start = True
                     elif self._data_structure == 1 and self._substring_of_display_channel in self._current_file:
