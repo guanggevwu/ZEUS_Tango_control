@@ -95,7 +95,7 @@ class DaqGUI:
         self.frame2.grid(column=0, row=1, sticky=(N, W, E, S))
 
         self.frame2_checkbutton_content = {'overwrite_config': {'text': 'Use the config.py configuration for the cameras', 'init_status': True},  'save_config': {'text': 'Save the configurations to a file', 'init_status': True}, 'background_image': {
-            'text': 'Save backgrounds image before acquisition', 'init_status': True}, 'stitch': {'text': 'Stitch the images from multiple cameras and save a large image', 'init_status': True}, 'laser_shot_id': {'text': 'include shot id from laser side in file name', 'init_status': False}, }
+            'text': 'Save backgrounds image before acquisition', 'init_status': True}, 'stitch': {'text': 'Stitch the images from multiple cameras and save a large image', 'init_status': True}, 'laser_shot_id': {'text': 'save shot id table', 'init_status': False}, }
 
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
             checkbox_var = BooleanVar(value=value['init_status'])
