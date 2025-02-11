@@ -52,9 +52,9 @@ class ESP301(Device):
             self._raw_command_return = ''
             # print(
             #     f'ESP301 is connected. Model: {self._model}. Serial number: {self._serial_number}')
-            self.set_status("Gentec device is connected.")
+            self.set_status("ESP301 device is connected.")
         except:
-            print("Could NOT connect to  Genotec-eo")
+            print("Could NOT connect to  ESP301")
             self.set_state(DevState.OFF)
 
     user_defined_name = attribute(
@@ -132,8 +132,9 @@ class ESP301(Device):
             self.dev.readline().decode().replace('\r\n', ''))
         return self._ax1_position
 
+    # wait for stop has not been tested yet.
     def write_ax1_position(self, attr):
-        self.dev.write(f"1PA{attr.get_write_value():.4f}\r".encode())
+        self.dev.write(f"1PA{attr.get_write_value():.4f};1WS\r".encode())
 
     def read_ax2_position(self, attr):
         self.dev.write(b"2TP\r")
@@ -142,7 +143,7 @@ class ESP301(Device):
         return self._ax2_position
 
     def write_ax2_position(self, attr):
-        self.dev.write(f"2PA{attr.get_write_value():.4f}\r".encode())
+        self.dev.write(f"2PA{attr.get_write_value():.4f};2WS\r".encode())
 
     def read_ax3_position(self, attr):
         self.dev.write(b"3TP\r")
@@ -151,7 +152,7 @@ class ESP301(Device):
         return self._ax3_position
 
     def write_ax3_position(self, attr):
-        self.dev.write(f"3PA{attr.get_write_value():.4f}\r".encode())
+        self.dev.write(f"3PA{attr.get_write_value():.4f};3WS\r".encode())
 
     error_message = attribute(
         label="error message",

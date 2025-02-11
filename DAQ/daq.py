@@ -15,9 +15,6 @@ import shutil
 import matplotlib.pyplot as plt
 from threading import Thread
 import csv
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.other import generate_basename
 
 logging.basicConfig(
     format="%(asctime)s %(message)s",
@@ -77,24 +74,25 @@ class Daq:
         atexit.register(self.termination)
 
     def set_camera_configuration(self, config_dict=None, saving=True, default_config_dict=default_config_dict):
-        if config_dict is None:
-            config_dict = {}
         # list of user defined names of the cameras
         user_defined_name_list = [one_cam_dict['user_defined_name']
                                   for one_cam_dict in self.cam_info.values()]
         # retrieve selected camera configurations from the default configurations
         combined_config = {}
         # the overwrite priority is "specified camera in config_dict" > "all in config_dict" > "specified camera in default_config_dict" > "all in default_config_dict"
+        # 2025/02/05 change that if a configuration is passed to config_dict, then use the configuration which is basically just change polling and image number. All other changes are made by GUI. Otherwise, use default in config.py.
         for cam in user_defined_name_list:
             new_config = {}
-            if "all" in default_config_dict:
-                new_config.update(default_config_dict["all"])
-            if cam in default_config_dict:
-                new_config.update(default_config_dict.get(cam))
-            if "all" in config_dict:
-                new_config.update(config_dict["all"])
-            if cam in config_dict:
-                new_config.update(config_dict[cam])
+            if not config_dict:
+                if "all" in default_config_dict:
+                    new_config.update(default_config_dict["all"])
+                if cam in default_config_dict:
+                    new_config.update(default_config_dict.get(cam))
+            else:
+                if "all" in config_dict:
+                    new_config.update(config_dict["all"])
+                if cam in config_dict:
+                    new_config.update(config_dict[cam])
             combined_config[cam] = new_config
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
@@ -111,7 +109,7 @@ class Daq:
                 if hasattr(bs, key):
                     try:
                         old_value = getattr(bs, key)
-                        if key == "trigger_source":
+                        if key == "trigger_source" and old_value == value:
                             setattr(bs, key, value)
                         elif old_value != value:
                             setattr(bs, key, value)
@@ -122,9 +120,14 @@ class Daq:
                             f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}")
             # if the saving_format is not set in the configuration
             if ('saving_format' not in info['config_dict']):
-                info['file_name'] = '%s.%f'
+                info['file_name'] = '%s'
             else:
                 info['file_name'] = info['config_dict']['saving_format']
+            # if laser_shot_id:
+            #     info['file_name'] = info['file_name'].replace(
+            #         '.%f', '') + '_%id.%f'
+            #     self.labview = tango.DeviceProxy(
+            #         'laser/labview/labview_programe')
         if saving:
             Key_list = ['model', 'format_pixel', "exposure", "gain",
                         "trigger_selector", "trigger_source"]
@@ -168,8 +171,8 @@ class Daq:
                 time.sleep(1)
             if bs.is_new_image:
                 data, data_array = self.get_image(bs)
-                file_name = generate_basename(
-                    info['file_name'], {'%s': f'Background', '%t': 'Time{read_time}', '%e': 'Energy{energy:.3f}J', '%h': 'HotSpot{hot_spot:.4f}Jcm-2', '%f': 'tiff', 'device_proxy': bs})
+                file_name = self.generate_file_name(info, bs, shoot=False)
+                file_name = file_name.replace('%f', 'tiff')
                 data.save(os.path.join(
                     info['cam_dir'], file_name))
                 self.logger(
@@ -215,14 +218,14 @@ class Daq:
             time.sleep(interval)
             logging.info(f"trigger {i} sent!")
 
-    def acquisition(self, stitch=True, shot_start=1, shot_end=float('inf'), scan_table=None):
+    def acquisition(self, stitch=True, shot_start=1, shot_end=float('inf'), laser_shot_id=False, scan_table=None):
         '''
         Main acquisition function. Use external trigger and save data.
         '''
         # set scan value
         # self.scan_attr_proxies is a dictionary. Its key is a string device/attr and its value is the attribute proxy
         self.scan_attr_proxies = {}
-        if scan_table is not None:
+        if scan_table and any(scan_table.values()):
             self.scan_table = scan_table
             for device_attr_name, value in self.scan_table.items():
                 os.makedirs(os.path.join(self.dir, 'scan_list'), exist_ok=True)
@@ -232,7 +235,9 @@ class Daq:
                     self.set_scan_value(
                         self.scan_attr_proxies[device_attr_name], value, shot_start)
             self.save_scan_list(shot_start, add_header=True)
-
+        if laser_shot_id:
+            self.yellow_programe = tango.DeviceProxy(
+                "laser/labview/labview_programe")
         # acquisition
         self.logger('Waiting for a trigger...')
         xy_reader_count = 0
@@ -240,7 +245,8 @@ class Daq:
             stitch = False
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
-            bs.reset_number(shot_start-1)
+            if hasattr(bs, 'reset_number'):
+                bs.reset_number(shot_start-1)
             info['shot_num'] = shot_start
         while True:
             if self.thread_event is not None:
@@ -253,18 +259,19 @@ class Daq:
                 if info['shot_num'] > shot_end:
                     info['is_completed'] = True
                 elif bs.is_new_image:
+
                     if 'basler' in bs.dev_name() or bs.data_type == "image":
                         data, data_array = self.get_image(bs)
-                        file_name = generate_basename(
-                            info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%e': 'Energy{energy:.3f}J', '%h': 'HotSpot{hot_spot:.4f}Jcm-2', '%f': 'tiff', 'device_proxy': bs})
+                        file_name = self.generate_file_name(info, bs)
+                        file_name = file_name.replace('%f', '.tiff')
                         freezed_shot_number = info["shot_num"]
                         Thread(target=self.thread_saving,
                                args=(data, info, file_name, freezed_shot_number)).start()
                         add_number = 1
                         stitch_local = True
                     elif 'file_reader' in bs.dev_name() or bs.data_type == "xy":
-                        file_name = generate_basename(
-                            info['file_name'], {'%s': f'Shot{info["shot_num"]}', '%t': 'Time{read_time}', '%o': '{current_file}', '%f': 'csv', 'device_proxy': bs})
+                        file_name = self.generate_file_name(info, bs)
+                        file_name = file_name.replace('%f', '.csv')
                         shutil.copy(os.path.join(bs.folder_path, bs.current_file), os.path.join(
                             info['cam_dir'], file_name))
                         xy_reader_count += 1
@@ -298,9 +305,30 @@ class Daq:
                                 self.set_scan_value(
                                     ap, self.scan_table[device_attr_name], info['shot_num'])
                             self.save_scan_list(info['shot_num'])
+                        if laser_shot_id:
+                            self.save_shot_id_table(info['shot_num'])
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
                 self.logger("All shots completed!")
                 return
+
+    def generate_file_name(self, info, bs, shoot=True):
+        rep = info['file_name']
+        if '%s' in rep:
+            if not shoot:
+                rep = rep.replace('%s', 'Background')
+            else:
+                rep = rep.replace('%s', f'Shot{info["shot_num"]}')
+        if '%t' in rep:
+            rep = rep.replace('%t', f'Time{bs.read_time}')
+        if '%e' in rep:
+            rep = rep.replace('%e', f'Energy{bs.energy:.3f}J')
+        if '%h' in rep:
+            rep = rep.replace('%h', f'HotSpot{bs.hot_spot:.4f}Jcm-2')
+        if '%id' in rep:
+            rep = rep.replace('%id', f'id{self.labview.shot_id}')
+        if '%o' in rep:
+            rep = rep.replace('%o', f'{bs.current_file}')
+        return rep
 
     def set_scan_value(self, attr_proxy, value_list, shot_number):
         if shot_number <= len(value_list) and value_list[shot_number-1]:
@@ -326,6 +354,16 @@ class Daq:
                                 [f'{key} ({value.get_config().unit})' for key, value in self.scan_attr_proxies.items()])
             writer.writerow([shot_number, datetime.now().strftime(
                 "%H:%M:%S.%f")]+[i.read().value for i in self.scan_attr_proxies.values()])
+
+    def save_shot_id_table(self, shot_number):
+        file_exists = os.path.isfile(os.path.join(self.dir, 'shot_id.csv'))
+        with open(os.path.join(self.dir, 'shot_id.csv'), 'a') as csvfile:
+            headers = ['shot_number', 'shot_id', 'shot_id_time']
+            writer = csv.DictWriter(csvfile, fieldnames=headers)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow({'shot_number': shot_number-1,
+                            'shot_id': self.yellow_programe.shot_id, 'shot_id_time': self.yellow_programe.read_time})
 
     def thread_saving(self, data, info, file_name, freezed_shot_number):
         data.save(os.path.join(info['cam_dir'], file_name))

@@ -94,8 +94,8 @@ class DaqGUI:
             root, text='Options', padding=pad_widget, style='Sty1.TLabelframe')
         self.frame2.grid(column=0, row=1, sticky=(N, W, E, S))
 
-        self.frame2_checkbutton_content = {'default_config': {'text': 'Use the default configuration for the cameras', 'init_status': True},  'save_config': {'text': 'Save the configurations to a file', 'init_status': True}, 'background_image': {
-            'text': 'Save backgrounds image before acquisition', 'init_status': True}, 'stitch': {'text': 'Stitch the images from multiple cameras and save a large image', 'init_status': True}, }
+        self.frame2_checkbutton_content = {'overwrite_config': {'text': 'Use the config.py configuration for the cameras', 'init_status': True},  'save_config': {'text': 'Save the configurations to a file', 'init_status': True}, 'background_image': {
+            'text': 'Save backgrounds image before acquisition', 'init_status': True}, 'stitch': {'text': 'Stitch the images from multiple cameras and save a large image', 'init_status': True}, 'laser_shot_id': {'text': 'include shot id from laser side in file name', 'init_status': False}, }
 
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
             checkbox_var = BooleanVar(value=value['init_status'])
@@ -182,7 +182,8 @@ class DaqGUI:
                     self.init_dict['save_path']) if "save_path" in self.init_dict else ''
 
                 for key, value in self.options.items():
-                    self.frame2_checkbutton_content[key]['var'].set(value)
+                    if key in self.frame2_checkbutton_content:
+                        self.frame2_checkbutton_content[key]['var'].set(value)
         else:
             self.selected_devices = dict()
             self.options = None
@@ -341,18 +342,18 @@ class DaqGUI:
 
     def start_acquisition(self):
         self.options = {
-            "default_config": self.frame2_checkbutton_content['default_config']['var'].get(),
+            "overwrite_config": self.frame2_checkbutton_content['overwrite_config']['var'].get(),
             "save_config": self.frame2_checkbutton_content['save_config']['var'].get(),
             "background_image": self.frame2_checkbutton_content['background_image']['var'].get(),
-            "stitch": self.frame2_checkbutton_content['stitch']['var'].get()
+            "stitch": self.frame2_checkbutton_content['stitch']['var'].get(),
+            "laser_shot_id": self.frame2_checkbutton_content['laser_shot_id']['var'].get()
         }
         with open(self.init_file_path, 'w') as jsonfile:
             json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get()},
                       jsonfile)
-        default_config = {} if self.options["default_config"] else dict(
-        )
-        default_config.update(
-            {"all": {"repetition": self.shot_end_var.get()-self.shot_start_var.get()+1}})
+        # if the checkbox is checked, then we use the config saved in config.py file and we pass None here. If it is unchecked, then we pass the basic configuration and ignore the configuration in the file.
+        overwrite_config = None if self.options["overwrite_config"] else {"all": {
+            "repetition": self.shot_end_var.get()-self.shot_start_var.get()+1, "is_polling_periodically": False, "trigger_source": "External", }}
         self.daq = Daq(self.selected_devices,
                        dir=self.path_var.get(), thread_event=self.my_event, check_exist=False, GUI=self)
         '''
@@ -374,13 +375,13 @@ class DaqGUI:
                         return
         '''
         self.daq.set_camera_configuration(
-            config_dict=default_config, saving=self.options['save_config'])
+            config_dict=overwrite_config, saving=self.options['save_config'])
         if self.options['background_image']:
             self.daq.take_background(stitch=self.options['stitch'])
         scan_table = self.window2.scan_table if hasattr(
             self, 'window2') else None
         self.daq.acquisition(
-            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], scan_table=scan_table)
+            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], laser_shot_id=self.options['laser_shot_id'], scan_table=scan_table)
         if not self.my_event.is_set():
             self.toggle_acquisition()
 
