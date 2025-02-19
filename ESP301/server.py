@@ -47,6 +47,7 @@ class ESP301(Device):
             self._read_time = "N/A"
             self._user_defined_name = 'esp301'
             self._host_computer = platform.node()
+            self._ax1_step, self._ax2_step, self._ax3_step = 0, 0, 0
             self.error_table = {'0': 'NO ERRORS.', '1': "PCI COMMUNICATION TIME-OUT.", '4': "EMERGENCY SOP ACTIVATED.",
                                 '6': 'COMMAND DOES NOT EXIST.', '7': 'PARAMETER OUT OF RANGE.', 'others': 'Please refer to label tooltip.'}
             self._raw_command_return = ''
@@ -119,12 +120,42 @@ class ESP301(Device):
             memorized=True,
             access=AttrWriteType.READ_WRITE,
         )
+        ax1_step = attribute(
+            name="ax1_step",
+            label="axis 1 step",
+            dtype=float,
+            unit='mm',
+            format='8.4f',
+            memorized=True,
+            access=AttrWriteType.READ_WRITE,
+        )
+        ax2_step = attribute(
+            name="ax2_step",
+            label="axis 2 step",
+            dtype=float,
+            unit='mm',
+            format='8.4f',
+            memorized=True,
+            access=AttrWriteType.READ_WRITE,
+        )
+        ax3_step = attribute(
+            name="ax3_step",
+            label="axis 3 step",
+            dtype=float,
+            unit='mm',
+            format='8.4f',
+            memorized=True,
+            access=AttrWriteType.READ_WRITE,
+        )
         if '1' in self.axis:
             self.add_attribute(ax1_position)
+            self.add_attribute(ax1_step)
         if '2' in self.axis:
             self.add_attribute(ax2_position)
+            self.add_attribute(ax2_step)
         if '3' in self.axis:
             self.add_attribute(ax3_position)
+            self.add_attribute(ax3_step)
 
     def read_ax1_position(self, attr):
         self.dev.write(b"1TP\r")
@@ -134,7 +165,8 @@ class ESP301(Device):
 
     # wait for stop has not been tested yet.
     def write_ax1_position(self, attr):
-        self.dev.write(f"1PA{attr.get_write_value():.4f};1WS\r".encode())
+        self._ax1_position = attr.get_write_value()
+        self.dev.write(f"1PA{self._ax1_position:.4f};1WS\r".encode())
 
     def read_ax2_position(self, attr):
         self.dev.write(b"2TP\r")
@@ -143,7 +175,8 @@ class ESP301(Device):
         return self._ax2_position
 
     def write_ax2_position(self, attr):
-        self.dev.write(f"2PA{attr.get_write_value():.4f};2WS\r".encode())
+        self._ax2_position = attr.get_write_value()
+        self.dev.write(f"2PA{self._ax2_position:.4f};2WS\r".encode())
 
     def read_ax3_position(self, attr):
         self.dev.write(b"3TP\r")
@@ -152,7 +185,26 @@ class ESP301(Device):
         return self._ax3_position
 
     def write_ax3_position(self, attr):
-        self.dev.write(f"3PA{attr.get_write_value():.4f};3WS\r".encode())
+        self._ax3_position = attr.get_write_value()
+        self.dev.write(f"3PA{self._ax3_position:.4f};3WS\r".encode())
+
+    def read_ax1_step(self, attr):
+        return self._ax1_step
+
+    def write_ax1_step(self, attr):
+        self._ax1_step = attr.get_write_value()
+
+    def read_ax2_step(self, attr):
+        return self._ax2_step
+
+    def write_ax2_step(self, attr):
+        self._ax2_step = attr.get_write_value()
+
+    def read_ax3_step(self, attr):
+        return self._ax3_step
+
+    def write_ax3_step(self, attr):
+        self._ax3_step = attr.get_write_value()
 
     error_message = attribute(
         label="error message",
@@ -202,18 +254,28 @@ class ESP301(Device):
         for a in axis:
             self.dev.write(f"{a}ST\r".encode())
 
-    @command(dtype_in=str)
-    def move_relative_axis1(self, rel, plus=True):
-        print(rel)
+    @command(dtype_in=bool)
+    def move_relative_axis1(self, plus=True):
+        if plus:
+            self.dev.write(f"1PR{self._ax1_step:.4f}\r".encode())
+        else:
+            self.dev.write(f"1PR{-self._ax1_step:.4f}\r".encode())
+        print(f'{self._ax1_step}, {plus}')
         # self.dev.write(f"1PR{rel:.4f}\r".encode())
 
-    @command(dtype_in=float)
-    def move_relative_axis2(self, rel, plus=True):
-        self.dev.write(f"2PR{rel:.4f}\r".encode())
+    @command(dtype_in=bool)
+    def move_relative_axis2(self, plus=True):
+        if plus:
+            self.dev.write(f"2PR{self._ax2_step:.4f}\r".encode())
+        else:
+            self.dev.write(f"2PR{-self._ax2_step:.4f}\r".encode())
 
-    @command(dtype_in=float)
-    def move_relative_axis3(self, rel, plus=True):
-        self.dev.write(f"3PR{rel:.4f}\r".encode())
+    @command(dtype_in=bool)
+    def move_relative_axis3(self, plus=True):
+        if plus:
+            self.dev.write(f"3PR{self._ax3_step:.4f}\r".encode())
+        else:
+            self.dev.write(f"3PR{-self._ax3_step:.4f}\r".encode())
 
 
 if __name__ == "__main__":

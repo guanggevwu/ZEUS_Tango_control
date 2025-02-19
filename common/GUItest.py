@@ -3,11 +3,15 @@ from taurus.qt.qtgui.input import TaurusValueLineEdit, TaurusValueSpinBox, Tauru
 import sys
 from taurus.external.qt import Qt
 from taurus.qt.qtgui.application import TaurusApplication
+from taurus.qt.qtgui.compact import TaurusReadWriteSwitcher
+
 
 app = TaurusApplication(sys.argv, cmd_line_parser=None)
 panel = Qt.QWidget()
 layout = Qt.QHBoxLayout()
 panel.setLayout(layout)
+
+
 w1 = TaurusLabel()
 w2 = TaurusLabel()
 w3 = TaurusValueLineEdit()  # or TaurusValueSpinBox or TaurusWheelEdit
@@ -20,6 +24,17 @@ w1.model, w1.bgRole = 'sys/taurustest/1/position#label', ''
 w2.model = 'sys/taurustest/1/position#rvalue.magnitude'
 w3.model = 'sys/taurustest/1/position#wvalue.magnitude'
 w4.model, w4.bgRole = 'sys/taurustest/1/position#rvalue.units', ''
+
+# w = TaurusReadWriteSwitcher()
+# a = TaurusLabel()
+# b = TaurusValueLineEdit()
+# # a.model = 'sys/taurustest/1/position#rvalue.magnitude'
+# # b.model = 'sys/taurustest/1/position#wvalue.magnitude'
+# w.setReadWidget(a)
+# w.setWriteWidget(b)
+# w.model = 'sys/taurustest/1/position'
+# layout.addWidget(w)
+
 
 panel.show()
 sys.exit(app.exec_())

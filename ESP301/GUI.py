@@ -1,4 +1,6 @@
 from taurus.qt.qtgui.input import TaurusValueComboBox, TaurusValueCheckBox, TaurusValueLineEdit
+from taurus.qt.qtgui.compact import TaurusReadWriteSwitcher
+from taurus.qt.qtgui.display import TaurusLabel
 
 import os
 import sys
@@ -30,31 +32,38 @@ def create_app():
         panel, panel1_layout = basler_app.create_blank_panel('v')
         attr_list = basler_app.attr_list[d]['attrs']
         for attr in attr_list:
-            if attr not in ['axis_1_position', 'axis_2_position', 'axis_3_position', 'State', 'Status']:
+            if attr not in ['ax1_position', 'ax2_position', 'ax3_position', 'ax1_step', 'ax2_step', 'ax3_step', 'State', 'Status']:
                 basler_app.add_label_widget(panel1_layout, d, attr)
         axis_index = ['1', '2', '3']
         for a in axis_index:
-            if f'axis_{a}_position' in attr_list:
+            if f'ax{a}_position' in attr_list:
                 basler_app.add_label_widget(
-                    panel1_layout, d, 'axis_{a}_position')
-            # relative_panel, relative_panel_layout = basler_app.create_blank_panel(
-            #     VorH='h')
-            # input_for_command = TaurusValueLineEdit()
-            # button1 = TaurusCommandButton(
-            #     command=f'move_relative_axis{a}', parameters=[input_for_command.getValue(), False]
-            # )
-            # button1.setCustomText('-')
-            # button1.setModel(d)
-            # button2 = TaurusCommandButton(
-            #     command=f'move_relative_axis{a}', parameters=[input_for_command.getValue(), True]
-            # )
-            # button2.setCustomText('+')
-            # button2.setModel(d)
+                    panel1_layout, d, f'ax{a}_position')
+                relative_panel, relative_panel_layout = basler_app.create_blank_panel(
+                    VorH='h')
+                step_widget = TaurusReadWriteSwitcher()
+                r_widget = TaurusLabel()
+                w_widget = TaurusValueLineEdit()
 
-            # relative_panel_layout.addWidget(button1)
-            # relative_panel_layout.addWidget(input_for_command)
-            # relative_panel_layout.addWidget(button2)
-            # panel1_layout.addWidget(relative_panel)
+                step_widget.setReadWidget(r_widget)
+                step_widget.setWriteWidget(w_widget)
+                step_widget.model = f'{d}/ax{a}_step'
+
+                button1 = TaurusCommandButton(
+                    command=f'move_relative_axis{a}', parameters=[False]
+                )
+                button1.setCustomText('-')
+                button1.setModel(d)
+                button2 = TaurusCommandButton(
+                    command=f'move_relative_axis{a}', parameters=[True]
+                )
+                button2.setCustomText('+')
+                button2.setModel(d)
+
+                relative_panel_layout.addWidget(button1)
+                relative_panel_layout.addWidget(step_widget)
+                relative_panel_layout.addWidget(button2)
+                panel1_layout.addWidget(relative_panel)
 
         cmd_list = basler_app.attr_list[d]['commands']
         cmd_list = [i for i in cmd_list[3:] if 'move_relative' not in i]
