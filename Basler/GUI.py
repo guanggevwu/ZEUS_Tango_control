@@ -91,31 +91,30 @@ class BaslerGUI():
 
         self.gui.createPanel(panel1, panel1_w1_name)
 
-    def add_label_widget(self, layout, device_name, attr_name, self_created_attr=False, check_exist=False):
+    def add_label_widget(self, layout, device_name, attr_name,  check_exist=False):
         # if check_exist:
         #     try:
         #         Device(device_name).ping()
         #     except:
         #         return
+        if "eval" not in attr_name:
+            attr_name = device_name+'/'+ attr_name
         panel, panel_layout = self.create_blank_panel('h')
         panel_widget = []
         panel_widget.append(TaurusLabel())
         panel_widget.append(TaurusLabel())
         panel_widget[0].model, panel_widget[0].bgRole = f'{attr_name}#label', ''
-
-        if not self_created_attr:
-            attr_name = [device_name+'/'+a for a in attr_name]
-        if not self_created_attr:
+        if ("eval" not in attr_name and self.attr_list[device_name]['dp'].get_attribute_config(attr_name.split('/')[-1]).unit):
             panel_widget[1].model = attr_name + '#rvalue.magnitude'
         else:
             panel_widget[1].model = attr_name
         panel_layout.addWidget(panel_widget[0])
         panel_layout.addWidget(panel_widget[1])
-        if not self_created_attr and self.attr_list[device_name]['dp'].get_attribute_config(attr_name).writable_attr_name != 'None':
+        if "eval" not in attr_name and self.attr_list[device_name]['dp'].get_attribute_config(attr_name.split('/')[-1]).writable_attr_name != 'None':
             panel_widget.append(TaurusValueLineEdit())
             panel_widget[-1].model = attr_name + '#wvalue.magnitude'
             panel_layout.addWidget(panel_widget[-1])
-        if not self_created_attr and self.attr_list[device_name]['dp'].get_attribute_config(attr_name).unit:
+        if "eval" not in attr_name and self.attr_list[device_name]['dp'].get_attribute_config(attr_name.split('/')[-1]).unit:
             panel_widget.append(TaurusLabel())
             panel_widget[-1].model, panel_widget[-1].bgRole = attr_name + \
                 '#rvalue.units', ''
