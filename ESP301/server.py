@@ -47,7 +47,7 @@ class ESP301(Device):
             self._read_time = "N/A"
             self._user_defined_name = 'esp301'
             self._host_computer = platform.node()
-            self._ax1_step, self._ax2_step, self._ax3_step = 0, 0, 0
+            self._ax1_step, self._ax2_step, self._ax3_step, self._ax12_step = 0, 0, 0, 0
             self.error_table = {'0': 'NO ERRORS.', '1': "PCI COMMUNICATION TIME-OUT.", '4': "EMERGENCY SOP ACTIVATED.",
                                 '6': 'COMMAND DOES NOT EXIST.', '7': 'PARAMETER OUT OF RANGE.', 'others': 'Please refer to label tooltip.'}
             self._raw_command_return = ''
@@ -147,6 +147,15 @@ class ESP301(Device):
             memorized=True,
             access=AttrWriteType.READ_WRITE,
         )
+        ax12_step = attribute(
+            name="ax12 step",
+            label="ax12_step",
+            dtype=float,
+            unit='mm',
+            format='8.4f',
+            memorized=True,
+            access=AttrWriteType.READ_WRITE,
+        )
         if '1' in self.axis:
             self.add_attribute(ax1_position)
             self.add_attribute(ax1_step)
@@ -156,6 +165,8 @@ class ESP301(Device):
         if '3' in self.axis:
             self.add_attribute(ax3_position)
             self.add_attribute(ax3_step)
+        if '1' in self.axis and '2' in self.axis:
+            self.add_attribute(ax12_step)
 
     def read_ax1_position(self, attr):
         self.dev.write(b"1TP\r")
@@ -205,6 +216,12 @@ class ESP301(Device):
 
     def write_ax3_step(self, attr):
         self._ax3_step = attr.get_write_value()
+
+    def read_ax12_step(self, attr):
+        return self._ax12_step
+
+    def write_ax12_step(self, attr):
+        self._ax12_step = attr.get_write_value()
 
     error_message = attribute(
         label="error message",
@@ -276,6 +293,12 @@ class ESP301(Device):
             self.dev.write(f"3PR{self._ax3_step:.4f}\r".encode())
         else:
             self.dev.write(f"3PR{-self._ax3_step:.4f}\r".encode())
+
+    @command(dtype_in=bool)
+    def move_relative_axis12(self, plus=True):
+        self.move_relative_axis1(self, plus=plus)
+        self.move_relative_axis2(self, plus=plus)
+        # self.dev.write(f"1PR{rel:.4f}\r".encode())
 
 
 if __name__ == "__main__":

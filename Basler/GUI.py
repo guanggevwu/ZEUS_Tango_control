@@ -22,15 +22,6 @@ if True:
     from common.TaurusGUI_Argparse import TaurusArgparse
     from common.config import device_name_table, image_panel_config
 
-parser = TaurusArgparse(
-    description='GUI for Basler camera', device_default='test/basler/test', nargs_string='+', polling_default=1000)
-# parser.add_argument('-s', '--simple', action='store_true',
-#                     help="show image without shot number and command")
-args = parser.parse_args()
-# device_name = args.device
-# changeDefaultPollingPeriod(args.polling)
-# is_form_compact = args.compact
-
 
 class BaslerGUI():
     def __init__(self, device_list, polling, is_form_compact=False):
@@ -100,7 +91,7 @@ class BaslerGUI():
 
         self.gui.createPanel(panel1, panel1_w1_name)
 
-    def add_label_widget(self, layout, device_name, attr_name, check_exist=False):
+    def add_label_widget(self, layout, device_name, attr_name, self_created_attr=False, check_exist=False):
         # if check_exist:
         #     try:
         #         Device(device_name).ping()
@@ -110,23 +101,26 @@ class BaslerGUI():
         panel_widget = []
         panel_widget.append(TaurusLabel())
         panel_widget.append(TaurusLabel())
-        panel_widget[0].model, panel_widget[0].bgRole = device_name + \
-            '/' + f'{attr_name}#label', ''
-        panel_widget[1].model = device_name + \
-            '/' + attr_name + '#rvalue.magnitude'
+        panel_widget[0].model, panel_widget[0].bgRole = f'{attr_name}#label', ''
+
+        if not self_created_attr:
+            attr_name = [device_name+'/'+a for a in attr_name]
+        if not self_created_attr:
+            panel_widget[1].model = attr_name + '#rvalue.magnitude'
+        else:
+            panel_widget[1].model = attr_name
         panel_layout.addWidget(panel_widget[0])
         panel_layout.addWidget(panel_widget[1])
-        if self.attr_list[device_name]['dp'].get_attribute_config(attr_name).writable_attr_name != 'None':
+        if not self_created_attr and self.attr_list[device_name]['dp'].get_attribute_config(attr_name).writable_attr_name != 'None':
             panel_widget.append(TaurusValueLineEdit())
-            panel_widget[-1].model = device_name + \
-                '/' + attr_name + '#wvalue.magnitude'
+            panel_widget[-1].model = attr_name + '#wvalue.magnitude'
             panel_layout.addWidget(panel_widget[-1])
-        if self.attr_list[device_name]['dp'].get_attribute_config(attr_name).unit:
+        if not self_created_attr and self.attr_list[device_name]['dp'].get_attribute_config(attr_name).unit:
             panel_widget.append(TaurusLabel())
-            panel_widget[-1].model, panel_widget[-1].bgRole = device_name + \
-                '/' + attr_name + '#rvalue.units', ''
+            panel_widget[-1].model, panel_widget[-1].bgRole = attr_name + \
+                '#rvalue.units', ''
             panel_layout.addWidget(panel_widget[-1])
-        if attr_name in ["energy", "hot_spot"]:
+        if any(a in attr_name for a in ["energy", "hot_spot"]):
             for i in panel_widget:
                 i.setFont(Qt.QFont("Sans Serif", 16))
         layout.addWidget(panel)
@@ -214,6 +208,10 @@ class BaslerGUI():
 
 
 def create_app():
+    parser = TaurusArgparse(
+        description='GUI for Basler camera', device_default='test/basler/test', nargs_string='+', polling_default=1000)
+    args = parser.parse_args()
+
     if 'combination' in args.device[0]:
         device_list = device_name_table[args.device[0]]
     elif isinstance(args.device, list):

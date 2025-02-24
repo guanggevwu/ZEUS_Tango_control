@@ -7,9 +7,6 @@ if True:
     from common.config import device_name_table, image_panel_config
     from common.TaurusGUI_Argparse import TaurusArgparse
     from Basler.GUI import BaslerGUI, create_app
-parser = TaurusArgparse(
-    description='GUI for Labview programe', device_default='laser/labview/labview_programe', polling_default=1000)
-args = parser.parse_args()
 
 
 def create_app():
@@ -32,4 +29,7 @@ def create_app():
 
 
 if __name__ == "__main__":
+    parser = TaurusArgparse(
+        description='GUI for Labview programe', device_default='laser/labview/labview_programe', polling_default=1000)
+    args = parser.parse_args()
     create_app()

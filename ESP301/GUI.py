@@ -12,9 +12,6 @@ if True:
     from common.config import device_name_table, image_panel_config
     from common.TaurusGUI_Argparse import TaurusArgparse
     from Basler.GUI import BaslerGUI, create_app
-parser = TaurusArgparse(
-    description='GUI for ESP301', device_default='laser/esp301/esp301', polling_default=500)
-args = parser.parse_args()
 
 
 def create_app():
@@ -34,11 +31,14 @@ def create_app():
         for attr in attr_list:
             if attr not in ['ax1_position', 'ax2_position', 'ax3_position', 'ax1_step', 'ax2_step', 'ax3_step', 'State', 'Status']:
                 basler_app.add_label_widget(panel1_layout, d, attr)
-        axis_index = ['1', '2', '3']
+        basler_app.add_label_widget(
+            panel1_layout, d, 'eval:{ax1_position}-{ax2_position}')
+        axis_index = ['12', '1', '2', '3']
         for a in axis_index:
             if f'ax{a}_position' in attr_list:
                 basler_app.add_label_widget(
                     panel1_layout, d, f'ax{a}_position')
+            if f'ax{a}_step' in attr_list:
                 relative_panel, relative_panel_layout = basler_app.create_blank_panel(
                     VorH='h')
                 step_widget = TaurusReadWriteSwitcher()
@@ -76,4 +76,7 @@ def create_app():
 
 
 if __name__ == "__main__":
+    parser = TaurusArgparse(
+        description='GUI for ESP301', device_default='laser/esp301/esp301', polling_default=500)
+    args = parser.parse_args()
     create_app()
