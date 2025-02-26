@@ -98,7 +98,7 @@ class BaslerGUI():
         #     except:
         #         return
         if "eval" not in attr_name:
-            attr_name = device_name+'/'+ attr_name
+            attr_name = device_name+'/' + attr_name
         panel, panel_layout = self.create_blank_panel('h')
         panel_widget = []
         panel_widget.append(TaurusLabel())

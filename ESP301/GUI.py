@@ -29,15 +29,19 @@ def create_app():
         panel, panel1_layout = basler_app.create_blank_panel('v')
         attr_list = basler_app.attr_list[d]['attrs']
         for attr in attr_list:
-            if attr not in ['ax1_position', 'ax2_position', 'ax3_position', 'ax1_step', 'ax2_step', 'ax3_step', 'State', 'Status']:
+            if attr not in ['ax1_position', 'ax2_position', 'ax3_position', 'ax1_step', 'ax2_step', 'ax3_step', 'ax12_step', 'ax12_distance', 'State', 'Status']:
                 basler_app.add_label_widget(panel1_layout, d, attr)
-        basler_app.add_label_widget(
-            panel1_layout, d, 'eval:{ax1_position}-{ax2_position}')
+        # basler_app.add_label_widget(
+        #     panel1_layout, d, f'eval:new={{{d}/ax1_position}}-{{{d}/ax2_position}};new')
+
         axis_index = ['12', '1', '2', '3']
         for a in axis_index:
             if f'ax{a}_position' in attr_list:
                 basler_app.add_label_widget(
                     panel1_layout, d, f'ax{a}_position')
+            if f'ax{a}_distance' in attr_list:
+                basler_app.add_label_widget(
+                    panel1_layout, d, f'ax{a}_distance')
             if f'ax{a}_step' in attr_list:
                 relative_panel, relative_panel_layout = basler_app.create_blank_panel(
                     VorH='h')
@@ -52,12 +56,12 @@ def create_app():
                 button1 = TaurusCommandButton(
                     command=f'move_relative_axis{a}', parameters=[False]
                 )
-                button1.setCustomText('-')
+                button1.setCustomText(f'ax{a}-')
                 button1.setModel(d)
                 button2 = TaurusCommandButton(
                     command=f'move_relative_axis{a}', parameters=[True]
                 )
-                button2.setCustomText('+')
+                button2.setCustomText(f'ax{a}+')
                 button2.setModel(d)
 
                 relative_panel_layout.addWidget(button1)
