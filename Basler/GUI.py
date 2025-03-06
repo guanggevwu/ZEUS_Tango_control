@@ -105,7 +105,7 @@ class BaslerGUI():
         panel_widget.append(TaurusLabel())
         panel_widget[0].model, panel_widget[0].bgRole = f'{attr_name}#label', ''
         if ("eval" not in attr_name and self.attr_list[device_name]['dp'].get_attribute_config(attr_name.split('/')[-1]).unit):
-            panel_widget[1].model = attr_name + '#rvalue.magnitude'
+            panel_widget[1].model = attr_name + '#rvalue'
         else:
             panel_widget[1].model = attr_name
         panel_layout.addWidget(panel_widget[0])
@@ -113,11 +113,6 @@ class BaslerGUI():
         if "eval" not in attr_name and self.attr_list[device_name]['dp'].get_attribute_config(attr_name.split('/')[-1]).writable_attr_name != 'None':
             panel_widget.append(TaurusValueLineEdit())
             panel_widget[-1].model = attr_name + '#wvalue.magnitude'
-            panel_layout.addWidget(panel_widget[-1])
-        if "eval" not in attr_name and self.attr_list[device_name]['dp'].get_attribute_config(attr_name.split('/')[-1]).unit:
-            panel_widget.append(TaurusLabel())
-            panel_widget[-1].model, panel_widget[-1].bgRole = attr_name + \
-                '#rvalue.units', ''
             panel_layout.addWidget(panel_widget[-1])
         if any(a in attr_name for a in ["energy", "hot_spot"]):
             for i in panel_widget:
