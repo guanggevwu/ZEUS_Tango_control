@@ -57,6 +57,9 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "basler_TA2-FarField": {'server': 'Basler/TA2-FarField', '_class': 'Basler', 'name': 'TA2/basler/TA2-FarField'},
             "basler_TA2-Alignment": {'server': 'Basler/TA2-Alignment', '_class': 'Basler', 'name': 'TA2/basler/TA2-Alignment'},
             "basler_TA2-GOSSIP": {'server': 'Basler/TA2-GOSSIP', '_class': 'Basler', 'name': 'TA2/basler/TA2-GOSSIP'},
+            "basler_TA2-Screen-1w": {'server': 'Basler/TA2-Screen-1w', '_class': 'Basler', 'name': 'TA2/basler/TA2-Screen-1w', 'property': {'friendly_name': 'TA2-Screen-1w'}},
+            "basler_TA2-Screen-2w": {'server': 'Basler/TA2-Screen-2w', '_class': 'Basler', 'name': 'TA2/basler/TA2-Screen-2w', 'property': {'friendly_name': 'TA2-Screen-2w'}},
+
             "basler_TA1-Ebeam": {'server': 'Basler/TA1-Ebeam', '_class': 'Basler', 'name': 'TA1/basler/TA1-Ebeam'},
             "basler_TA1-EspecH": {'server': 'Basler/TA1-EspecH', '_class': 'Basler', 'name': 'TA1/basler/TA1-EspecH'},
             "basler_TA1-EspecL": {'server': 'Basler/TA1-EspecL', '_class': 'Basler', 'name': 'TA1/basler/TA1-EspecL'},
