@@ -27,8 +27,9 @@ class BaslerGUI():
     def __init__(self, device_list, polling, is_form_compact=False):
         changeDefaultPollingPeriod(polling)
         if len(device_list) > 1:
-            app_name = device_list[0].replace(
-                '/', '_') + f'_and_{len(device_list)-1}_more'
+            device_list_sorted = sorted(
+                [i.split('/')[-1] for i in device_list])
+            app_name = '&'.join(device_list_sorted)
         else:
             app_name = device_list[0].replace('/', '_')
         self.is_form_compact = is_form_compact
