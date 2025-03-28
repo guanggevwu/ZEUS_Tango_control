@@ -27,6 +27,10 @@ class DaqGUI:
     def __init__(self, root):
         self.db = tango.Database()
         self.root_path = os.path.dirname(os.path.dirname(__file__))
+        # self.current_shot_numbern is for highlight function. O indicate no highlight before start acquisition.
+        self.current_shot_number = 0
+        # self.row_shotnum is for define start shot on scan list.
+        self.row_shotnum = 1
         if platform.system() == 'Linux':
             self.python_path = os.path.join(
                 self.root_path, 'venv', 'bin', 'python')
@@ -146,6 +150,8 @@ class DaqGUI:
         self.frame4.grid(column=0, row=3, sticky=(N, W, E, S))
         self.t = Text(self.frame4, width=70, height=20, font=(
             'Helvetica', int(self.font_mid*0.75)), wrap=WORD)
+        self.t.tag_config("red_text", foreground="red")
+        self.t.tag_config("green_text", foreground="green")
         self.t.grid(column=0, row=0, sticky=W)
         self.insert_to_disabled("DAQ GUI is started.")
         sb = ttk.Scrollbar(self.frame4,
@@ -195,22 +201,19 @@ class DaqGUI:
             child.grid_configure(padx=[self.font_mid, 0], pady=3)
 
     def open_device_list(self):
-        if not (hasattr(self, "window1") and self.window1.winfo_exists()):
-            self.window1 = DeviceListWindow(
+        if not (hasattr(self, "device_list_window") and self.device_list_window.winfo_exists()):
+            self.device_list_window = DeviceListWindow(
                 update_selected_devices=self.update_selected_devices, selected_devices=self.selected_devices, device_names_in_db=self.device_names_in_db)
-            self.window1.title("Device List")
-        self.window1.attributes('-topmost', True)
-        self.window1.attributes('-topmost', False)
+            self.device_list_window.title("Device List")
+        self.device_list_window.attributes('-topmost', True)
+        self.device_list_window.attributes('-topmost', False)
 
     def open_scan_list(self):
-        if not (hasattr(self, "window2") and self.window2.winfo_exists()):
-            if not hasattr(self, 'current_shot_number'):
-                self.current_shot_number = 0
-            self.window2 = ScanWindow(
-                db=self.db, current_shot_number=self.current_shot_number)
-            self.window2.title("Scan List")
-        self.window2.attributes('-topmost', True)
-        self.window2.attributes('-topmost', False)
+        if not (hasattr(self, "scan_window") and self.scan_window.winfo_exists()):
+            self.scan_window = ScanWindow(self)
+            self.scan_window.title("Scan Module")
+        self.scan_window.attributes('-topmost', True)
+        self.scan_window.attributes('-topmost', False)
 
     def connect_to_device(self, device_name):
         if 'server_pid' not in self.selected_devices[device_name]:
@@ -330,7 +333,7 @@ class DaqGUI:
             self.acquisition['button']['style'] = 'Sty3_start.TButton'
             self.acquisition['button']['text'] = 'Start'
             self.daq.termination()
-            self.insert_to_disabled("Stopped acquisition.")
+            self.insert_to_disabled("Stopped acquisition.", 'red_text')
         else:
             self.acquisition['status'] = True
             self.acquisition['is_completed'] = False
@@ -338,7 +341,8 @@ class DaqGUI:
             Thread(target=self.start_acquisition).start()
             self.acquisition['button']['style'] = 'Sty3_stop.TButton'
             self.acquisition['button']['text'] = 'Stop'
-            self.insert_to_disabled("Started acquisition in a new thread.")
+            self.insert_to_disabled(
+                "Started acquisition in a new thread.", 'green_text')
 
     def start_acquisition(self):
         self.options = {
@@ -378,18 +382,18 @@ class DaqGUI:
             config_dict=overwrite_config, saving=self.options['save_config'])
         if self.options['background_image']:
             self.daq.take_background(stitch=self.options['stitch'])
-        scan_table = self.window2.scan_table if hasattr(
-            self, 'window2') else None
+        scan_table = self.scan_window.scan_table if hasattr(
+            self, 'scan_window') else None
         self.daq.acquisition(
             shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], laser_shot_id=self.options['laser_shot_id'], scan_table=scan_table)
         if not self.my_event.is_set():
             self.toggle_acquisition()
 
-    def insert_to_disabled(self, text):
+    def insert_to_disabled(self, text, tag_config=None):
         time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
         logging.info(text)
         self.t['state'] = 'normal'
-        self.t.insert(END, f'{time}, {text}\n')
+        self.t.insert(END, f'{time}, {text}\n', tag_config)
         self.t.see("end")
         self.t['state'] = 'disabled'
 
@@ -419,16 +423,28 @@ class DeviceListWindow(Toplevel):
 
 
 class ScanWindow(Toplevel):
-    def __init__(self, db, current_shot_number):
+    def __init__(self, parent):
         super().__init__(master=root)
-        self.db = db
-        self.current_shot_number = current_shot_number
-        self.item_each_row = 2
+        self.parent = parent
+        pad_widget = "10 0 0 10"
+        self.scan_frame1 = ttk.Labelframe(
+            self, text='Scannable Device', padding=pad_widget, style='Sty1.TLabelframe')
+        self.scan_frame1.grid(column=0, row=0, columnspan=2, sticky=W)
+        self.scan_frame2 = ttk.Labelframe(
+            self, text='Scan Table', padding=pad_widget, style='Sty1.TLabelframe')
+        self.scan_frame2.grid(column=0, row=1, rowspan=2, sticky=W)
+        self.scan_frame3 = ttk.Labelframe(
+            self, text='Starting shot number', padding=pad_widget, style='Sty1.TLabelframe')
+        self.scan_frame3.grid(column=1, row=1, sticky=W)
+        self.scan_frame4 = ttk.Labelframe(
+            self, text='Input', padding=pad_widget, style='Sty1.TLabelframe')
+        self.scan_frame4.grid(column=1, row=2, sticky=W)
+        self.item_each_row = 4
         # getting scannable device from db and manually specify the attr name
         self.scannable_list = [
-            i+'/pressure_psi' for i in self.db.get_device_name('*', "GXRegulator")] + [
-            i+f'/ax{axis}_position' for i in self.db.get_device_name('*', "ESP301") for axis in ['1', '2', '3']]
-        # scan_table format: key is the device/attr string, value is the scan value list.
+            i+'/pressure_psi' for i in self.parent.db.get_device_name('*', "GXRegulator")] + [
+            i+f'/ax{axis}_position' for i in self.parent.db.get_device_name('*', "ESP301") for axis in ['1', '2', '3']] + ['sys/taurustest/1/position']
+        # scan_table format: key is the device/attr string, value is string the scan value list.
         self.scan_table = defaultdict(list)
         self.scan_table_file = os.path.join(
             os.path.dirname(__file__), 'scan_table.csv')
@@ -447,21 +463,30 @@ class ScanWindow(Toplevel):
                 idx/self.item_each_row), idx % self.item_each_row
             checkbox_var = BooleanVar(
                 value=True) if device_attr_name in self.scan_table else BooleanVar(value=False)
-            checkbox = ttk.Checkbutton(self, text='/'.join(device_attr_name.split('/')[2:]), command=lambda device_attr_name=device_attr_name, checkbox_var=checkbox_var: self.add_device_to_scan(device_attr_name, checkbox_var),
+            checkbox = ttk.Checkbutton(self.scan_frame1, text='/'.join(device_attr_name.split('/')[2:]), command=lambda device_attr_name=device_attr_name, checkbox_var=checkbox_var: self.add_device_to_scan(device_attr_name, checkbox_var),
                                        variable=checkbox_var, style='Sty1.TCheckbutton')
             checkbox.grid(
-                column=col, row=self.scannable_list_row)
+                column=col, row=self.scannable_list_row, sticky=W)
+
+        ttk.Label(
+            self.scan_frame3, text='Starting from shot ', font=('Helvetica', 12)).grid(row=0, column=0)
+
+        self.firstrow_var = IntVar(value=1)
+        ttk.Entry(self.scan_frame3, textvariable=self.firstrow_var).grid(
+            row=0, column=1)
+        ttk.Button(
+            self.scan_frame3, text='Change', command=self.change_row_shotnum, style="Sty3_start.TButton").grid(
+            row=0, column=2)
 
         self.update_tree()
         self.update_add_section()
-        # self.add_button = ttk.Button(self, text='Add to list', command=self.add_data_to_list)
-        # self.add_button.grid(row=len(self.scan_table)+1, column=len(self.scannable_list)+1, columnspan=2)
+
         remove_selected_button = ttk.Button(
-            self, text='Remove selected', command=self.remove_selected, style="Sty3_stop.TButton")
+            self.scan_frame2, text='Remove selected', command=self.remove_selected, style="Sty3_stop.TButton")
         remove_selected_button.grid(
             row=21, column=0, columnspan=int(self.item_each_row/2))
         clear_button = ttk.Button(
-            self, text='Clear all', command=self.clear_list, style='Sty2_offline.TButton')
+            self.scan_frame2, text='Clear all', command=self.clear_list, style='Sty2_offline.TButton')
         clear_button.grid(row=21, column=int(
             self.item_each_row/2), columnspan=int(self.item_each_row/2))
 
@@ -480,6 +505,11 @@ class ScanWindow(Toplevel):
         self.update_add_section()
         self.save_scan_table_to_file()
 
+    def change_row_shotnum(self):
+        '''Button command: apply the row to shotnum value'''
+        self.parent.row_shotnum = self.firstrow_var.get()
+        self.update_tree()
+
     def add_data_to_list(self):
         '''Button command: add a new row of scan values'''
         for i in self.scan_table:
@@ -489,12 +519,14 @@ class ScanWindow(Toplevel):
         self.save_scan_table_to_file()
 
     def clear_list(self):
+        '''Button command: clear the scan list'''
         for i in self.scan_table:
             self.scan_table[i] = []
         self.update_tree()
         self.save_scan_table_to_file()
 
     def remove_selected(self):
+        '''Button command: remove selected row'''
         selected_item = self.tree.selection()
         for key, value in self.scan_table.items():
             self.scan_table[key] = [v for idx, v in enumerate(
@@ -513,7 +545,7 @@ class ScanWindow(Toplevel):
         '''Render the tree widget'''
         if hasattr(self, 'tree'):
             self.tree.destroy()
-        self.tree = ttk.Treeview(self, style="normal.Treeview")
+        self.tree = ttk.Treeview(self.scan_frame2, style="normal.Treeview")
         self.tree.column("#0", width=50, anchor='center')
         self.tree['columns'] = list(self.scan_table.keys())
         for i in self.scan_table:
@@ -524,11 +556,11 @@ class ScanWindow(Toplevel):
                 if not self.tree.exists(str(idx+1)):
                     # assign a tag for each row so that we can change the tag configuration (for example change background color) in the future.
                     self.tree.insert('', 'end', str(idx+1),
-                                     text=f'#{idx+1}', tags=(f'#{idx+1}'))
+                                     text=f'#{idx+self.parent.row_shotnum}', tags=(f'#{idx+self.parent.row_shotnum}'))
                 self.tree.set(str(idx+1), key, v)
-        if hasattr(self, 'current_shot_number') and self.current_shot_number:
+        if self.tree.tag_has(f'#{self.parent.current_shot_number}'):
             self.tree.tag_configure(
-                f'#{self.current_shot_number}', background='yellow')
+                f'#{self.parent.current_shot_number}', background='yellow')
         self.tree.grid(column=0, columnspan=self.item_each_row,
                        row=self.scannable_list_row+1, rowspan=len(self.scan_table)+1)
 
@@ -541,20 +573,22 @@ class ScanWindow(Toplevel):
         self.add_section_widget = defaultdict(dict)
         for idx, i in enumerate(self.scan_table):
             self.add_section_widget[i]['label'] = ttk.Label(
-                self, text='/'.join(i.split('/')[-2:]), font=('Helvetica', 12))
+                self.scan_frame4, text='/'.join(i.split('/')[-2:]), font=('Helvetica', 12))
             self.add_section_widget[i]['label'].grid(
-                row=idx+self.scannable_list_row+1, column=len(self.scannable_list)+1)
-            self.add_section_widget[i]['label'].grid_configure(padx=[20, 0])
+                row=idx+1, column=len(self.scannable_list)+1)
+            self.add_section_widget[i]['label'].grid_configure(
+                pady=[0, 10])
             self.add_section_widget[i]['var'] = StringVar()
             self.add_section_widget[i]['entry'] = ttk.Entry(
-                self, textvariable=self.add_section_widget[i]['var'])
+                self.scan_frame4, textvariable=self.add_section_widget[i]['var'])
             self.add_section_widget[i]['entry'].grid(
-                row=idx+self.scannable_list_row+1, column=len(self.scannable_list)+2)
-            self.add_section_widget[i]['entry'].grid_configure(padx=[0, 20])
+                row=idx+1, column=len(self.scannable_list)+2)
+            self.add_section_widget[i]['entry'].grid_configure(
+                pady=[0, 10])
 
         if not hasattr(self, 'add_button'):
             self.add_button = ttk.Button(
-                self, text='Add to list', command=self.add_data_to_list, style="Sty3_start.TButton")
+                self.scan_frame4, text='Add to list', command=self.add_data_to_list, style="Sty3_start.TButton")
         self.add_button.grid(row=self.scannable_list_row+len(self.scan_table) +
                              1, column=len(self.scannable_list)+1, columnspan=2)
 

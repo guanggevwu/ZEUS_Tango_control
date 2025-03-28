@@ -227,11 +227,15 @@ class Daq:
         self.scan_attr_proxies = {}
         if scan_table and any(scan_table.values()):
             self.scan_table = scan_table
+
             for device_attr_name, value in self.scan_table.items():
+                if not hasattr(self, "scan_shot_range"):
+                    self.scan_shot_range = range(
+                        self.GUI.row_shotnum, self.GUI.row_shotnum + len(value))
                 os.makedirs(os.path.join(self.dir, 'scan_list'), exist_ok=True)
                 self.scan_attr_proxies[device_attr_name] = tango.AttributeProxy(
                     device_attr_name)
-                if shot_start <= len(value):
+                if shot_start in self.scan_shot_range:
                     self.set_scan_value(
                         self.scan_attr_proxies[device_attr_name], value, shot_start)
             self.save_scan_list(shot_start, add_header=True)
@@ -301,8 +305,9 @@ class Daq:
                     info['shot_num'] += add_number
                     # head to next scan point when all cameras completed a shot.
                     if all([i['shot_num'] >= info['shot_num'] for i in self.cam_info.values()]):
-                        self.logger(f"shot {info['shot_num']-1} is completed.")
-                        if scan_table is not None:
+                        self.logger(
+                            f"Shot {info['shot_num']-1} is completed.", 'green_text')
+                        if scan_table is not None and info['shot_num'] in self.scan_shot_range:
                             for device_attr_name, ap in self.scan_attr_proxies.items():
                                 self.set_scan_value(
                                     ap, self.scan_table[device_attr_name], info['shot_num'])
@@ -332,21 +337,31 @@ class Daq:
             rep = rep.replace('%o', f'{bs.current_file}')
         return rep
 
-    def set_scan_value(self, attr_proxy, value_list, shot_number):
-        if shot_number <= len(value_list) and value_list[shot_number-1]:
-            attr_proxy.write(float(value_list[shot_number-1]))
+    def set_scan_value(self, attr_proxy, value_list: list, shot_number: int):
+        """
+        Set the value for an attribute. Highlight the current row.
+
+        :param attr_proxy: Tango attribute
+        :param value_list: value list for this attribute
+        :param shot_number: the shot number to be set
+        :returns: None
+        """
+
+        if value_list[self.scan_shot_range.index(shot_number)]:
+            value = value_list[self.scan_shot_range.index(shot_number)]
+            attr_proxy.write(float(value))
             self.logger(
-                f'{attr_proxy.get_device_proxy().dev_name().split("/")[-1]}/{attr_proxy.name()}: {value_list[shot_number-1]}')
-            if hasattr(self.GUI, 'window2') and self.GUI.window2.winfo_exists():
-                self.GUI.window2.tree.tag_configure(
-                    f'#{shot_number}', background='yellow')
-                if shot_number > 1:
-                    self.GUI.window2.tree.tag_configure(
-                        f'#{shot_number-1}', background='white')
-            self.GUI.current_shot_number = shot_number
+                f'Shot {shot_number}. {attr_proxy.get_device_proxy().dev_name().split("/")[-1]}/{attr_proxy.name()}: {value}')
         else:
             self.logger(
-                f'{attr_proxy.get_device_proxy.dev_name().split("/")[-1]}/{attr_proxy.name()}: empty scan value. It was {attr_proxy.read().value} {attr_proxy.get_config().unit}.')
+                f'Shot {shot_number}. {attr_proxy.get_device_proxy().dev_name().split("/")[-1]}/{attr_proxy.name()}: empty scan value. It was {attr_proxy.read().value} {attr_proxy.get_config().unit}.')
+        self.GUI.current_shot_number = shot_number
+        if self.GUI.scan_window.winfo_exists():
+            self.GUI.scan_window.tree.tag_configure(
+                f'#{shot_number}', background='yellow')
+            if self.GUI.scan_window.tree.tag_has(f'#{shot_number-1}'):
+                self.GUI.scan_window.tree.tag_configure(
+                    f'#{shot_number-1}', background='white')
 
     def save_scan_list(self, shot_number, add_header=False):
         with open(os.path.join(self.dir, 'scan_list', 'scan.csv'), 'a') as csvfile:
@@ -436,13 +451,3 @@ class Daq:
             config_dict = {'all': {"is_polling_periodically": True}}
         self.set_camera_configuration(
             config_dict=config_dict, saving=False, default_config_dict={})
-
-# if __name__ == "__main__":
-#     dt_string = datetime.now().strftime("%Y%m%d")
-#     run_num = input('\nPlease input a run number: ')
-#     save_dir = os.path.join(r'N:\2024\Qing_test', f'{dt_string}_run{run_num}')
-#     # select_cam_list = ['TA2-NearField', 'TA2-FarField', "TA2-GOSSIP"]
-#     select_cam_list = ['TA2-NearField', 'TA2-FarField']
-#     daq = Daq(save_dir, select_cam_list=select_cam_list, shots=30)
-#     daq.set_camera_configuration()
-#     daq.take_background()
