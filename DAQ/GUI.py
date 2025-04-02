@@ -171,7 +171,7 @@ class DaqGUI:
         # self.selected_devices is a dictionary. Key is the device name, value is another dictionary. In the sub-dictionary, the keys are "checkbutton" and "server_pid".
         self.init_file_path = os.path.join(
             os.path.dirname(__file__), 'init.json')
-        self.class_name = ['Basler', 'FileReader']
+        self.class_name = ['Basler', 'FileReader', 'Vimba']
         self.device_names_in_db = []
         for c in self.class_name:
             self.device_names_in_db.extend(self.db.get_device_name('*', c))

@@ -866,7 +866,6 @@ class Basler(Device):
 
     def read_is_new_image(self):
         # self.i, grabbing successfully grabbed image. self._image_number, image counting and can be reset at any time.
-        self._is_new_image = False
         while self.camera.IsGrabbing():
             # the retrieve time out may need to be reconsidered.
             time0 = time.perf_counter()

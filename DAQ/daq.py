@@ -103,7 +103,7 @@ class Daq:
                 info['config_dict'] = combined_config['all']
             else:
                 info['config_dict'] = dict()
-            if 'basler' in bs.dev_name():
+            if any([cam_type in bs.dev_name() for cam_type in ['basler', 'vimba']]):
                 bs.relax()
             for key, value in info['config_dict'].items():
                 if hasattr(bs, key):
@@ -133,9 +133,9 @@ class Daq:
                         "trigger_selector", "trigger_source"]
             full_configuration = dict()
             for c, info in self.cam_info.items():
-                if 'basler' in info['device_proxy'].dev_name():
+                if any([cam_type in info['device_proxy'].dev_name() for cam_type in ['basler', 'vimba']]):
                     full_configuration[c] = {key: getattr(
-                        info['device_proxy'], key) for key in Key_list}
+                        info['device_proxy'], key, None) for key in Key_list}
             json_object = json.dumps(full_configuration)
             os.makedirs(self.dir, exist_ok=True)
             with open(os.path.join(self.dir, "settings.json"), "w+") as settings_File:
@@ -163,7 +163,7 @@ class Daq:
         '''take a background image'''
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
-            if 'basler' in bs.dev_name():
+            if any([cam_type in bs.dev_name() for cam_type in ['basler', 'vimba']]):
                 trigger_source = bs.trigger_source
                 bs.trigger_source = "software"
                 time.sleep(0.5)
@@ -188,7 +188,7 @@ class Daq:
                             f"Background for stitching {back_image.size} is saved.")
             else:
                 self.logger('Error when taking background image.')
-            if 'basler' in bs.dev_name():
+            if any([cam_type in bs.dev_name() for cam_type in ['basler', 'vimba']]):
                 bs.trigger_source = trigger_source
 
     def set_acquisition_start_mode(self):
@@ -206,7 +206,7 @@ class Daq:
         test the camera using software trigger
         """
         for c, info in self.cam_info.items():
-            if 'basler' in info['device_proxy'].dev_name():
+            if any([cam_type in info['device_proxy'].dev_name() for cam_type in ['basler', 'vimba']]):
                 info['device_proxy'].trigger_source = "software"
 
     def simulate_send_software_trigger(self, interval, shots=1):
@@ -264,10 +264,11 @@ class Daq:
                     info['is_completed'] = True
                 elif bs.is_new_image:
 
-                    if 'basler' in bs.dev_name() or bs.data_type == "image":
+                    if any([cam_type in bs.dev_name() for cam_type in ['basler', 'vimba']]) or bs.data_type == "image":
                         data, data_array = self.get_image(bs)
                         file_name = self.generate_file_name(info, bs)
                         file_name = file_name.replace('%f', '.tiff')
+                        # probably this is not needed as it is an int which is immutable.
                         freezed_shot_number = info["shot_num"]
                         Thread(target=self.thread_saving,
                                args=(data, info, file_name, freezed_shot_number)).start()
