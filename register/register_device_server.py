@@ -95,6 +95,8 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "file_reader_6": {'server': 'FileReader/laser_axis', '_class': 'FileReader', 'name': 'facility/file_reader/laser_axis', 'property': {'file_type': 'image'}},
             "file_reader_7": {'server': 'FileReader/transverse', '_class': 'FileReader', 'name': 'facility/file_reader/transverse', 'property': {'file_type': 'image'}},
             "file_reader_8": {'server': 'FileReader/spectrometer', '_class': 'FileReader', 'name': 'facility/file_reader/spectrometer', 'property': {'file_type': 'xy'}},
+            "file_reader_9": {'server': 'FileReader/TA3-Xray', '_class': 'FileReader', 'name': 'TA3/file_reader/TA3-Xray', 'property': {'file_type': 'image'}},
+            
             "asyncio_device_1": {'server': 'AsyncioDevice/asyncio_device_1', '_class': 'AsyncioDevice', 'name': 'test/asyncio_device/asyncio_device_1'},
             "TA1_regulator_1": {'server': 'GXRegulator/TA1_regulator_1', '_class': 'FileReader', 'name': 'TA1/gx_regulator/TA1_regulator_1', 'property': {'high_voltage_channel': '0', 'low_voltage_channel': '1'}},
             "TA1_regulator_2": {'server': 'GXRegulator/TA1_regulator_2', '_class': 'FileReader', 'name': 'TA1/gx_regulator/TA1_regulator_2', 'property': {'high_voltage_channel': '2', 'low_voltage_channel': '3'}},

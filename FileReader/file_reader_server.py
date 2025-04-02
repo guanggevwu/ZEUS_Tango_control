@@ -160,7 +160,7 @@ class FileReader(Device):
             file_folder = os.listdir(self._folder_path)
         except FileNotFoundError:
             return []
-        self._file_list = file_folder
+        self._file_list = [i for i in file_folder if self._file_extension in i]
         return self._file_list
 
     current_file = attribute(
