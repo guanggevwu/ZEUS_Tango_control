@@ -617,7 +617,6 @@ class Basler(Device):
                 if self._polling == 0:
                     self._polling = 200
                 self._timeout_polling_ratio = 0.75
-                self._is_new_image = False
                 self._image = np.zeros(
                     (self.camera.Height.Value, self.camera.Width.Value))
                 self._flux = np.zeros(
@@ -723,7 +722,7 @@ class Basler(Device):
             self.csv_fieldnames = ['_read_time', '_image_number', '_energy', '_hot_spot', '_exposure', '_gain', '_binning_horizontal', '_binning_vertical', '_width',
                                    '_height', 'QE195_reading', 'mean_intensity_of_calibration_images', 'leak_coe', 'clip_coe', 'pixel_size']
         else:
-            self.csv_fieldnames = ['_read_time','_image_number',  '_exposure', '_gain',
+            self.csv_fieldnames = ['_read_time', '_image_number',  '_exposure', '_gain',
                                    '_binning_horizontal', '_binning_vertical', '_width', '_height']
         self.data_to_log = {}
         for name in self.csv_fieldnames:
@@ -866,6 +865,7 @@ class Basler(Device):
 
     def read_is_new_image(self):
         # self.i, grabbing successfully grabbed image. self._image_number, image counting and can be reset at any time.
+        self._is_new_image = False
         while self.camera.IsGrabbing():
             # the retrieve time out may need to be reconsidered.
             time0 = time.perf_counter()
@@ -955,7 +955,7 @@ class Basler(Device):
                                     os.remove(os.path.join(
                                         path, self.image_basename))
                                     try:
-                                        with open(os.path.join(path, 'logging.csv'),"r+") as f:
+                                        with open(os.path.join(path, 'logging.csv'), "r+") as f:
                                             current_position = previous_position = f.tell()
                                             while f.readline():
                                                 previous_position = current_position
