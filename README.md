@@ -71,7 +71,21 @@ A few buttons on the interface.
 
 It is possible to run "Python .DAQ/GUI.py" in a second computer to start a second Taurus GUI. Just don't start the device servers again or "Start".
 
-## Basler camera
+## Add a new device to Tango system
+
+First, you add a new item to the dictionary in "./register/register_device_server.py". The key can be anything but the value need to contain information like class, server and instance. E.g.,
+
+```python
+"basler_test": {'server': 'Basler/test', '_class': 'Basler', 'name': 'test/basler/test', 'property': {'friendly_name': 'test'}}
+```
+
+The property is usually some parameters that are used for connection to that device. It can be IP address, device name, serial number or port number. Then you run the following command to add a new device server.
+
+```
+python ./register/register_device_server.py add basler_test
+```
+
+## Basler/Allied Vision camera
 
 The example code shows how to obtain one image by triggerring a Basler camera with a software trigger.
 
