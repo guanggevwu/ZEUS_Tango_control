@@ -308,7 +308,7 @@ class Daq:
                     if all([i['shot_num'] >= info['shot_num'] for i in self.cam_info.values()]):
                         self.logger(
                             f"Shot {info['shot_num']-1} is completed.", 'green_text')
-                        if scan_table is not None and info['shot_num'] in self.scan_shot_range:
+                        if scan_table is not None and hasattr(self, "scan_shot_range") and info['shot_num'] in self.scan_shot_range:
                             for device_attr_name, ap in self.scan_attr_proxies.items():
                                 self.set_scan_value(
                                     ap, self.scan_table[device_attr_name], info['shot_num'])
