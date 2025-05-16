@@ -38,7 +38,7 @@ class ESP301(Device):
         '''
         save_data is initialized before save_path during the initialization caused by hw_memorized. self.write_save_data(True) will not set self._save to True because self._save_path is an empty string at that moment. Introducing self._try_save_data will save the intended status and can be used later in write_save_path function.
         '''
-        Device.init_device(self)
+        super().init_device()
         self.set_state(DevState.INIT)
         try:
             self.dev = serial.Serial(
@@ -213,7 +213,7 @@ class ESP301(Device):
 
     def read_ax12_distance(self, attr):
         return float(f'{(self._ax1_position-self._ax2_position):.3f}')
-    
+
     def read_ax1_step(self, attr):
         return self._ax1_step
 

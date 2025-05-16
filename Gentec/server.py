@@ -690,7 +690,7 @@ class GentecEO(Device):
         self._rsd = 0
         self._max = 0
         self._min = 0
-        Device.init_device(self)
+        super().init_device()
         self.set_state(DevState.INIT)
         com_obj = self.find_com_number()
         if com_obj is not None:

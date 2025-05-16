@@ -184,6 +184,7 @@ class DG535(Device):
                                          access=AttrWriteType.READ_WRITE))
 
     def init_device(self):
+        super().init_device()
         self._host_computer = platform.node()
         try:
             rm = pyvisa.ResourceManager()
@@ -210,7 +211,7 @@ class DG535(Device):
             logging.info("Could NOT connect to  DG535")
             self.set_state(DevState.OFF)
 
-    @ command()
+    @command()
     def send_single_shot(self):
         self.device.write('SS')
         logging.info("Send a single-shot trigger")

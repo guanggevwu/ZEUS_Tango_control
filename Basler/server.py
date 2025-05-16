@@ -656,6 +656,11 @@ class Basler(Device):
                 self.serial_number))
             self.set_state(DevState.OFF)
 
+    def delete_device(self):
+        self.camera.Close()
+        print("Camera is disconnected.")
+        super().delete_device()
+
     def get_camera_device(self):
         for device in pylon.TlFactory.GetInstance().EnumerateDevices():
             if device.GetSerialNumber() == self.serial_number or device.GetUserDefinedName() == self.friendly_name:
