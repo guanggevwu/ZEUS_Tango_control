@@ -17,6 +17,7 @@ import platform
 import ctypes
 import csv
 from collections import defaultdict
+from queue import Queue
 
 logging.basicConfig(
     format="%(asctime)s %(message)s",
@@ -27,6 +28,8 @@ class DaqGUI:
     def __init__(self, root):
         self.db = tango.Database()
         self.root_path = os.path.dirname(os.path.dirname(__file__))
+        self.logging_q = Queue()
+        Thread(target=self.logger_thread).start()
         # self.current_shot_numbern is for highlight function. O indicate no highlight before start acquisition.
         self.current_shot_number = 0
         # self.row_shotnum is for define start shot on scan list.
@@ -167,6 +170,7 @@ class DaqGUI:
 
         self.init_settings()
 
+        
     def init_settings(self):
         # self.selected_devices is a dictionary. Key is the device name, value is another dictionary. In the sub-dictionary, the keys are "checkbutton" and "server_pid".
         self.init_file_path = os.path.join(
@@ -390,12 +394,17 @@ class DaqGUI:
             self.toggle_acquisition()
 
     def insert_to_disabled(self, text, tag_config=None):
-        time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
         logging.info(text)
-        self.t['state'] = 'normal'
-        self.t.insert(END, f'{time}, {text}\n', tag_config)
-        self.t.see("end")
-        self.t['state'] = 'disabled'
+        time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+        self.logging_q.put([time, text, tag_config])
+
+    def logger_thread(self):
+        while 1:
+            time, text, tag_config = self.logging_q.get()
+            self.t['state'] = 'normal'
+            self.t.insert(END, f'{time}, {text}\n', tag_config)
+            self.t.see("end")
+            self.t['state'] = 'disabled'
 
 
 class DeviceListWindow(Toplevel):

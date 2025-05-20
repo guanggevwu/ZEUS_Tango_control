@@ -284,6 +284,13 @@ class Basler(Device):
         doc='frame rate (only applicable when frames per trigger is large than 1)'
     )
 
+    resulting_fps = attribute(
+        label="resulting frame rate",
+        dtype=float,
+        access=AttrWriteType.READ,
+        doc='Several factors may limit the frame rate on any Basler camera, e.g., bandwidth.'
+    )
+
     offsetX = attribute(
         label="offset x axis",
         dtype=int,
@@ -870,6 +877,14 @@ class Basler(Device):
             self.camera.AcquisitionFrameRateEnable.SetValue(False)
             self._fps = 0
 
+    def read_resulting_fps(self):
+        if self._model_category == 1:
+            self._resulting_fps = self.camera.BslResultingAcquisitionFrameRate.Value
+        else:
+            self._resulting_fps = self.camera.ResultingFrameRateAbs.Value
+        self._resulting_fps = round(self._resulting_fps, 2)
+        return self._resulting_fps
+
     def read_is_new_image(self):
         # self.i, grabbing successfully grabbed image. self._image_number, image counting and can be reset at any time.
         self._is_new_image = False
@@ -1069,7 +1084,7 @@ class Basler(Device):
             self.i = 0
             # Previous we use a very large number for _grab_number, but it caused some memory problem when we have many camera.
             self._grab_number = max(
-                [self._repetition*self._frames_per_trigger, 50])
+                [self._repetition*self._frames_per_trigger, 200])
             self.camera.StartGrabbingMax(
                 self._grab_number, pylon.GrabStrategy_OneByOne)
             self.logger.info(
