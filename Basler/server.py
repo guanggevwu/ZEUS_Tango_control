@@ -599,6 +599,8 @@ class Basler(Device):
         handlers = [logging.StreamHandler()]
         logging.basicConfig(handlers=handlers,
                             format="%(asctime)s %(message)s", level=logging.INFO)
+        # force disable polling for "image" in DB
+        self.disable_polling('image')
         try:
             self.device = self.get_camera_device()
             if self.device is not None:
