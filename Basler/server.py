@@ -1028,7 +1028,11 @@ class Basler(Device):
                 #     f"f{flux_path_string} is save to {path_to_name}")
 
     def read_image(self):
-        # now read_image() is only triggered when it is a new image.
+        # now read_image() is only triggered when it is a new image. Polling period setting in attribute will Not overwrite the polling settings in the db.
+        # If image is polling automatically (periodically), push event from server side still work. But the client request from client side will use the data stored in the period polled buffer.
+        # If image is not polling automatically, the client request will call the read_attr function and thus use the latest data.
+        # Therefore, image should not be polled.
+        self.logger.info(f'in server read: {np.mean(self._image)}')
         return self._image
 
     def read_flux(self):
