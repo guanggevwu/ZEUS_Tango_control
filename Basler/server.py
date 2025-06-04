@@ -42,6 +42,8 @@ class Basler(Device):
 
     # The image attribute should not be polled periodically since images are large. They will be pushed when is_new_image attribute is True.
     def grabbing_wrap(func):
+        '''
+        A decorator to stop grabbing before executing the function and start grabbing after the function is executed.'''
         def wrapper(*args, **kwargs):
             is_grabbing = args[0].camera.IsGrabbing()
             if is_grabbing:
@@ -573,7 +575,7 @@ class Basler(Device):
         elif attr.get_write_value() == "0":
             self._filter_option = attr.get_write_value()
         else:
-            raise (
+            raise Exception(
                 f"Can't accept the filter option [{attr.get_write_value()}]")
 
     def init_device(self):

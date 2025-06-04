@@ -170,7 +170,6 @@ class DaqGUI:
 
         self.init_settings()
 
-        
     def init_settings(self):
         # self.selected_devices is a dictionary. Key is the device name, value is another dictionary. In the sub-dictionary, the keys are "checkbutton" and "server_pid".
         self.init_file_path = os.path.join(
@@ -408,24 +407,37 @@ class DaqGUI:
 
 
 class DeviceListWindow(Toplevel):
-    def __init__(self, update_selected_devices, selected_devices, device_names_in_db):
+    def __init__(self, update_selected_devices, selected_devices, device_names_in_db: list):
         self.update_selected_devices = update_selected_devices
         self.selected_devices = selected_devices
         self.device_names_in_db = device_names_in_db
         super().__init__(master=root)
         newframe1 = ttk.Frame(self)
         newframe1.grid(column=0, row=0, columnspan=1, sticky=(N, W, E, S))
-        item_each_row = 3
+        devices_seperated_by_location = defaultdict(list)
+        locations = ['laser', 'TA1', 'TA2', 'TA3', 'Others']
+        for device_name in self.device_names_in_db:
+            for location in locations[:-1]:
+                if location == device_name.split('/')[0]:
+                    devices_seperated_by_location[location].append(
+                        device_name)
+                    break
+            else:
+                devices_seperated_by_location[locations[-1]].append(
+                    device_name)
         checkboxes = dict()
-        for idx, device_name in enumerate(self.device_names_in_db):
-            row, col = int(idx/item_each_row)+1, idx % item_each_row
-            checkbox_var = BooleanVar(
-                value=True) if device_name in self.selected_devices else BooleanVar(value=False)
-            checkbox = ttk.Checkbutton(newframe1, text=device_name, command=lambda device_name=device_name, checkbox_var=checkbox_var: self.update_selected_devices(device_name, checkbox_var),
-                                       variable=checkbox_var, style='Sty1.TCheckbutton')
-            checkbox.grid(
-                column=col, row=row, sticky=W)
-            checkboxes[device_name] = checkbox_var
+        for col, (location, device_sub_list) in enumerate(devices_seperated_by_location.items()):
+            sub_frame = ttk.Labelframe(
+                newframe1, text=location, padding="0 0 10 0", style='Sty1.TLabelframe')
+            sub_frame.grid(column=col, row=0, sticky=N)
+            for row, device_name in enumerate(device_sub_list):
+                checkbox_var = BooleanVar(
+                    value=True) if device_name in self.selected_devices else BooleanVar(value=False)
+                checkbox = ttk.Checkbutton(sub_frame, text=device_name, command=lambda device_name=device_name, checkbox_var=checkbox_var: self.update_selected_devices(device_name, checkbox_var),
+                                           variable=checkbox_var, style='Sty1.TCheckbutton')
+                checkbox.grid(
+                    column=0, row=row, sticky=W)
+                checkboxes[device_name] = checkbox_var
 
         for child in newframe1.winfo_children():
             child.grid_configure(padx=[0, 0], pady=5)
