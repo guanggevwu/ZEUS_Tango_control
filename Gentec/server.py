@@ -436,22 +436,8 @@ class GentecEO(Device):
         #     '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open'''
         if self._model == "PH100-Si-HA-OD1":
             self._base_unit = 'W'
-            # 3nw to 1 w
-            self.display_range_steps = range(8, 25)
         else:
             self._base_unit = 'J'
-            # for 'QE65LP-S-MB-QED-IN', the range is 3 mj to 300j
-            if self._model == 'QE65LP-S-MB-QED-IN':
-                self.display_range_steps = range(19, 30)
-            # for 'QE65LP-S-MB-QED-IN', the range is 30 mj to 300j
-            if self._model.startswith('QE195'):
-                self.display_range_steps = range(21, 30)
-            # somehow the last two I are in a special format
-            elif 'QE12LP-S-MB-INT' in self._model:
-                self.display_range_steps = range(17, 27)
-            # 30mj to 300j
-            else:
-                self.display_range_steps = range(21, 30)
 
         self.range_dict = {}
         res_table = [1, 3, 10, 30, 100, 300]
@@ -579,7 +565,7 @@ class GentecEO(Device):
 
     def format_unit(self, value, _base_unit):
         magnitude_ranges = [[float("-inf"), 0], [0, 1e-12], [1e-12, 1e-9],
-                            [1e-9, 1e-6], [1e-6, 1e-3], [1e-3, 1], [1, 1000]]
+                            [1e-9, 1e-6], [1e-6, 1e-3], [1e-3, 1], [1, float("inf")]]
         unit_prefix = ['', '', 'p', 'n', 'u', 'm', '']
         scale_list = [1, 1, 1e12, 1e9, 1e6, 1e3, 1]
         for idx, m in enumerate(magnitude_ranges):
@@ -709,6 +695,7 @@ class GentecEO(Device):
                 decoded = decoded+chr(int(i[-4:-2], 16))
             self._serial_number = decoded[42*2:45*2]
             self._model = decoded[26*2:42*2]
+            self.display_range_steps=range(int(res_decode[10][-2:],16), int(res_decode[8][-2:],16))
             self._model = self._model.replace(
                 '\x00', '').replace(chr(int('CC', 16)), '')
             if self._model == "PH100-Si-HA-OD1":
