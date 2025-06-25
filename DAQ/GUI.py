@@ -29,7 +29,7 @@ class DaqGUI:
         self.db = tango.Database()
         self.root_path = os.path.dirname(os.path.dirname(__file__))
         self.logging_q = Queue()
-        Thread(target=self.logger_thread).start()
+        Thread(target=self.logger_thread, daemon=True).start()
         # self.current_shot_numbern is for highlight function. O indicate no highlight before start acquisition.
         self.current_shot_number = 0
         # self.row_shotnum is for define start shot on scan list.
