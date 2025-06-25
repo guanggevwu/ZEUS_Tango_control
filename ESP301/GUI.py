@@ -33,8 +33,10 @@ def create_app():
                 basler_app.add_label_widget(panel1_layout, d, attr)
         # basler_app.add_label_widget(
         #     panel1_layout, d, f'eval:new={{{d}/ax1_position}}-{{{d}/ax2_position}};new')
-
-        axis_index = ['12', '1', '2', '3']
+        if d == 'laser/esp301/esp300_test':
+            axis_index = ['12', '1', '2', '3']
+        else:
+            axis_index = ['1', '2', '3']
         for a in axis_index:
             if f'ax{a}_position' in attr_list:
                 basler_app.add_label_widget(

@@ -32,7 +32,7 @@ class LoggerAdapter(logging.LoggerAdapter):
 class ESP301(Device):
 
     com = device_property(dtype=str, default_value='COM1')
-    axis = device_property(dtype=str, default_value='1,2')
+    axis = device_property(dtype=str, default_value='1,2,3')
 
     def init_device(self):
         '''

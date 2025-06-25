@@ -36,8 +36,6 @@ class Daq:
         self.dir = dir
         self.select_cam_list = select_cam_list
         self.thread_event = thread_event
-        # compare shot number of each camera with self.current_shot_for_all_cam to determine if it is time to stitch and inform "shot xx is compeleted"
-        self.current_shot_for_all_cam = 1
         Yes_for_all = False
         if not len(select_cam_list):
             raise Exception("Please select cameras!")
@@ -252,7 +250,9 @@ class Daq:
         resulting_fps_dict = {}
         if len(self.cam_info) < 2:
             stitch = False
+        # compare shot number of each camera with self.current_shot_for_all_cam to determine if it is time to stitch and inform "shot xx is compeleted"
         # reset shot number and set the start shot number
+        self.current_shot_for_all_cam = shot_start
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
             if hasattr(bs, 'reset_number'):

@@ -87,6 +87,8 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "waverunner_104mxi_1": {'server': 'LeCroy/old_scope', '_class': 'LeCroy', 'name': 'facility/lecroy/waverunner_104mxi_1'},
             "wavesurfer_3034z_1": {'server': 'LeCroy/wavesurfer_3034z_1', '_class': 'LeCroy', 'name': 'facility/lecroy/wavesurfer_3034z_1'},
             "dg535_test": {'server': 'DG535/testsr', '_class': 'DG535', 'name': 'test/dg535/1'},
+            "esp300_test": {'server': 'ESP301/test', '_class': 'ESP301', 'name': 'test/esp300/esp300_test'},
+            "esp300_turning_box3": {'server': 'ESP301/esp300_turning_box3', '_class': 'ESP301', 'name': 'test/esp300/esp300_turning_box3'},
             "file_reader_1": {'server': 'FileReader/file_reader_1', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_1'},
             "file_reader_2": {'server': 'FileReader/image_reader_2', '_class': 'FileReader', 'name': 'facility/file_reader/image_reader_2', 'property': {'file_type': 'image'}},
             "file_reader_3": {'server': 'FileReader/xy_reader', '_class': 'FileReader', 'name': 'facility/file_reader/xy_reader', 'property': {'file_type': 'xy'}},
@@ -96,7 +98,7 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "file_reader_7": {'server': 'FileReader/transverse', '_class': 'FileReader', 'name': 'facility/file_reader/transverse', 'property': {'file_type': 'image'}},
             "file_reader_8": {'server': 'FileReader/spectrometer', '_class': 'FileReader', 'name': 'facility/file_reader/spectrometer', 'property': {'file_type': 'xy'}},
             "file_reader_9": {'server': 'FileReader/TA3-Xray', '_class': 'FileReader', 'name': 'TA3/file_reader/TA3-Xray', 'property': {'file_type': 'image'}},
-            
+
             "asyncio_device_1": {'server': 'AsyncioDevice/asyncio_device_1', '_class': 'AsyncioDevice', 'name': 'test/asyncio_device/asyncio_device_1'},
             "TA1_regulator_1": {'server': 'GXRegulator/TA1_regulator_1', '_class': 'FileReader', 'name': 'TA1/gx_regulator/TA1_regulator_1', 'property': {'high_voltage_channel': '0', 'low_voltage_channel': '1'}},
             "TA1_regulator_2": {'server': 'GXRegulator/TA1_regulator_2', '_class': 'FileReader', 'name': 'TA1/gx_regulator/TA1_regulator_2', 'property': {'high_voltage_channel': '2', 'low_voltage_channel': '3'}},
