@@ -20,7 +20,7 @@ if platform.system() == 'Windows':
         os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'zeus.png')
 
 parser = TaurusArgparse(
-    description='GUI for Gentec-EO devices', device_default='test/gentec/1')
+    description='GUI for Gentec-EO devices', device_default='test/gentec/1', polling_default=200)
 args = parser.parse_args()
 
 device_name = args.device
