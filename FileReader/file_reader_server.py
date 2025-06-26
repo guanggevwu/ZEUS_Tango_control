@@ -160,7 +160,8 @@ class FileReader(Device):
             file_folder = os.listdir(self._folder_path)
         except FileNotFoundError:
             return []
-        self._file_list = [i for i in file_folder if self._file_extension in i]
+        # only count files that meet the file extension requirement and that has a size larger than 0.
+        self._file_list = [i for i in file_folder if self._file_extension in i and os.path.getsize(os.path.join(self._folder_path, i))>0]
         return self._file_list
 
     current_file = attribute(

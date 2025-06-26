@@ -262,8 +262,9 @@ class Daq:
             info['is_completed'] = False
             if hasattr(bs, 'resulting_fps'):
                 resulting_fps_dict[bs.user_defined_name] = bs.resulting_fps
-        self.logger(
-            f'Resulting fps: {resulting_fps_dict}. Please limit the triggerring rate to the minimum, i.e., {np.min([value for value in resulting_fps_dict.values()])} Hz.')
+        if resulting_fps_dict:
+            self.logger(
+                f'Resulting fps: {resulting_fps_dict}. Please limit the triggerring rate to the minimum, i.e., {np.min([value for value in resulting_fps_dict.values()])} Hz.')
         threads = []
         for c, info in self.cam_info.items():
             t = Thread(target=self.thread_acquire_data, args=[
