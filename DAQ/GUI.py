@@ -102,7 +102,7 @@ class DaqGUI:
         self.frame2.grid(column=0, row=1, sticky=(N, W, E, S))
 
         self.frame2_checkbutton_content = {'overwrite_config': {'text': 'Use the config.py configuration for the cameras', 'init_status': True},  'save_config': {'text': 'Save the configurations to a file', 'init_status': True}, 'background_image': {
-            'text': 'Save backgrounds image before acquisition', 'init_status': True}, 'stitch': {'text': 'Stitch the images from multiple cameras and save a large image', 'init_status': True}, 'laser_shot_id': {'text': 'save shot id table', 'init_status': False}, }
+            'text': 'Save backgrounds image before acquisition', 'init_status': True}, 'stitch': {'text': 'Stitch the images from multiple cameras and save a large image', 'init_status': True}, 'laser_shot_id': {'text': 'save shot id table', 'init_status': False}, 'MA3_QE12': {'text': 'save MA3 QE12 data', 'init_status': False},}
 
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
             checkbox_var = BooleanVar(value=value['init_status'])
@@ -353,7 +353,8 @@ class DaqGUI:
             "save_config": self.frame2_checkbutton_content['save_config']['var'].get(),
             "background_image": self.frame2_checkbutton_content['background_image']['var'].get(),
             "stitch": self.frame2_checkbutton_content['stitch']['var'].get(),
-            "laser_shot_id": self.frame2_checkbutton_content['laser_shot_id']['var'].get()
+            "laser_shot_id": self.frame2_checkbutton_content['laser_shot_id']['var'].get(),
+            "MA3_QE12": self.frame2_checkbutton_content['MA3_QE12']['var'].get()
         }
         with open(self.init_file_path, 'w') as jsonfile:
             json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get()},
@@ -388,7 +389,7 @@ class DaqGUI:
         scan_table = self.scan_window.scan_table if hasattr(
             self, 'scan_window') else None
         self.daq.acquisition(
-            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], laser_shot_id=self.options['laser_shot_id'], scan_table=scan_table)
+            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], laser_shot_id=self.options['laser_shot_id'], MA3_QE12=self.option['MA3_QE12'],scan_table=scan_table)
         if not self.my_event.is_set():
             self.toggle_acquisition()
 
