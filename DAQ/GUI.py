@@ -101,15 +101,15 @@ class DaqGUI:
             root, text='Options', padding=pad_widget, style='Sty1.TLabelframe')
         self.frame2.grid(column=0, row=1, sticky=(N, W, E, S))
 
-        self.frame2_checkbutton_content = {'overwrite_config': {'text': 'Use the config.py configuration for the cameras', 'init_status': True},  'save_config': {'text': 'Save the configurations to a file', 'init_status': True}, 'background_image': {
-            'text': 'Save backgrounds image before acquisition', 'init_status': True}, 'stitch': {'text': 'Stitch the images from multiple cameras and save a large image', 'init_status': True}, 'laser_shot_id': {'text': 'save shot id table', 'init_status': False}, 'MA3_QE12': {'text': 'save MA3 QE12 data', 'init_status': False},}
-
+        self.frame2_checkbutton_content = {'background_image': {
+            'text': 'Save background images', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'laser_shot_id': {'text': 'Save shot id data', 'init_status': False}, 'MA3_QE12': {'text': 'Save MA3 QE12 data', 'init_status': False},}
+        item_per_column = 2
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
             checkbox_var = BooleanVar(value=value['init_status'])
             checkbox = ttk.Checkbutton(self.frame2, text=value['text'],
                                        variable=checkbox_var, style='Sty1.TCheckbutton')
             checkbox.grid(
-                column=0, row=idx, sticky=W)
+                column=idx%item_per_column, row=int(idx/item_per_column), sticky=W)
             value['var'] = checkbox_var
 
         # ---------------------frame 3
@@ -264,7 +264,7 @@ class DaqGUI:
             self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_online.TButton'
             self.insert_to_disabled(f'{device_name} is connected.')
         except (tango.DevFailed, tango.ConnectionFailed) as e:
-            if self.selected_devices[device_name]['connection_try_times'] >= 5:
+            if self.selected_devices[device_name]['connection_try_times'] >= 2:
                 if type(e) is tango.DevFailed:
                     self.insert_to_disabled(
                         f'Type: {type(e)}. Check if {device_name} exists in the data base.')
@@ -349,8 +349,6 @@ class DaqGUI:
 
     def start_acquisition(self):
         self.options = {
-            "overwrite_config": self.frame2_checkbutton_content['overwrite_config']['var'].get(),
-            "save_config": self.frame2_checkbutton_content['save_config']['var'].get(),
             "background_image": self.frame2_checkbutton_content['background_image']['var'].get(),
             "stitch": self.frame2_checkbutton_content['stitch']['var'].get(),
             "laser_shot_id": self.frame2_checkbutton_content['laser_shot_id']['var'].get(),
@@ -360,8 +358,6 @@ class DaqGUI:
             json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get()},
                       jsonfile)
         # if the checkbox is checked, then we use the config saved in config.py file and we pass None here. If it is unchecked, then we pass the basic configuration and ignore the configuration in the file.
-        overwrite_config = None if self.options["overwrite_config"] else {"all": {
-            "repetition": self.shot_end_var.get()-self.shot_start_var.get()+1, "is_polling_periodically": False, "trigger_source": "External", }}
         self.daq = Daq(self.selected_devices,
                        dir=self.path_var.get(), thread_event=self.my_event, check_exist=False, GUI=self)
         '''
@@ -382,14 +378,13 @@ class DaqGUI:
                         self.acquisition['button']['text'] = 'Start'
                         return
         '''
-        self.daq.set_camera_configuration(
-            config_dict=overwrite_config, saving=self.options['save_config'])
+        self.daq.set_camera_configuration()
         if self.options['background_image']:
             self.daq.take_background(stitch=self.options['stitch'])
         scan_table = self.scan_window.scan_table if hasattr(
             self, 'scan_window') else None
         self.daq.acquisition(
-            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], laser_shot_id=self.options['laser_shot_id'], MA3_QE12=self.options['MA3_QE12'],scan_table=scan_table)
+            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], scan_table=scan_table)
         if not self.my_event.is_set():
             self.toggle_acquisition()
 
