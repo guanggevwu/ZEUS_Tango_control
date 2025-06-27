@@ -84,6 +84,7 @@ class Daq:
         combined_config = {}
         # the overwrite priority is "specified camera in config_dict" > "all in config_dict" > "specified camera in default_config_dict" > "all in default_config_dict"
         # 2025/02/05 change that if a configuration is passed to config_dict, then use the configuration which is basically just change polling and image number. All other changes are made by GUI. Otherwise, use default in config.py.
+        # Although the option that "use default config.py" in the GUI is removed, config_dict is stilled used in the termination function.
         for cam in user_defined_name_list:
             new_config = {}
             if not config_dict:
@@ -146,13 +147,14 @@ class Daq:
 
     def get_image(self, bs):
         bits = ''.join([i for i in bs.format_pixel if i.isdigit()])
+        image = bs.image
         if int(bits) > 8:
             bits = '16'
-        data_PIL = Image.fromarray(bs.image.astype(f'uint{bits}'))
+        data_PIL = Image.fromarray(image.astype(f'uint{bits}'))
         if hasattr(bs, "image_with_MeV_mark"):
             data_array = bs.image_with_MeV_mark.astype(f'uint{bits}')
         else:
-            data_array = bs.image.astype(f'uint{bits}')
+            data_array = image.astype(f'uint{bits}')
         return data_PIL, data_array
 
     def stretch_image(self, current_image):
@@ -221,7 +223,7 @@ class Daq:
             time.sleep(interval)
             logging.info(f"trigger {i} sent!")
 
-    def acquisition(self, stitch=True, shot_start=1, shot_end=float('inf'), laser_shot_id=False, MA3_QE12=False, scan_table=None):
+    def acquisition(self, stitch=True, shot_start=1, shot_end=float('inf'), scan_table=None):
         '''
         Main acquisition function. Use external trigger and save data.
         '''
@@ -242,10 +244,10 @@ class Daq:
                     self.set_scan_value(
                         self.scan_attr_proxies[device_attr_name], value, shot_start)
             self.save_scan_list(shot_start, add_header=True)
-        if laser_shot_id:
+        if self.GUI.options["laser_shot_id"]:
             self.yellow_programe = tango.DeviceProxy(
                 "laser/labview/labview_programe")
-        if MA3_QE12:
+        if self.GUI.options["MA3_QE12"]:
             self.MA3_QE12 = tango.DeviceProxy(
                 "laser/gentec/MA3_QE12")
         # acquisition
@@ -275,7 +277,7 @@ class Daq:
             threads.append(t)
             t.start()
         t_shot_completion = Thread(target=self.thread_stitch_and_go_to_next_scan_point, args=[
-                                   stitch, laser_shot_id, MA3_QE12, scan_table], daemon=True)
+                                   stitch, scan_table], daemon=True)
         threads.append(t_shot_completion)
         t_shot_completion.start()
         for t in threads:
@@ -330,7 +332,7 @@ class Daq:
                 # self.logger(
                 #     f"It takes {datetime.now()-t0} to save {info['user_defined_name']} {info['shot_num']-1} out of thread.")
 
-    def thread_stitch_and_go_to_next_scan_point(self, stitch, laser_shot_id, MA3_QE12, scan_table):
+    def thread_stitch_and_go_to_next_scan_point(self, stitch, scan_table):
         while True:
             if self.thread_event is not None and self.thread_event.is_set():
                 # self.logger(f'stitching and scan thread stopped.')
@@ -358,8 +360,8 @@ class Daq:
                             ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
                     self.save_scan_list(self.current_shot_for_all_cam)
                 self.csv_header =  ['shot_number']
-                if laser_shot_id or MA3_QE12:
-                    self.save_shot_id_table(self.current_shot_for_all_cam, laser_shot_id, MA3_QE12)
+                if self.GUI.options["laser_shot_id"] or self.GUI.options["MA3_QE12"]:
+                    self.save_scalars(self.current_shot_for_all_cam)
 
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
                 self.logger("All shots completed!")
@@ -421,10 +423,10 @@ class Daq:
             writer.writerow([shot_number, datetime.now().strftime(
                 "%H:%M:%S.%f")]+[i.read().value for i in self.scan_attr_proxies.values()])
 
-    def save_shot_id_table(self, shot_number, laser_shot_id, MA3_QE12):
-        if laser_shot_id:
+    def save_scalars(self, shot_number,):
+        if self.GUI.options["laser_shot_id"]:
             self.csv_header.extend(['shot_id_time', 'shot_id'])
-        if MA3_QE12:
+        if self.GUI.options["MA3_QE12"]:
             self.csv_header.extend(['MA3_QE12_read_time', 'MA3_QE12_main_value', 'MA3_QE12_multiplier'])
         file_exists = os.path.isfile(os.path.join(self.dir, 'shot_id.csv'))
         with open(os.path.join(self.dir, 'shot_id.csv'), 'a') as csvfile:
@@ -432,12 +434,13 @@ class Daq:
             if not file_exists:
                 writer.writeheader()
             data_to_write = {'shot_number': shot_number-1}
-            if laser_shot_id:
+            if self.GUI.options["laser_shot_id"]:
                 data_to_write.update({'shot_id': self.yellow_programe.shot_id, 'shot_id_time': self.yellow_programe.read_time})
-            if MA3_QE12:
+            if self.GUI.options["MA3_QE12"]:
                 data_to_write.update({'MA3_QE12_read_time': self.MA3_QE12.read_time,
                             'MA3_QE12_main_value': self.MA3_QE12.main_value, 'MA3_QE12_multiplier': self.MA3_QE12.multiplier})                
             writer.writerow(data_to_write)
+            self.logger(f'Wrote scalars: {data_to_write}')
 
     def thread_saving(self, data, save_path, message):
         data.save(save_path)

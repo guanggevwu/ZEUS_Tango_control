@@ -956,7 +956,7 @@ class Basler(Device):
                 self._is_new_image = True
                 self._read_time = datetime.datetime.now().strftime("%H-%M-%S.%f")
                 # self.push_change_event("image", self._image)
-                self.push_change_event("image", self.read_image())
+                self.push_change_event("image", self._image)
                 self.push_change_event("flux", self.read_flux())
                 self.push_change_event(
                     "image_number", self.read_image_number())
