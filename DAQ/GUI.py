@@ -389,7 +389,7 @@ class DaqGUI:
         scan_table = self.scan_window.scan_table if hasattr(
             self, 'scan_window') else None
         self.daq.acquisition(
-            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], laser_shot_id=self.options['laser_shot_id'], MA3_QE12=self.option['MA3_QE12'],scan_table=scan_table)
+            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], laser_shot_id=self.options['laser_shot_id'], MA3_QE12=self.options['MA3_QE12'],scan_table=scan_table)
         if not self.my_event.is_set():
             self.toggle_acquisition()
 

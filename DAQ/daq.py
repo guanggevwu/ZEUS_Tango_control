@@ -423,20 +423,19 @@ class Daq:
 
     def save_shot_id_table(self, shot_number, laser_shot_id, MA3_QE12):
         if laser_shot_id:
-            self.csv_header.append('shot_id_time', 'shot_id')
+            self.csv_header.extend(['shot_id_time', 'shot_id'])
         if MA3_QE12:
-            self.csv_header.append('MA3_QE12_read_time', 'MA3_QE12_main_value', 'MA3_QE12_multiplier')
+            self.csv_header.extend(['MA3_QE12_read_time', 'MA3_QE12_main_value', 'MA3_QE12_multiplier'])
         file_exists = os.path.isfile(os.path.join(self.dir, 'shot_id.csv'))
         with open(os.path.join(self.dir, 'shot_id.csv'), 'a') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=self.csv_header)
             if not file_exists:
                 writer.writeheader()
-            data_to_write = {}
+            data_to_write = {'shot_number': shot_number-1}
             if laser_shot_id:
-                data_to_write.extend({'shot_number': shot_number-1,
-                            'shot_id': self.yellow_programe.shot_id, 'shot_id_time': self.yellow_programe.read_time})
+                data_to_write.update({'shot_id': self.yellow_programe.shot_id, 'shot_id_time': self.yellow_programe.read_time})
             if MA3_QE12:
-                data_to_write.extend({'MA3_QE12_read_time': self.MA3_QE12.read_time,
+                data_to_write.update({'MA3_QE12_read_time': self.MA3_QE12.read_time,
                             'MA3_QE12_main_value': self.MA3_QE12.main_value, 'MA3_QE12_multiplier': self.MA3_QE12.multiplier})                
             writer.writerow(data_to_write)
 
