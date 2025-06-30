@@ -180,7 +180,22 @@ class Basler(Device):
 
     def write_save_interval(self, value):
         self._save_interval = value
-
+        
+    resulting_fps = attribute(
+        label="resulting frame rate",
+        dtype=float,
+        access=AttrWriteType.READ,
+        doc='Several factors may limit the frame rate on any Basler camera, e.g., bandwidth.'
+    )
+    
+    bandwidth = attribute(
+        label="bandwidth",
+        dtype=float,
+        unit="MB/s",
+        access=AttrWriteType.READ_WRITE,
+        memorized=is_memorized,
+        doc='Bandwidth assigned to this device. For some simple cameras, this parameter is not availabe, shown as -1.'
+    )
     naming_format = attribute(
         label='naming format',
         dtype=str,
@@ -286,12 +301,6 @@ class Basler(Device):
         doc='frame rate (only applicable when frames per trigger is large than 1)'
     )
 
-    resulting_fps = attribute(
-        label="resulting frame rate",
-        dtype=float,
-        access=AttrWriteType.READ,
-        doc='Several factors may limit the frame rate on any Basler camera, e.g., bandwidth.'
-    )
 
     offsetX = attribute(
         label="offset x axis",
@@ -886,6 +895,19 @@ class Basler(Device):
             self._resulting_fps = self.camera.ResultingFrameRateAbs.Value
         self._resulting_fps = round(self._resulting_fps, 2)
         return self._resulting_fps
+    
+    def read_bandwidth(self):
+        try:
+            self._bandwidth = float(self.camera.GetNodeMap().GetNode('DeviceLinkThroughputLimit').Value)/1e6
+        except:
+            self._bandwidth = -1
+        return self._bandwidth
+    
+    def write_bandwidth(self, value):
+        try:
+            self._bandwidth = self.camera.GetNodeMap().GetNode('DeviceLinkThroughputLimit').SetValue(int(value*1e6))
+        except:
+            self._bandwidth = -1
 
     def read_is_new_image(self):
         # self.i, grabbing successfully grabbed image. self._image_number, image counting and can be reset at any time.
