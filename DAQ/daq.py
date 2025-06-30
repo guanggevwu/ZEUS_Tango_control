@@ -266,10 +266,10 @@ class Daq:
             # when there is a shot limit, the acquisition stops after the requested image numbers are reached.
             info['is_completed'] = False
             if hasattr(bs, 'resulting_fps'):
-                resulting_fps_dict[bs.user_defined_name] = bs.resulting_fps
+                resulting_fps_dict[bs.user_defined_name] = (f'{bs.bandwidth:.1f} {bs.get_attribute_config("bandwidth").unit}', bs.resulting_fps)
         if resulting_fps_dict:
             self.logger(
-                f'Resulting fps: {resulting_fps_dict}. Please limit the triggerring rate to the minimum, i.e., {np.min([value for value in resulting_fps_dict.values()])} Hz.')
+                f'Bandwidth and resulting fps: {resulting_fps_dict}. Triggering rate should be limited by the slowest camera.')
         threads = []
         for c, info in self.cam_info.items():
             t = Thread(target=self.thread_acquire_data, args=[
