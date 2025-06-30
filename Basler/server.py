@@ -729,7 +729,7 @@ class Basler(Device):
                     os.makedirs(v, exist_ok=True)
                 except OSError as inst:
                     logging.error(inst)
-                    raise (f'error on save_path part {idx}')
+                    raise Exception(f'error on save_path part {idx}')
         self._save_path = value
         self.push_change_event("save_path", self.read_save_path())
 

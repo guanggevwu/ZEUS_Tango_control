@@ -399,7 +399,7 @@ class GentecEO(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
         hw_memorized=True,
-        doc='save the data'
+        doc='Start to collect statistics. It will reset the historical data and start to collect new data. If it is set to False, the historical data will be cleared.'
     )
 
     def read_start_statistics(self):
@@ -695,7 +695,8 @@ class GentecEO(Device):
                 decoded = decoded+chr(int(i[-4:-2], 16))
             self._serial_number = decoded[42*2:45*2]
             self._model = decoded[26*2:42*2]
-            self.display_range_steps=range(int(res_decode[10][-2:],16), int(res_decode[8][-2:],16))
+            self.display_range_steps = range(
+                int(res_decode[10][-2:], 16), int(res_decode[8][-2:], 16))
             self._model = self._model.replace(
                 '\x00', '').replace(chr(int('CC', 16)), '')
             if self._model == "PH100-Si-HA-OD1":
