@@ -12,6 +12,7 @@ from taurus.qt.qtgui.display import TaurusLabel
 from taurus_pyqtgraph import TaurusPlot
 from taurus import tauruscustomsettings
 import platform
+import tango
 if platform.system() == 'Windows':
     tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'zeus.png')
@@ -39,7 +40,7 @@ class BaslerGUI():
         self.attr_list = {}
 
     def add_device(self, device_name):
-        exclude = ['is_new_image']
+        exclude = []
         device_info = {}
         device_info['dp'] = Device(device_name)
         device_info['attrs'] = device_info['dp'].get_attribute_list()
@@ -161,8 +162,8 @@ class BaslerGUI():
         dropdown = {'trigger_source': (('Off', 'Off'), ('Software', 'Software'), ('External', 'External')), 'trigger_selector': (
             ('AcquisitionStart', 'AcquisitionStart'), ('FrameStart', 'FrameStart')), }
         for idx, full_attr in enumerate(form_model):
-            # change the bool write to auto apply.
-            if full_attr.split('/')[-1] in self.attr_list[device_name]['attrs'] and self.attr_list[device_name]['dp'].attribute_query(full_attr.split('/')[-1]).data_type == 1:
+            # change the bool write to auto apply. Only apply to writable bool widget.
+            if full_attr.split('/')[-1] in self.attr_list[device_name]['attrs'] and self.attr_list[device_name]['dp'].attribute_query(full_attr.split('/')[-1]).data_type == 1 and self.attr_list[device_name]['dp'].attribute_query(full_attr.split('/')[-1]).writable == tango._tango.AttrWriteType.READ_WRITE:
                 idx = form_model.index(full_attr)
                 panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
             if full_attr.split('/')[-1] in dropdown:

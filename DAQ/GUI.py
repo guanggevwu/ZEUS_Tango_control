@@ -88,6 +88,7 @@ class DaqGUI:
 
         self.frame1 = ttk.Labelframe(
             root, text='Devices', padding=pad_widget, style='Sty1.TLabelframe')
+        self.frame1.grid_columnconfigure(2, weight=1)
         self.frame1.grid(column=0, row=0, sticky=(N, W, E, S))
         ttk.Button(self.frame1, text='Select', command=self.open_device_list, style='Sty1.TButton').grid(
             column=0, row=0, sticky='W')
@@ -95,6 +96,8 @@ class DaqGUI:
             self.frame1, text='Device GUI', command=self.start_device_GUI, style='Sty2_client_offline.TButton')
         self.client_GUI['button'].grid(column=1, row=0, sticky='W')
         self.device_row, self.selected_device_per_row = 1, 4
+        ttk.Button(self.frame1, text='Bandwidth', command=self.open_bandwidth_table, style='Sty1.TButton').grid(
+            column=3, row=0, sticky='W')
 
         # ---------------------frame 2
         self.frame2 = ttk.Labelframe(
@@ -102,14 +105,14 @@ class DaqGUI:
         self.frame2.grid(column=0, row=1, sticky=(N, W, E, S))
 
         self.frame2_checkbutton_content = {'background_image': {
-            'text': 'Save background images', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'laser_shot_id': {'text': 'Save shot id data', 'init_status': False}, 'MA3_QE12': {'text': 'Save MA3 QE12 data', 'init_status': False},}
+            'text': 'Save background images', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'laser_shot_id': {'text': 'Save shot id data', 'init_status': False}, 'MA3_QE12': {'text': 'Save MA3 QE12 data', 'init_status': False}, }
         item_per_column = 2
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
             checkbox_var = BooleanVar(value=value['init_status'])
             checkbox = ttk.Checkbutton(self.frame2, text=value['text'],
                                        variable=checkbox_var, style='Sty1.TCheckbutton')
             checkbox.grid(
-                column=idx%item_per_column, row=int(idx/item_per_column), sticky=W)
+                column=idx % item_per_column, row=int(idx/item_per_column), sticky=W)
             value['var'] = checkbox_var
 
         # ---------------------frame 3
@@ -120,7 +123,6 @@ class DaqGUI:
         ttk.Label(self.frame3, text='Save path:', font=(
             'Helvetica', int(self.font_mid*0.75))).grid(
             column=0, row=0, sticky='W')
-        # dt_string = datetime.now().strftime("%Y%m%d")
         self.path_var = StringVar()
         ttk.Entry(self.frame3, textvariable=self.path_var, font=(
             'Helvetica', int(self.font_mid*0.75)), width=60).grid(
@@ -171,7 +173,7 @@ class DaqGUI:
         self.init_settings()
 
     def init_settings(self):
-        # self.selected_devices is a dictionary. Key is the device name, value is another dictionary. In the sub-dictionary, the keys are "checkbutton" and "server_pid".
+        # self.selected_devices structure. self.selected_devices = {'[device name]': {'checkbutton': ttk.Button, 'server_pid': [int/string?], 'connection_try_times': [int], 'tango_dp': tango.DeviceProxy}, }
         self.init_file_path = os.path.join(
             os.path.dirname(__file__), 'init.json')
         self.class_name = ['Basler', 'FileReader', 'Vimba']
@@ -204,21 +206,32 @@ class DaqGUI:
             child.grid_configure(padx=[self.font_mid, 0], pady=3)
 
     def open_device_list(self):
+        '''Command for the select button in frame1. It opens a new window with a list of devices.'''
         if not (hasattr(self, "device_list_window") and self.device_list_window.winfo_exists()):
             self.device_list_window = DeviceListWindow(
                 update_selected_devices=self.update_selected_devices, selected_devices=self.selected_devices, device_names_in_db=self.device_names_in_db)
-            self.device_list_window.title("Device List")
+        self.device_list_window.deiconify()
         self.device_list_window.attributes('-topmost', True)
         self.device_list_window.attributes('-topmost', False)
 
     def open_scan_list(self):
+        '''Command for the scan button in frame3. It opens a new window with a scan list.'''
         if not (hasattr(self, "scan_window") and self.scan_window.winfo_exists()):
             self.scan_window = ScanWindow(self)
-            self.scan_window.title("Scan Module")
+        self.scan_window.deiconify()
         self.scan_window.attributes('-topmost', True)
         self.scan_window.attributes('-topmost', False)
 
+    def open_bandwidth_table(self):
+        '''Command for the scan button in frame1. It opens a new window with the bandwidth table.'''
+        if not (hasattr(self, "bandwidth") and self.scan_window.winfo_exists()):
+            self.bandwidth_window = BandwidthWindow(self)
+        self.bandwidth_window.deiconify()
+        self.bandwidth_window.attributes('-topmost', True)
+        self.bandwidth_window.attributes('-topmost', False)
+
     def connect_to_device(self, device_name):
+        '''Command for the device button in frame1. It connects to the device and starts the server if it is not already running.'''
         if 'server_pid' not in self.selected_devices[device_name]:
             device_class = self.db.get_device_info(
                 device_name).class_name
@@ -243,6 +256,7 @@ class DaqGUI:
             self.kill_device_server(device_name)
 
     def kill_device_server(self, device_name):
+        '''Command for the device button in frame1. It kills the device server if it is running. It is part of the connect_to_device function.'''
         try:
             os.kill(self.selected_devices[device_name]
                     ['server_pid'], signal.SIGTERM)
@@ -255,6 +269,7 @@ class DaqGUI:
         self.insert_to_disabled(f'{device_name} server is killed.')
 
     def check_device_server_status(self, device_name):
+        '''Check if the device server is running. If it is running, it will change the button style to online. If it is not running, it will try to connect again. It is called by the connect_to_device function.'''
         if 'connection_try_times' not in self.selected_devices[device_name]:
             return
         self.selected_devices[device_name]['connection_try_times'] += 1
@@ -262,9 +277,10 @@ class DaqGUI:
             dp = tango.DeviceProxy(device_name)
             dp.ping()
             self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_online.TButton'
+            self.selected_devices[device_name]['tango_dp'] = dp
             self.insert_to_disabled(f'{device_name} is connected.')
         except (tango.DevFailed, tango.ConnectionFailed) as e:
-            if self.selected_devices[device_name]['connection_try_times'] >= 2:
+            if self.selected_devices[device_name]['connection_try_times'] >= 4:
                 if type(e) is tango.DevFailed:
                     self.insert_to_disabled(
                         f'Type: {type(e)}. Check if {device_name} exists in the data base.')
@@ -277,6 +293,7 @@ class DaqGUI:
                     3000, lambda: self.check_device_server_status(device_name))
 
     def start_device_GUI(self):
+        '''Command for the device GUI button in frame1. It starts the client GUI for the selected devices. If the client GUI is already running, it will kill it.'''
         if 'client_pid' not in self.client_GUI:
             if len(self.selected_devices) == 0:
                 messagebox.showinfo(message='Please select devices!')
@@ -300,6 +317,7 @@ class DaqGUI:
             self.insert_to_disabled(f'Client GUI is killed.')
 
     def terminate(self):
+        '''Kill all the processes started by this GUI. It is called when the GUI is closed.'''
         for key, value in self.selected_devices.items():
             if 'server_pid' in value:
                 os.kill(value['server_pid'], signal.SIGTERM)
@@ -309,6 +327,7 @@ class DaqGUI:
             "Terminate. All processes are killed.")
 
     def update_selected_devices(self, device_name, checkbox_var):
+        '''The function is called when check or uncheck the devices in the device list window. Update the selected devices based on the checkbox state. If the checkbox is checked, it will create a button for the device. If it is unchecked, it will remove the button and delete the device from the selected devices dictionary.'''
         if checkbox_var.get():
             device_button = ttk.Button(
                 self.frame1, command=lambda device_name=device_name: self.connect_to_device(device_name), text=device_name.split('/')[-1], style='Sty2_offline.TButton')
@@ -330,6 +349,7 @@ class DaqGUI:
         self.pad_space(self.frame1)
 
     def toggle_acquisition(self):
+        '''Command for the start/stop button in frame3. It toggles the acquisition status. If the acquisition is running, it will stop it. If it is not running, it will start it in a new thread.'''
         if self.acquisition['status']:
             self.my_event.set()
             self.acquisition['status'] = False
@@ -348,6 +368,7 @@ class DaqGUI:
                 "Started acquisition in a new thread.", 'green_text')
 
     def start_acquisition(self):
+        '''Start the acquisition in a new thread. It will create a Daq object and call its acquisition method. It will also save the options and selected devices to a json file. It is called by the toggle_acquisition function.'''
         self.options = {
             "background_image": self.frame2_checkbutton_content['background_image']['var'].get(),
             "stitch": self.frame2_checkbutton_content['stitch']['var'].get(),
@@ -408,6 +429,7 @@ class DeviceListWindow(Toplevel):
         self.selected_devices = selected_devices
         self.device_names_in_db = device_names_in_db
         super().__init__(master=root)
+        self.title("Device List")
         newframe1 = ttk.Frame(self)
         newframe1.grid(column=0, row=0, columnspan=1, sticky=(N, W, E, S))
         devices_seperated_by_location = defaultdict(list)
@@ -439,9 +461,70 @@ class DeviceListWindow(Toplevel):
             child.grid_configure(padx=[0, 0], pady=5)
 
 
+class BandwidthWindow(Toplevel):
+    def __init__(self, parent):
+        self.parent = parent
+        super().__init__(master=root)
+        ttk.Label(self, text='Allowed bandwidth:', font=(
+            'Helvetica', int(self.parent.font_mid*0.75))).grid(
+            column=0, row=0, sticky='W')
+        self.total_bandwidth_var = DoubleVar(value=80.0)
+        ttk.Entry(self, textvariable=self.total_bandwidth_var, font=(
+            'Helvetica', int(self.parent.font_mid*0.75)), width=20).grid(
+            column=1, row=0, sticky='W')
+        ttk.Button(self, text='Optimize', command=self.optimize_bandwidth, style='Sty1.TButton').grid(
+            column=2, row=0, sticky='W')
+        ttk.Button(self, text='Refresh', command=self.update_bandwidth_tree, style='Sty1.TButton').grid(
+            column=3, row=0, sticky='W')
+        self.tree = ttk.Treeview(self, style="normal.Treeview")
+        self.tree.column("#0", width=150, anchor='center')
+        self.tree.heading('#0', text='Name')
+        column_heading = ['Bandwidth', 'Resulting fps']
+        self.tree['columns'] = column_heading
+        self.update_bandwidth_tree()
+
+    def update_bandwidth_tree(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        for i in self.tree['columns']:
+            self.tree.column(i, width=150, anchor='center')
+            self.tree.heading(i, text=i)
+        self.bandwidth_list = []
+        self.resulting_fps_list = []
+        self.frame_size_list = []
+        self.name_list = []
+        for key, value in self.parent.selected_devices.items():
+            if not 'basler' in key.lower():
+                continue
+            bandwidth = value['tango_dp'].bandwidth
+            resulting_fps = value['tango_dp'].resulting_fps
+            self.tree.insert('', 'end', text=key.split(
+                '/')[-1], values=(bandwidth, resulting_fps))
+            if bandwidth < 0:
+                continue
+            self.name_list.append(key)
+            self.bandwidth_list.append(bandwidth)
+            self.resulting_fps_list.append(resulting_fps)
+            self.frame_size_list.append(bandwidth/resulting_fps)
+        self.tree.grid(column=0, columnspan=4, row=1)
+
+    def optimize_bandwidth(self):
+        total_bandwidth = self.total_bandwidth_var.get()
+        if not total_bandwidth:
+            messagebox.showinfo(message='Please input the total bandwidth!')
+            return
+        for key, value in self.parent.selected_devices.items():
+            if key in self.name_list:
+                value['tango_dp'].bandwidth = total_bandwidth / \
+                    np.sum(self.frame_size_list) * \
+                    self.frame_size_list[self.name_list.index(key)]
+        self.update_bandwidth_tree()
+
+
 class ScanWindow(Toplevel):
     def __init__(self, parent):
         super().__init__(master=root)
+        self.title("Scan Module")
         self.parent = parent
         pad_widget = "10 0 0 10"
         self.scan_frame1 = ttk.Labelframe(
@@ -566,7 +649,7 @@ class ScanWindow(Toplevel):
         self.tree.column("#0", width=50, anchor='center')
         self.tree['columns'] = list(self.scan_table.keys())
         for i in self.scan_table:
-            self.tree.column(i, width=150, anchor='center')
+            self.tree.column(i, width=50, anchor='center')
             self.tree.heading(i, text='/'.join(i.split('/')[-2:]))
         for key, value in self.scan_table.items():
             for idx, v in enumerate(value):

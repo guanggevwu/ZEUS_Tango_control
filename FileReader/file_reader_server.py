@@ -156,12 +156,15 @@ class FileReader(Device):
     )
 
     def read_file_list(self):
+        if self._debug:
+            t0 = time.perf_counter()
         try:
-            file_folder = os.listdir(self._folder_path)
+            # only count files that meet the file extension requirement and that has a size larger than 0.
+            self._file_list = [i.name  for i in os.scandir(self._folder_path) if i.is_file() and i.stat().st_size and i.name.split('.')[-1] == self._file_extension]
         except FileNotFoundError:
-            return []
-        # only count files that meet the file extension requirement and that has a size larger than 0.
-        self._file_list = [i for i in file_folder if self._file_extension in i and os.path.getsize(os.path.join(self._folder_path, i))>0]
+            self._file_list = []
+        if self._debug:
+            logging.info(f'filter {time.perf_counter()-t0}')
         return self._file_list
 
     current_file = attribute(
@@ -210,8 +213,13 @@ class FileReader(Device):
     def read_is_new_image(self):
         # logging.info(f'{len(self.previous_list)=}')
         # logging.info(f'{len(self.read_file_list())=}')
+        if self._debug:
+            t0 = time.perf_counter()
         new_files = [i for i in self.read_file_list()
                      if i not in self.previous_list]
+        if self._debug:
+            logging.info(time.perf_counter() - t0)
+
         if new_files != []:
             new_files = sorted(new_files, key=lambda x: os.path.getmtime(
                 os.path.join(self._folder_path, x)))
