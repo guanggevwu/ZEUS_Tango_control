@@ -312,10 +312,13 @@ class Daq:
                 elif 'file_reader' in bs.dev_name() or bs.data_type == "xy":
                     file_name = self.generate_file_name(info, bs)
                     file_name = file_name.replace('%f', '.csv')
+                    source_path = os.path.join(bs.folder_path, bs.current_file)
+                    destination_path = os.path.join(
+                        info['cam_dir'], file_name)
+                    message = f"Shot {info['shot_num']} for {info['user_defined_name']} is saved."
+                    Thread(target=self.thread_copy, args=(source_path, destination_path, message))
                     shutil.copy(os.path.join(bs.folder_path, bs.current_file), os.path.join(
                         info['cam_dir'], file_name))
-                    self.logger(
-                        f"Shot {info['shot_num']} for {info['user_defined_name']} is saved.")
                     xy_reader_count += 1
                     if xy_reader_count == bs.files_per_shot:
                         data_array = self.save_plot_data(bs.x, bs.y)
@@ -444,6 +447,10 @@ class Daq:
 
     def thread_saving(self, data, save_path, message):
         data.save(save_path)
+        self.logger(message)
+
+    def thread_copy(self, source_path, destination_path, message):
+        shutil.copy(source_path, destination_path)
         self.logger(message)
 
     def imadjust(self, input, tol=0.01):

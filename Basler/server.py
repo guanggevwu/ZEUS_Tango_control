@@ -180,7 +180,7 @@ class Basler(Device):
 
     def write_save_interval(self, value):
         self._save_interval = value
-        
+
     resulting_fps = attribute(
         label="resulting frame rate",
         dtype=float,
@@ -969,7 +969,7 @@ class Basler(Device):
                     self._image_with_MeV_mark = np.array(
                         im_pil).astype(self._image.dtype)
                     self.push_change_event(
-                        "image_with_MeV_mark", self._image_with_MeV_mark)
+                        "image_with_MeV_mark", self.read_image_with_MeV_mark())
                 grabResult.Release()
                 if self._debug:
                     self.logger.info(
@@ -978,7 +978,7 @@ class Basler(Device):
                 self._is_new_image = True
                 self._read_time = datetime.datetime.now().strftime("%H-%M-%S.%f")
                 # self.push_change_event("image", self._image)
-                self.push_change_event("image", self._image)
+                self.push_change_event("image", self.read_image())
                 self.push_change_event("flux", self.read_flux())
                 self.push_change_event(
                     "image_number", self.read_image_number())

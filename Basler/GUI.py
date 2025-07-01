@@ -182,14 +182,18 @@ class BaslerGUI():
             self.add_label_widget(
                 panel3_layout, 'laser/gentec/Onshot', 'main_value', check_exist=True)
         for d in device_list:
+            widget_one_device = Qt.QWidget()
+            widget_one_device_layout = Qt.QHBoxLayout()
+            widget_one_device.setLayout(widget_one_device_layout)
             self.add_label_widget(
-                panel3_layout, d, 'user_defined_name')
+                widget_one_device_layout, d, 'user_defined_name')
             # because Basler uses 'image_number' and FileReader uses 'file_number'.
             if 'basler' in d:
                 self.add_label_widget(
-                    panel3_layout, d, 'image_number')
+                    widget_one_device_layout, d, 'image_number')
             elif 'file_reader' in d:
-                self.add_label_widget(panel3_layout, d, 'file_number')
+                self.add_label_widget(widget_one_device_layout, d, 'file_number')
+            panel3_layout.addWidget(widget_one_device)    
             self.add_command(panel3_layout, d)
         self.gui.createPanel(panel3, f'{len(device_list)} devices')
 
@@ -205,7 +209,7 @@ class BaslerGUI():
 
 def create_app():
     parser = TaurusArgparse(
-        description='GUI for Basler camera', device_default='test/basler/test', nargs_string='+', polling_default=1000)
+        description='GUI for Basler camera', device_default='test/basler/test', nargs_string='+', polling_default=1500)
     args = parser.parse_args()
 
     if 'combination' in args.device[0]:

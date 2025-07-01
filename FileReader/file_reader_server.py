@@ -240,7 +240,7 @@ class FileReader(Device):
                             self._image = np.array(image_PIL)                                                                                                                                   
                             self._format_pixel = str(
                                 self.mode_to_bpp[image_PIL.mode])
-                        self.push_change_event("image", self._image)
+                        self.push_change_event("image", self.read_image())
                     elif self._data_structure == 0:
                         with open(os.path.join(self._folder_path, self._current_file), newline='') as csvfile:
                             reader = csv.reader(csvfile)
