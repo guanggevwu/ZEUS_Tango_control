@@ -506,7 +506,7 @@ class GentecEO(Device):
 
     def do_things_if_new(self):
         self._new = True
-        self._read_time = datetime.datetime.now().strftime("%H:%M:%S.%f %m/%d")
+        self._read_time = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S.%f")
         if self._debug:
             print(
                 f'New data is acquired. {self._main_value_adjust} {self._main_value_adjust_unit} at {self._read_time}')
