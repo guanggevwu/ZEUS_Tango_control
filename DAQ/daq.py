@@ -117,8 +117,10 @@ class Daq:
                             setattr(bs, key, value)
                         elif old_value != value:
                             setattr(bs, key, value)
-                            self.logger(
-                                f"{info['user_defined_name']}/{key} is changed from {old_value} to {value}")
+                            # as "is_polling_periodically" is not an important information for the operators.
+                            if key != "is_polling_periodically":
+                                self.logger(
+                                    f"{info['user_defined_name']}/{key} is changed from {old_value} to {value}")
                     except:
                         self.logger(
                             f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}")
@@ -250,8 +252,6 @@ class Daq:
         if self.GUI.options["MA3_QE12"]:
             self.MA3_QE12 = tango.DeviceProxy(
                 "laser/gentec/MA3_QE12")
-        # acquisition
-        self.logger('Waiting for a trigger...')
         resulting_fps_dict = {}
         if len(self.cam_info) < 2:
             stitch = False
@@ -269,7 +269,7 @@ class Daq:
                 resulting_fps_dict[bs.user_defined_name] = (f'{bs.bandwidth:.1f} {bs.get_attribute_config("bandwidth").unit}', bs.resulting_fps)
         if resulting_fps_dict:
             self.logger(
-                f'Bandwidth and resulting fps: {resulting_fps_dict}. Triggering rate should be limited by the slowest camera.')
+                f'Bandwidth and resulting fps: {resulting_fps_dict}. Triggering rate is limited by the slowest camera.')
         threads = []
         for c, info in self.cam_info.items():
             t = Thread(target=self.thread_acquire_data, args=[
@@ -282,13 +282,15 @@ class Daq:
         t_shot_completion.start()
         for t in threads:
             t.join()
+        # acquisition
+        self.logger('Waiting for a trigger...')
 
     def thread_acquire_data(self, info, stitch, shot_end,):
         xy_reader_count = 0
         while True:
             if self.thread_event is not None and self.thread_event.is_set():
-                self.logger(
-                    f"{info['user_defined_name']} acquisition thread stopped.")
+                # self.logger(
+                #     f"{info['user_defined_name']} acquisition thread stopped.")
                 break
             bs = info['device_proxy']
             # self.logger(f'{bs.dev_name()}, {info["shot_num"]}, start')
