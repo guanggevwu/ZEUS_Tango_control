@@ -59,6 +59,8 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "basler_TA2-GOSSIP": {'server': 'Basler/TA2-GOSSIP', '_class': 'Basler', 'name': 'TA2/basler/TA2-GOSSIP'},
             "basler_TA2-Screen-1w": {'server': 'Basler/TA2-Screen-1w', '_class': 'Basler', 'name': 'TA2/basler/TA2-Screen-1w', 'property': {'friendly_name': 'TA2-Screen-1w'}},
             "basler_TA2-Screen-2w": {'server': 'Basler/TA2-Screen-2w', '_class': 'Basler', 'name': 'TA2/basler/TA2-Screen-2w', 'property': {'friendly_name': 'TA2-Screen-2w'}},
+            "basler_TA3-NearField": {'server': 'Basler/TA3-NearField', '_class': 'Basler', 'name': 'TA3/basler/TA3-NearField', 'property': {'friendly_name': 'TA3-NearField'}},
+            "basler_TA3-Eprofile": {'server': 'Basler/TA3-Eprofile', '_class': 'Basler', 'name': 'TA3/basler/TA3-Eprofile', 'property': {'friendly_name': 'TA3-Eprofile'}},
 
             "basler_TA1-Ebeam": {'server': 'Basler/TA1-Ebeam', '_class': 'Basler', 'name': 'TA1/basler/TA1-Ebeam'},
             "basler_TA1-EspecH": {'server': 'Basler/TA1-EspecH', '_class': 'Basler', 'name': 'TA1/basler/TA1-EspecH'},
@@ -100,8 +102,10 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "file_reader_9": {'server': 'FileReader/TA3-Xray', '_class': 'FileReader', 'name': 'TA3/file_reader/TA3-Xray', 'property': {'file_type': 'image'}},
 
             "asyncio_device_1": {'server': 'AsyncioDevice/asyncio_device_1', '_class': 'AsyncioDevice', 'name': 'test/asyncio_device/asyncio_device_1'},
-            "TA1_regulator_1": {'server': 'GXRegulator/TA1_regulator_1', '_class': 'FileReader', 'name': 'TA1/gx_regulator/TA1_regulator_1', 'property': {'high_voltage_channel': '0', 'low_voltage_channel': '1'}},
-            "TA1_regulator_2": {'server': 'GXRegulator/TA1_regulator_2', '_class': 'FileReader', 'name': 'TA1/gx_regulator/TA1_regulator_2', 'property': {'high_voltage_channel': '2', 'low_voltage_channel': '3'}},
+            "TA1_regulator_1": {'server': 'GXRegulator/TA1_regulator_1', '_class': 'GXRegulator', 'name': 'TA1/gx_regulator/TA1_regulator_1', 'property': {'high_voltage_channel': '0', 'low_voltage_channel': '1'}},
+            "TA1_regulator_2": {'server': 'GXRegulator/TA1_regulator_2', '_class': 'GXRegulator', 'name': 'TA1/gx_regulator/TA1_regulator_2', 'property': {'high_voltage_channel': '2', 'low_voltage_channel': '3'}},
+            "TA3_regulator_1": {'server': 'GXRegulator/TA3_regulator_1', '_class': 'GXRegulator', 'name': 'TA3/gx_regulator/TA3_regulator_1', 'property': {'high_voltage_channel': '0', 'low_voltage_channel': '1'}},
+            "TA3_regulator_2": {'server': 'GXRegulator/TA3_regulator_2', '_class': 'GXRegulator', 'name': 'TA3/gx_regulator/TA3_regulator_2', 'property': {'high_voltage_channel': '2', 'low_voltage_channel': '3'}},
             "labview": {'server': 'LabviewPrograme/labview', '_class': 'LabviewPrograme', 'name': 'laser/labview/labview_programe', 'property': {'port': '61557'}},
             "taurus_test": {'server': 'TaurusTest/taurustest', '_class': 'TaurusTest', 'name': 'sys/taurustest/1'},
             "Vimba_TA2_1": {'server': 'Vimba/TA2-1', '_class': 'Vimba', 'name': 'TA2/vimba/TA2-1'},

@@ -17,7 +17,7 @@ image_panel_config = {
     'testcam_basler_combination': {"combine_form_with_onshot": False},
     'laser/basler/3PW_Grating-4_NF': {'image': 'flux', 'calibration': True},
     'laser/basler/3PW_Screen': {'image': 'flux', 'calibration': True},
-    'test/basler/test': {'image': 'image_with_MeV_mark', 'calibration': True},
+    # 'test/basler/test': {'image': 'image_with_MeV_mark', 'calibration': True},
     'laser/basler/3PW_Grating-4_FF': {'image': 'image', 'calibration': False},
     'TA1/basler/TA1-EspecH': {'image': 'image_with_MeV_mark'},
 }

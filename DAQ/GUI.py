@@ -532,13 +532,13 @@ class ScanWindow(Toplevel):
         self.scan_frame1.grid(column=0, row=0, columnspan=2, sticky=W)
         self.scan_frame2 = ttk.Labelframe(
             self, text='Scan Table', padding=pad_widget, style='Sty1.TLabelframe')
-        self.scan_frame2.grid(column=0, row=1, rowspan=2, sticky=W)
+        self.scan_frame2.grid(column=0, row=1, rowspan=2, sticky="WE")
         self.scan_frame3 = ttk.Labelframe(
             self, text='Starting shot number', padding=pad_widget, style='Sty1.TLabelframe')
-        self.scan_frame3.grid(column=1, row=1, sticky=W)
+        self.scan_frame3.grid(column=1, row=1, sticky="WENS")
         self.scan_frame4 = ttk.Labelframe(
             self, text='Input', padding=pad_widget, style='Sty1.TLabelframe')
-        self.scan_frame4.grid(column=1, row=2, sticky=W)
+        self.scan_frame4.grid(column=1, row=2, sticky="WENS")
         self.item_each_row = 4
         # getting scannable device from db and manually specify the attr name
         self.scannable_list = [
@@ -649,7 +649,7 @@ class ScanWindow(Toplevel):
         self.tree.column("#0", width=50, anchor='center')
         self.tree['columns'] = list(self.scan_table.keys())
         for i in self.scan_table:
-            self.tree.column(i, width=50, anchor='center')
+            self.tree.column(i, anchor='center')
             self.tree.heading(i, text='/'.join(i.split('/')[-2:]))
         for key, value in self.scan_table.items():
             for idx, v in enumerate(value):

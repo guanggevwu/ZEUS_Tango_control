@@ -969,7 +969,7 @@ class Basler(Device):
                     self._image_with_MeV_mark = np.array(
                         im_pil).astype(self._image.dtype)
                     self.push_change_event(
-                        "image_with_MeV_mark", self.read_image_with_MeV_mark())
+                        "image_with_MeV_mark", self.read_image_with_MeV_mark("placeholder"))
                 grabResult.Release()
                 if self._debug:
                     self.logger.info(
