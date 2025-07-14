@@ -29,7 +29,6 @@ class DaqGUI:
         self.db = tango.Database()
         self.root_path = os.path.dirname(os.path.dirname(__file__))
         self.logging_q = Queue()
-        Thread(target=self.logger_thread, daemon=True).start()
         # self.current_shot_numbern is for highlight function. O indicate no highlight before start acquisition.
         self.current_shot_number = 0
         # self.row_shotnum is for define start shot on scan list.
@@ -171,6 +170,7 @@ class DaqGUI:
         self.pad_space(self.frame4)
 
         self.init_settings()
+        Thread(target=self.logger_thread, daemon=True).start()
 
     def init_settings(self):
         # self.selected_devices structure. self.selected_devices = {'[device name]': {'checkbutton': ttk.Button, 'server_pid': [int/string?], 'connection_try_times': [int], 'tango_dp': tango.DeviceProxy}, }
