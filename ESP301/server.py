@@ -49,6 +49,18 @@ class ESP301(Device):
             self._host_computer = platform.node()
             self._ax1_step, self._ax2_step, self._ax3_step, self._ax12_step = 0, 0, 0, 0
             self._raw_command_return = ''
+            self.unit_code = {0: "unknown",
+                              1: "unknown", 2: "mm", 3: "um", 7: "deg"}
+            self.dev.write(b"1SN?\r")
+            self._axis1_unit = self.unit_code[
+                int(self.dev.readline().decode().replace('\r\n', ''))]
+            self.dev.write(b"2SN?\r")
+            self._axis2_unit = self.unit_code[
+                int(self.dev.readline().decode().replace('\r\n', ''))]
+            self.dev.write(b"3SN?\r")
+            self._axis3_unit = self.unit_code[
+                int(self.dev.readline().decode().replace('\r\n', ''))]
+
             # print(
             #     f'ESP301 is connected. Model: {self._model}. Serial number: {self._serial_number}')
             self.set_status("ESP301 device is connected.")
@@ -95,7 +107,7 @@ class ESP301(Device):
             name="ax1_position",
             label="axis 1 position",
             dtype=float,
-            unit='mm',
+            unit=self._axis1_unit,
             format='6.3f',
             memorized=True,
             access=AttrWriteType.READ_WRITE,
@@ -104,7 +116,7 @@ class ESP301(Device):
             name="ax2_position",
             label="axis 2 position",
             dtype=float,
-            unit='mm',
+            unit=self._axis2_unit,
             format='6.3f',
             memorized=True,
             access=AttrWriteType.READ_WRITE,
@@ -113,7 +125,7 @@ class ESP301(Device):
             name="ax3_position",
             label="axis 3 position",
             dtype=float,
-            unit='mm',
+            unit=self._axis3_unit,
             format='6.3f',
             memorized=True,
             access=AttrWriteType.READ_WRITE,
@@ -123,7 +135,7 @@ class ESP301(Device):
             name="ax12_distance",
             label="ax12 distance",
             dtype=float,
-            unit='mm',
+            unit=self._axis1_unit,
             format='6.3f',
             access=AttrWriteType.READ,
         )
@@ -131,7 +143,7 @@ class ESP301(Device):
             name="ax1_step",
             label="axis 1 step",
             dtype=float,
-            unit='mm',
+            unit=self._axis1_unit,
             format='6.3',
             memorized=True,
             hw_memorized=True,
@@ -141,7 +153,7 @@ class ESP301(Device):
             name="ax2_step",
             label="axis 2 step",
             dtype=float,
-            unit='mm',
+            unit=self._axis2_unit,
             format='6.3f',
             memorized=True,
             hw_memorized=True,
@@ -151,7 +163,7 @@ class ESP301(Device):
             name="ax3_step",
             label="axis 3 step",
             dtype=float,
-            unit='mm',
+            unit=self._axis3_unit,
             format='6.3f',
             memorized=True,
             hw_memorized=True,
@@ -161,7 +173,7 @@ class ESP301(Device):
             name="ax12_step",
             label="ax12 step",
             dtype=float,
-            unit='mm',
+            unit=self._axis1_unit,
             format='6.3f',
             memorized=True,
             hw_memorized=True,
@@ -176,7 +188,7 @@ class ESP301(Device):
         if '3' in self.axis:
             self.add_attribute(ax3_position)
             self.add_attribute(ax3_step)
-        if '1' in self.axis and '2' in self.axis:
+        if '1' in self.axis and '2' in self.axis and self._axis1_unit == self._axis2_unit:
             self.add_attribute(ax12_distance)
             self.add_attribute(ax12_step)
 
