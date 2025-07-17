@@ -35,6 +35,8 @@ def create_app():
         #     panel1_layout, d, f'eval:new={{{d}/ax1_position}}-{{{d}/ax2_position}};new')
         if d == 'laser/esp301/esp300_test':
             axis_index = ['12', '1', '2', '3']
+        elif d == 'test/esp300/esp300_turning_box3':
+            axis_index = ['1', '2']
         else:
             axis_index = ['1', '2', '3']
         for a in axis_index:
