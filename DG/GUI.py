@@ -46,8 +46,8 @@ panel1.setLayout(panel1_layout)
 panel1_w1 = TaurusForm()
 
 form_model = [i for i in model]
-order_list = ['name_attr', 'trigger', 'internal_rate', 'burst_rate', 'A_relative_channel', 'A_relative_delay', 'B_relative_channel',
-              'B_relative_delay', 'C_relative_channel', 'C_relative_delay', 'D_relative_channel', 'D_relative_delay', 'send_write', 'send_query']
+order_list = ['host_computer', 'user_defined_name', 'trigger', 'internal_rate', 'send_write', 'A_relative_channel', 'A_relative_delay', 'B_relative_channel',
+              'B_relative_delay', 'C_relative_channel', 'C_relative_delay', 'D_relative_channel', 'D_relative_delay', 'E_relative_channel', 'E_relative_delay', 'F_relative_channel', 'F_relative_delay', 'G_relative_channel', 'G_relative_delay', 'H_relative_channel', 'H_relative_delay', 'send_write']
 for idx, attr in enumerate(order_list):
     form_model.remove(f'{device_name}/{attr}')
     form_model.insert(idx, f'{device_name}/{attr}')
@@ -61,12 +61,12 @@ panel1_w1.compact = is_form_compact
 # must convert numpy.float64 to float so that the dropdown list can work.
 dropdown = {}
 common_dropdown = (('T0', 'T0'), ('A', 'A'),
-                   ('B', 'B'), ('C', 'C'), ('D', 'D'))
-for channel in ['A', 'B', 'C', 'D']:
+                   ('B', 'B'), ('C', 'C'), ('D', 'D'), ('E', 'E'), ('F', 'F'), ('G', 'G'), ('H', 'H'), )
+for channel in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:
     dropdown[f'{channel}_relative_channel'] = tuple(
         i for i in common_dropdown if i != (channel, channel))
-dropdown['trigger'] = (('Internal', 'Internal'), ('External', 'External'),
-                       ('Single Shot', 'Single Shot'), ('Burst', 'Burst'))
+dropdown['trigger'] = (('Internal', 'Internal'), ('External rising', 'External rising'),
+                       ('External falling', 'External falling'), ('Single shot external rising edges', 'Single shot external rising edges'), ('Single shot external falling edges','Single shot external falling edges'), ('Single shot', 'Single shot'), ('Line', 'Line'))
 
 # change the bool write to auto apply.
 for idx, full_attr in enumerate(form_model):
@@ -74,7 +74,7 @@ for idx, full_attr in enumerate(form_model):
         panel1_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
     if full_attr.split('/')[-1] in dropdown:
         panel1_w1[idx].writeWidgetClass = create_my_dropdown_list_class(
-            full_attr.split('/')[-1], dropdown[full_attr.split('/')[-1]], autoApply=False)
+            full_attr.split('/')[-1], dropdown[full_attr.split('/')[-1]])
 
 panel1_command = Qt.QWidget()
 panel1_command_layout = Qt.QHBoxLayout()

@@ -10,12 +10,12 @@ if True:
     from common.start_menu import Menu
 
 
-class DG535Menu(Menu):
+class DG645Menu(Menu):
     def __init__(self, root):
         super().__init__()
         self.get_class_related_info()
         root.title(f"{self.class_name} menu")
-        self.menu_dict = {'start server': ['server.py', self.instances, []],
+        self.menu_dict = {'start server': ['dg645_server.py', self.instances, []],
                           'start Taurus GUI': ['GUI.py', self.device_names, []]}
         frame1 = ttk.Frame(root, padding="3 3 12 12")
         frame1.grid(column=0, row=0, sticky=(N, W, E, S))
@@ -51,6 +51,6 @@ class DG535Menu(Menu):
 
 if __name__ == '__main__':
     root = Tk()
-    dummy = DG535Menu(root)
+    dummy = DG645Menu(root)
     atexit.register(dummy.terminate_all)
     root.mainloop()
