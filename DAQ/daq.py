@@ -15,7 +15,7 @@ import shutil
 import matplotlib.pyplot as plt
 from threading import Thread
 import csv
-
+from playsound3 import playsound
 logging.basicConfig(
     format="%(asctime)s %(message)s",
     level=logging.INFO)
@@ -266,7 +266,8 @@ class Daq:
             # when there is a shot limit, the acquisition stops after the requested image numbers are reached.
             info['is_completed'] = False
             if hasattr(bs, 'resulting_fps'):
-                resulting_fps_dict[bs.user_defined_name] = (f'{bs.bandwidth:.1f} {bs.get_attribute_config("bandwidth").unit}', bs.resulting_fps)
+                resulting_fps_dict[bs.user_defined_name] = (
+                    f'{bs.bandwidth:.1f} {bs.get_attribute_config("bandwidth").unit}', bs.resulting_fps)
         if resulting_fps_dict:
             self.logger(
                 f'Bandwidth and resulting fps: {resulting_fps_dict}. Triggering rate is limited by the slowest camera.')
@@ -318,7 +319,8 @@ class Daq:
                     destination_path = os.path.join(
                         info['cam_dir'], file_name)
                     message = f"Shot {info['shot_num']} for {info['user_defined_name']} is saved."
-                    Thread(target=self.thread_copy, args=(source_path, destination_path, message))
+                    Thread(target=self.thread_copy, args=(
+                        source_path, destination_path, message))
                     shutil.copy(os.path.join(bs.folder_path, bs.current_file), os.path.join(
                         info['cam_dir'], file_name))
                     xy_reader_count += 1
@@ -359,12 +361,14 @@ class Daq:
                 self.current_shot_for_all_cam += 1
                 self.logger(
                     f"Shot {self.current_shot_for_all_cam-1} is completed.", 'green_text')
+                playsound(os.path.join(os.path.dirname(__file__), 'media',
+                          'sound', 'shot_completion_1.mp3'), block=False)
                 if scan_table is not None and hasattr(self, "scan_shot_range") and self.current_shot_for_all_cam in self.scan_shot_range:
                     for device_attr_name, ap in self.scan_attr_proxies.items():
                         self.set_scan_value(
                             ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
                     self.save_scan_list(self.current_shot_for_all_cam)
-                self.csv_header =  ['shot_number']
+                self.csv_header = ['shot_number']
                 if self.GUI.options["laser_shot_id"] or self.GUI.options["MA3_QE12"]:
                     self.save_scalars(self.current_shot_for_all_cam)
 
@@ -432,7 +436,8 @@ class Daq:
         if self.GUI.options["laser_shot_id"]:
             self.csv_header.extend(['shot_id_time', 'shot_id'])
         if self.GUI.options["MA3_QE12"]:
-            self.csv_header.extend(['MA3_QE12_read_time', 'MA3_QE12_main_value', 'MA3_QE12_multiplier'])
+            self.csv_header.extend(
+                ['MA3_QE12_read_time', 'MA3_QE12_main_value', 'MA3_QE12_multiplier'])
         file_exists = os.path.isfile(os.path.join(self.dir, 'shot_id.csv'))
         with open(os.path.join(self.dir, 'shot_id.csv'), 'a') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=self.csv_header)
@@ -440,10 +445,11 @@ class Daq:
                 writer.writeheader()
             data_to_write = {'shot_number': shot_number-1}
             if self.GUI.options["laser_shot_id"]:
-                data_to_write.update({'shot_id': self.yellow_programe.shot_id, 'shot_id_time': self.yellow_programe.read_time})
+                data_to_write.update(
+                    {'shot_id': self.yellow_programe.shot_id, 'shot_id_time': self.yellow_programe.read_time})
             if self.GUI.options["MA3_QE12"]:
                 data_to_write.update({'MA3_QE12_read_time': self.MA3_QE12.read_time,
-                            'MA3_QE12_main_value': self.MA3_QE12.main_value, 'MA3_QE12_multiplier': self.MA3_QE12.multiplier})                
+                                      'MA3_QE12_main_value': self.MA3_QE12.main_value, 'MA3_QE12_multiplier': self.MA3_QE12.multiplier})
             writer.writerow(data_to_write)
             self.logger(f'Wrote scalars: {data_to_write}')
 

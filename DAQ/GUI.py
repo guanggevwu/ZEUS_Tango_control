@@ -281,12 +281,13 @@ class DaqGUI:
             self.insert_to_disabled(f'{device_name} is connected.')
         except (tango.DevFailed, tango.ConnectionFailed) as e:
             if self.selected_devices[device_name]['connection_try_times'] >= 4:
+                # tango.DevFailed is not gonna happen because it should always be in the data base.
                 if type(e) is tango.DevFailed:
                     self.insert_to_disabled(
-                        f'Type: {type(e)}. Check if {device_name} exists in the data base.')
+                        f'Exception: {type(e)}. Check if "{device_name}" exists in the data base.')
                 elif type(e) is tango.ConnectionFailed:
                     self.insert_to_disabled(
-                        f'Type: {type(e)}. Check if {device_name} server is started.')
+                        f'Exception: {type(e)}. "{device_name}" server is not running. Check if the device is occupied by other process.', 'red_text')
                 self.kill_device_server(device_name)
             else:
                 root.after(
