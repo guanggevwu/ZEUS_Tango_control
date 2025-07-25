@@ -696,7 +696,7 @@ class GentecEO(Device):
             self._serial_number = decoded[42*2:45*2]
             self._model = decoded[26*2:42*2]
             self.display_range_steps = range(
-                int(res_decode[10][-2:], 16), int(res_decode[8][-2:], 16))
+                int(res_decode[10][-2:], 16), int(res_decode[8][-2:], 16)+1)
             self._model = self._model.replace(
                 '\x00', '').replace(chr(int('CC', 16)), '')
             if self._model == "PH100-Si-HA-OD1":
