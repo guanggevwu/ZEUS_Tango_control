@@ -40,7 +40,8 @@ class BaslerGUI():
         self.attr_list = {}
 
     def add_device(self, device_name):
-        exclude = []
+        # this is important to exclude "is_new_image" attribute because we don't want client side periodically polling it.
+        exclude = ['is_new_image']
         device_info = {}
         device_info['dp'] = Device(device_name)
         device_info['attrs'] = device_info['dp'].get_attribute_list()
@@ -192,8 +193,9 @@ class BaslerGUI():
                 self.add_label_widget(
                     widget_one_device_layout, d, 'image_number')
             elif 'file_reader' in d:
-                self.add_label_widget(widget_one_device_layout, d, 'file_number')
-            panel3_layout.addWidget(widget_one_device)    
+                self.add_label_widget(
+                    widget_one_device_layout, d, 'file_number')
+            panel3_layout.addWidget(widget_one_device)
             self.add_command(panel3_layout, d)
         self.gui.createPanel(panel3, f'{len(device_list)} devices')
 

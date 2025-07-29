@@ -6,7 +6,7 @@ if server is set to polling to a number, read_attr will be called at the server 
 if Tango polling period < Taurus polling period, Taurus GUI will use Tango polling period only for str (not for 2D array with image module and int with label).
 if Tango polling period > Taurus polling period, Taurus GUI will use Tango polling period.
 
-To disable polling when using Taurus, set server polling to a large number.
+To disable polling when using Taurus, set server polling to a large number. 20250725, or just exclude the attribute from Taurus interface, for example, is_new_image attribute for Basler class.
 
 # the statement about self.push_change_event may be wrong. 20240813
 

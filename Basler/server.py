@@ -187,7 +187,7 @@ class Basler(Device):
         access=AttrWriteType.READ,
         doc='Several factors may limit the frame rate on any Basler camera, e.g., bandwidth.'
     )
-    
+
     bandwidth = attribute(
         label="bandwidth",
         dtype=float,
@@ -301,7 +301,6 @@ class Basler(Device):
         doc='frame rate (only applicable when frames per trigger is large than 1)'
     )
 
-
     offsetX = attribute(
         label="offset x axis",
         dtype=int,
@@ -384,6 +383,7 @@ class Basler(Device):
     )
 
     def read_image_number(self):
+        print("read image number")
         return self._image_number
 
     def initialize_dynamic_attributes(self):
@@ -835,7 +835,7 @@ class Basler(Device):
             value = attr
         if value.lower() == 'off':
             self.camera.TriggerMode.SetValue('Off')
-            self._is_polling_periodically = True
+            self.write_is_polling_periodically(self, True)
         else:
             self.camera.TriggerMode.SetValue('On')
             if value.lower() == 'external':
@@ -895,22 +895,25 @@ class Basler(Device):
             self._resulting_fps = self.camera.ResultingFrameRateAbs.Value
         self._resulting_fps = round(self._resulting_fps, 2)
         return self._resulting_fps
-    
+
     def read_bandwidth(self):
         try:
-            self._bandwidth = float(self.camera.GetNodeMap().GetNode('DeviceLinkThroughputLimit').Value)/1e6
+            self._bandwidth = float(self.camera.GetNodeMap().GetNode(
+                'DeviceLinkThroughputLimit').Value)/1e6
         except:
             self._bandwidth = -1
         return self._bandwidth
-    
+
     def write_bandwidth(self, value):
         try:
-            self._bandwidth = self.camera.GetNodeMap().GetNode('DeviceLinkThroughputLimit').SetValue(int(value*1e6))
+            self._bandwidth = self.camera.GetNodeMap().GetNode(
+                'DeviceLinkThroughputLimit').SetValue(int(value*1e6))
         except:
             self._bandwidth = -1
 
     def read_is_new_image(self):
         # self.i, grabbing successfully grabbed image. self._image_number, image counting and can be reset at any time.
+        print("read is new image")
         self._is_new_image = False
         while self.camera.IsGrabbing():
             # the retrieve time out may need to be reconsidered.
