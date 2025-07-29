@@ -149,7 +149,10 @@ class Daq:
 
     def get_image(self, bs):
         bits = ''.join([i for i in bs.format_pixel if i.isdigit()])
-        image = bs.image
+        if getattr(bs, 'format_pixel', '').lower() == "rgb8":
+            image = np.dstack((bs.image_r, bs.image_g, bs.image_b))
+        else:
+            image = bs.image
         if int(bits) > 8:
             bits = '16'
         data_PIL = Image.fromarray(image.astype(f'uint{bits}'))
@@ -302,7 +305,7 @@ class Daq:
                 if any([cam_type in bs.dev_name() for cam_type in ['basler', 'vimba']]) or bs.data_type == "image":
                     data, data_array = self.get_image(bs)
                     file_name = self.generate_file_name(info, bs)
-                    file_name = file_name.replace('%f', '.tiff')
+                    file_name = file_name.replace('%f', 'tiff')
                     # self.logger(
                     #     f"It takes {datetime.now()-t0} to acquire {info['user_defined_name']} {info['shot_num']}.")
                     save_path = os.path.join(info['cam_dir'], file_name)
@@ -333,6 +336,8 @@ class Daq:
                         add_number = 0
                         stitch_local = False
                 if stitch and stitch_local:
+                    if getattr(bs, 'format_pixel', '').lower() == "rgb8":
+                        data_array = 0.299*data_array[:,:,0]+ 0.587 * data_array[:,:,1] + 0.114 * data_array[:,:,2]
                     adjusted_image = self.stretch_image(data_array)
                     info['images_to_stitch'][f'shot{info["shot_num"]}'] = adjusted_image
                 info['shot_num'] += add_number

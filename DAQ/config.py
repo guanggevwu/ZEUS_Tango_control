@@ -3,6 +3,7 @@
 default_config_dict = {
     'TA2-NearField': {'format_pixel': "Mono12", },
     'TA2-FarField': {'format_pixel': "Mono12", },
+    'TA1-SideView': {'format_pixel': "RGB8", },
     # 'TA2-Gossip': {'format_pixel': "Mono12", "exposure": 1000, "gain": 240},
     'PW_Comp_In'.lower(): {'format_pixel': "Mono8", "exposure": 5000, "gain": 136, "saving_format": '%s_%t_%e_%h.%f'},
     'test': {'format_pixel': "Mono8", "exposure": 100000, "saving_format": '%s_%t_%e_%h.%f'},

@@ -143,7 +143,7 @@ class BaslerGUI():
                 panel_layout.addWidget(panel_w)
         layout.addWidget(panel)
 
-    def create_form_panel(self, device_name, exclude=['image', 'flux', 'energy', 'hot_spot']):
+    def create_form_panel(self, device_name, exclude=['image', 'image_r', 'image_g','image_b','flux', 'energy', 'hot_spot']):
         panel2, panel2_layout = self.create_blank_panel('v')
         panel2_w1 = TaurusForm()
         form_model = self.attr_list[device_name]['model']

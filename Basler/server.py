@@ -63,6 +63,30 @@ class Basler(Device):
         access=AttrWriteType.READ,
     )
 
+    image_r = attribute(
+        label="image_r",
+        max_dim_x=10000,
+        max_dim_y=10000,
+        dtype=((np.uint8,),),
+        access=AttrWriteType.READ,
+    )
+
+    image_g = attribute(
+        label="image_g",
+        max_dim_x=10000,
+        max_dim_y=10000,
+        dtype=((np.uint8,),),
+        access=AttrWriteType.READ,
+    )
+
+    image_b = attribute(
+        label="image_b",
+        max_dim_x=10000,
+        max_dim_y=10000,
+        dtype=((np.uint8,),),
+        access=AttrWriteType.READ,
+    )
+
     host_computer = attribute(
         label="host computer",
         dtype="str",
@@ -639,6 +663,14 @@ class Basler(Device):
                 self._timeout_polling_ratio = 0.75
                 self._image = np.zeros(
                     (self.camera.Height.Value, self.camera.Width.Value))
+                # if the pixel format can be read as rbg8, definitely should use slicing for images. Sometimes the pixel format at device start up is not 'rgb8', but I know for this type of camera (a2A1920-51gcBAS) we probably will change the format to 'rgb8' later, so we include rgb slice at startup.
+                if self.read_format_pixel().lower()=="rgb8" or self._model == 'a2A1920-51gcBAS':
+                    self._image_r = np.zeros(
+                        (self.camera.Height.Value, self.camera.Width.Value))
+                    self._image_g = np.zeros(
+                        (self.camera.Height.Value, self.camera.Width.Value))
+                    self._image_b = np.zeros(
+                        (self.camera.Height.Value, self.camera.Width.Value))
                 self._flux = np.zeros(
                     (self.camera.Height.Value, self.camera.Width.Value))
                 # always use continuous mode. Although it seems this is the default, still set it here in case.
@@ -929,6 +961,13 @@ class Basler(Device):
                     self.logger.info(
                         f'{self.i}')
                 self._image = grabResult.Array
+                if len(self._image.shape) == 3:
+                    self._image_r = self._image[:,:,0]
+                    self._image_g = self._image[:,:,1]
+                    self._image_b = self._image[:,:,2]
+                    # Convert to grayscale using the luminance formula (common weights)
+                    # Y = 0.299 * R + 0.587 * G + 0.114 * B
+                    self._image = 0.299*self._image_r+ 0.587 * self._image_g + 0.114 * self._image_b
                 if self._lr_flip:
                     self._image = np.fliplr(self._image)
                 if self._ud_flip:
@@ -1078,6 +1117,15 @@ class Basler(Device):
         # Therefore, image should not be polled.
         self.logger.info(f'in server read: {np.mean(self._image)}')
         return self._image
+    
+    def read_image_r(self):
+        return self._image_r
+    
+    def read_image_g(self):
+        return self._image_g
+    
+    def read_image_b(self):
+        return self._image_b
 
     def read_flux(self):
         return self._flux
