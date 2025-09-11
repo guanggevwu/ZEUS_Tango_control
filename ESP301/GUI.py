@@ -29,7 +29,7 @@ def create_app():
         panel, panel1_layout = basler_app.create_blank_panel('v')
         attr_list = basler_app.attr_list[d]['attrs']
         for attr in attr_list:
-            if attr not in ['ax1_position', 'ax2_position', 'ax3_position', 'ax1_step', 'ax2_step', 'ax3_step', 'ax12_step', 'ax12_distance', 'State', 'Status']:
+            if attr not in ['message','ax1_position', 'ax2_position', 'ax3_position', 'ax1_step', 'ax2_step', 'ax3_step', 'ax12_step', 'ax12_distance', 'State', 'Status']:
                 basler_app.add_label_widget(panel1_layout, d, attr)
         # basler_app.add_label_widget(
         #     panel1_layout, d, f'eval:new={{{d}/ax1_position}}-{{{d}/ax2_position}};new')
