@@ -407,7 +407,8 @@ class Basler(Device):
     )
 
     def read_image_number(self):
-        print("read image number")
+        if self._debug:
+            self.logger.info(f'Reading image number: {self._image_number}')
         return self._image_number
 
     def initialize_dynamic_attributes(self):
@@ -664,7 +665,7 @@ class Basler(Device):
                 self._image = np.zeros(
                     (self.camera.Height.Value, self.camera.Width.Value))
                 # if the pixel format can be read as rbg8, definitely should use slicing for images. Sometimes the pixel format at device start up is not 'rgb8', but I know for this type of camera (a2A1920-51gcBAS) we probably will change the format to 'rgb8' later, so we include rgb slice at startup.
-                if self.read_format_pixel().lower()=="rgb8" or self._model == 'a2A1920-51gcBAS':
+                if self.read_format_pixel().lower() == "rgb8" or self._model == 'a2A1920-51gcBAS':
                     self._image_r = np.zeros(
                         (self.camera.Height.Value, self.camera.Width.Value))
                     self._image_g = np.zeros(
@@ -867,7 +868,7 @@ class Basler(Device):
             value = attr
         if value.lower() == 'off':
             self.camera.TriggerMode.SetValue('Off')
-            self.write_is_polling_periodically(self, True)
+            self.write_is_polling_periodically(True)
         else:
             self.camera.TriggerMode.SetValue('On')
             if value.lower() == 'external':
@@ -945,7 +946,6 @@ class Basler(Device):
 
     def read_is_new_image(self):
         # self.i, grabbing successfully grabbed image. self._image_number, image counting and can be reset at any time.
-        print("read is new image")
         self._is_new_image = False
         while self.camera.IsGrabbing():
             # the retrieve time out may need to be reconsidered.
@@ -962,12 +962,13 @@ class Basler(Device):
                         f'{self.i}')
                 self._image = grabResult.Array
                 if len(self._image.shape) == 3:
-                    self._image_r = self._image[:,:,0]
-                    self._image_g = self._image[:,:,1]
-                    self._image_b = self._image[:,:,2]
+                    self._image_r = self._image[:, :, 0]
+                    self._image_g = self._image[:, :, 1]
+                    self._image_b = self._image[:, :, 2]
                     # Convert to grayscale using the luminance formula (common weights)
                     # Y = 0.299 * R + 0.587 * G + 0.114 * B
-                    self._image = 0.299*self._image_r+ 0.587 * self._image_g + 0.114 * self._image_b
+                    self._image = 0.299*self._image_r + 0.587 * \
+                        self._image_g + 0.114 * self._image_b
                 if self._lr_flip:
                     self._image = np.fliplr(self._image)
                 if self._ud_flip:
@@ -1117,13 +1118,13 @@ class Basler(Device):
         # Therefore, image should not be polled.
         self.logger.info(f'in server read: {np.mean(self._image)}')
         return self._image
-    
+
     def read_image_r(self):
         return self._image_r
-    
+
     def read_image_g(self):
         return self._image_g
-    
+
     def read_image_b(self):
         return self._image_b
 

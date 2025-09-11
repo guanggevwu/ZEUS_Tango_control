@@ -456,6 +456,8 @@ if __name__ == "__main__":
         for cam in all_cam:
             if cam.get_name() == sys.argv[1]:
                 break
+        else:
+            raise Exception(f'Camera {sys.argv[1]} not found!')
         with cam:
             Vimba.camera = cam
             Vimba.run_server()
