@@ -61,7 +61,8 @@ if __name__ == "__main__":
         user_input = input(prompt_add_delete_show)
         if user_input.lower() == 'a':
             info = {'Basler camera': {'Please enter the camera name defined in Pylon Viewer.\n': 'friendly_name',
-                                      "How about giving it a Tango Device name {tango_device_name}?\n": 'name'}}
+                                      "Enter Y/y to use {tango_device_name} as the device name or manuallyenter the device name?\n": 'name'}}
+            # prompt for device name
             prompt_device_type = "Enter number to choose device to add:\n" + \
                 "\n".join(
                     [f"{idx}. {value}" for idx, value in enumerate(info.keys())]) + "\n"
@@ -76,6 +77,8 @@ if __name__ == "__main__":
                 continue
             else:
                 server_class_name_property_input['property'] = {}
+
+            # prompt for properties and device name
             for prompt, value in info[device_type].items():
                 if '{tango_device_name}' in prompt:
                     prompt = prompt.format(
