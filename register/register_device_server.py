@@ -60,8 +60,11 @@ if __name__ == "__main__":
     while True:
         user_input = input(prompt_add_delete_show)
         if user_input.lower() == 'a':
-            info = {'Basler camera': {'Please enter the camera name defined in Pylon Viewer.\n': 'friendly_name',
-                                      "Enter Y/y to use {tango_device_name} as the device name or manuallyenter the device name?\n": 'name'}}
+            info = {'Basler camera':
+                    {'Please enter the camera name defined in Pylon Viewer.\n': 'friendly_name',
+                     "Enter Y/y to use {tango_device_name} as the device name or manuallyenter the device name?\n": 'name'},
+                    'Allied vision camera': {'Please enter the Tango device name in this format "**/vimba/**", for example "TA1/vimba/TA1_1".\n': 'full_name'}
+                    }
             # prompt for device name
             prompt_device_type = "Enter number to choose device to add:\n" + \
                 "\n".join(
@@ -72,40 +75,49 @@ if __name__ == "__main__":
                 continue
             else:
                 device_type = list(info.keys())[int(device_type_input)]
-            if not device_type == "Basler camera":
+            if device_type == "Basler camera":
+                server_class_name_property_input['property'] = {}
+                # prompt for properties and device name
+                for prompt, value in info[device_type].items():
+                    if '{tango_device_name}' in prompt:
+                        prompt = prompt.format(
+                            tango_device_name=suggested_device_name)
+                    user_input = input(prompt)
+                    if value == 'friendly_name':
+                        server_class_name_property_input['property'][value] = user_input
+                        friendly_name = user_input
+                        TA_search_patten = ['TA1', 'TA2',
+                                            'TA3', 'laser', 'test', 'facility']
+                        for ta in TA_search_patten:
+                            if ta in user_input:
+                                suggested_device_name = f'{ta}/basler/{user_input}'
+                                break
+                    elif (not user_input or user_input.lower() == 'y') and value == 'name':
+                        server_class_name_property_input['name'] = suggested_device_name
+                    elif user_input and value == 'name':
+                        server_class_name_property_input['name'] = user_input
+                server_class_name_property_input[
+                    'server'] = f'Basler/{server_class_name_property_input["property"]["friendly_name"]}'
+                server_class_name_property_input['_class'] = 'Basler'
+                add_tango_device(server_class_name_property_input)
+                if "property" in server_class_name_property_input:
+                    db.put_device_property(
+                        server_class_name_property_input['name'], server_class_name_property_input['property'])
+                    print(
+                        f'Property added. {server_class_name_property_input["property"]}')
+            elif device_type == "Allied vision camera":
+                # prompt for properties and device name
+                for prompt, value in info[device_type].items():
+                    user_input = input(prompt)
+                    if user_input and value == 'full_name':
+                        server_class_name_property_input['name'] = user_input
+                server_class_name_property_input[
+                    'server'] = f'Vimba/{user_input.split("/")[-1]}'
+                server_class_name_property_input['_class'] = 'Vimba'
+                add_tango_device(server_class_name_property_input)
+            else:
                 print("Currently only Basler camera is supported to add.")
                 continue
-            else:
-                server_class_name_property_input['property'] = {}
-
-            # prompt for properties and device name
-            for prompt, value in info[device_type].items():
-                if '{tango_device_name}' in prompt:
-                    prompt = prompt.format(
-                        tango_device_name=suggested_device_name)
-                user_input = input(prompt)
-                if value == 'friendly_name':
-                    server_class_name_property_input['property'][value] = user_input
-                    friendly_name = user_input
-                    TA_search_patten = ['TA1', 'TA2',
-                                        'TA3', 'laser', 'test', 'facility']
-                    for ta in TA_search_patten:
-                        if ta in user_input:
-                            suggested_device_name = f'{ta}/basler/{user_input}'
-                            break
-                elif (not user_input or user_input.lower() == 'y') and value == 'name':
-                    server_class_name_property_input['name'] = suggested_device_name
-                elif user_input and value == 'name':
-                    server_class_name_property_input['name'] = user_input
-            server_class_name_property_input[
-                'server'] = f'Basler/{server_class_name_property_input["property"]["friendly_name"]}'
-            server_class_name_property_input['_class'] = 'Basler'
-            add_tango_device(server_class_name_property_input)
-            if "property" in server_class_name_property_input:
-                db.put_device_property(
-                    server_class_name_property_input['name'], server_class_name_property_input['property'])
-                print(
-                    f'Property added. {server_class_name_property_input["property"]}')
 
         elif user_input.lower() == 'd':
             user_input = input("Show server/intance list? Y/N?")
