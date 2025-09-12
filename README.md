@@ -73,17 +73,7 @@ It is possible to run "Python .DAQ/GUI.py" in a second computer to start a secon
 
 ## Add a new device to Tango system
 
-First, you add a new item to the dictionary in "./register/register_device_server.py". The key can be anything and the value needs to contain information like class, server and instance, e.g.,
-
-```python
-"basler_test": {'server': 'Basler/test', '_class': 'Basler', 'name': 'test/basler/test', 'property': {'friendly_name': 'test'}}
-```
-
-The property is usually some parameters that are used for connection to that device. It can be IP address, device name, serial number or port number. Then you run the following command to add a new device server.
-
-```
-python ./register/register_device_server.py add basler_test
-```
+Run "./register/register_device_server.py" and follow the prompts.
 
 ## Basler/Allied Vision camera
 
