@@ -62,8 +62,8 @@ if __name__ == "__main__":
         if user_input.lower() == 'a':
             info = {'Basler camera':
                     {'Please enter the camera name defined in Pylon Viewer.\n': 'friendly_name',
-                     "Enter Y/y to use {tango_device_name} as the device name or manuallyenter the device name?\n": 'name'},
-                    'Allied vision camera': {'Please enter the Tango device name in this format "**/vimba/**", for example "TA1/vimba/TA1_1".\n': 'full_name'}
+                     "Enter Y/y to use {tango_device_name} as the device name or manually enter the device name?\n": 'name'},
+                    'Allied vision camera': {'Please enter the Tango device name in this format "**/vimba/**", for example "TA1/vimba/TA1_1" or "TA1/vimba/12345678". The last part is the user defined name or serial number.\n': 'full_name'}
                     }
             # prompt for device name
             prompt_device_type = "Enter number to choose device to add:\n" + \

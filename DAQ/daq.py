@@ -284,10 +284,11 @@ class Daq:
                                    stitch, scan_table], daemon=True)
         threads.append(t_shot_completion)
         t_shot_completion.start()
+        self.logger('Waiting for a trigger...')
         for t in threads:
             t.join()
         # acquisition
-        self.logger('Waiting for a trigger...')
+
 
     def thread_acquire_data(self, info, stitch, shot_end,):
         xy_reader_count = 0

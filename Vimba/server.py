@@ -85,10 +85,11 @@ class Vimba(Device):
         label="name",
         dtype=str,
         access=AttrWriteType.READ,
+        doc="The user_defined_name is originally defined in the Vimba Viewer software. Some Allied Vision cameras don't support this function. Now this property is the serial number."
     )
 
     def read_user_defined_name(self):
-        return self.camera.DeviceUserID.get()
+        return self.camera.get_serial()
 
     is_polling_periodically = attribute(
         label="polling periodically",
@@ -454,7 +455,7 @@ if __name__ == "__main__":
     with VmbSystem.get_instance() as vmb:
         all_cam = vmb.get_all_cameras()
         for cam in all_cam:
-            if cam.get_name() == sys.argv[1]:
+            if cam.get_name() == sys.argv[1] or cam.get_serial() == sys.argv[1]:
                 break
         else:
             raise Exception(f'Camera {sys.argv[1]} not found!')
