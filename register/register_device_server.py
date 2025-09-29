@@ -92,14 +92,17 @@ if __name__ == "__main__":
                             if ta in user_input:
                                 suggested_device_name = f'{ta}/basler/{user_input}'
                                 break
+                        else:
+                            suggested_device_name = f'other/basler/{user_input}'
                     elif (not user_input or user_input.lower() == 'y') and value == 'name':
                         server_class_name_property_input['name'] = suggested_device_name
+                        break
                     elif user_input and value == 'name':
                         server_class_name_property_input['name'] = user_input
                 server_class_name_property_input[
                     'server'] = f'Basler/{server_class_name_property_input["property"]["friendly_name"]}'
                 server_class_name_property_input['_class'] = 'Basler'
-                add_tango_device(server_class_name_property_input)
+                # add_tango_device(server_class_name_property_input)
                 if "property" in server_class_name_property_input:
                     db.put_device_property(
                         server_class_name_property_input['name'], server_class_name_property_input['property'])

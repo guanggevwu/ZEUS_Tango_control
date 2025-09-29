@@ -281,7 +281,7 @@ class Basler(Device):
         if value in [0, 90, 180, 270]:
             self._rotate = value
         else:
-            raise ('Must be 0, 90, 180 or 270.')
+            raise Exception('Must be 0, 90, 180 or 270.')
 
     exposure = attribute(
         name="exposure",
