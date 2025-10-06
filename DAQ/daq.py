@@ -255,6 +255,9 @@ class Daq:
         if self.GUI.options["MA3_QE12"]:
             self.MA3_QE12 = tango.DeviceProxy(
                 "laser/gentec/MA3_QE12")
+        if self.GUI.options["Owis_positions"]:
+            self.Owis = tango.DeviceProxy(
+                "test/OwisPs/test")
         resulting_fps_dict = {}
         if len(self.cam_info) < 2:
             stitch = False
@@ -288,7 +291,6 @@ class Daq:
         for t in threads:
             t.join()
         # acquisition
-
 
     def thread_acquire_data(self, info, stitch, shot_end,):
         xy_reader_count = 0
@@ -338,7 +340,9 @@ class Daq:
                         stitch_local = False
                 if stitch and stitch_local:
                     if getattr(bs, 'format_pixel', '').lower() == "rgb8":
-                        data_array = 0.299*data_array[:,:,0]+ 0.587 * data_array[:,:,1] + 0.114 * data_array[:,:,2]
+                        data_array = 0.299 * \
+                            data_array[:, :, 0] + 0.587 * data_array[:,
+                                                                     :, 1] + 0.114 * data_array[:, :, 2]
                     adjusted_image = self.stretch_image(data_array)
                     info['images_to_stitch'][f'shot{info["shot_num"]}'] = adjusted_image
                 info['shot_num'] += add_number
@@ -375,7 +379,7 @@ class Daq:
                             ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
                     self.save_scan_list(self.current_shot_for_all_cam)
                 self.csv_header = ['shot_number']
-                if self.GUI.options["laser_shot_id"] or self.GUI.options["MA3_QE12"]:
+                if self.GUI.options["laser_shot_id"] or self.GUI.options["MA3_QE12"] or self.GUI.options["Owis_positions"]:
                     self.save_scalars(self.current_shot_for_all_cam)
 
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
@@ -444,6 +448,9 @@ class Daq:
         if self.GUI.options["MA3_QE12"]:
             self.csv_header.extend(
                 ['MA3_QE12_read_time', 'MA3_QE12_main_value', 'MA3_QE12_multiplier'])
+        if self.GUI.options["Owis_positions"]:
+            self.csv_header.extend(
+                ['Owis_read_time', 'Owis_ax1_position', 'Owis_ax2_position'])
         file_exists = os.path.isfile(os.path.join(self.dir, 'shot_id.csv'))
         with open(os.path.join(self.dir, 'shot_id.csv'), 'a') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=self.csv_header)
@@ -456,6 +463,17 @@ class Daq:
             if self.GUI.options["MA3_QE12"]:
                 data_to_write.update({'MA3_QE12_read_time': self.MA3_QE12.read_time,
                                       'MA3_QE12_main_value': self.MA3_QE12.main_value, 'MA3_QE12_multiplier': self.MA3_QE12.multiplier})
+            if self.GUI.options["Owis_positions"]:
+                # not sure if the attribute always exists
+                attr_temp = {}
+                for axis in range(1, 3):
+                    if not hasattr(self.Owis, f'ax{axis}_position'):
+                        attr_temp[f'ax{axis}_position'] = 'N/A'
+                    else:
+                        attr_temp[f'ax{axis}_position'] = getattr(
+                            self.Owis, f'ax{axis}_position')
+                data_to_write.update({'Owis_read_time': self.Owis.read_time,
+                                      'Owis_ax1_position': attr_temp['ax1_position'], 'Owis_ax2_position': attr_temp['ax2_position']})
             writer.writerow(data_to_write)
             self.logger(f'Wrote scalars: {data_to_write}')
 

@@ -104,7 +104,7 @@ class DaqGUI:
         self.frame2.grid(column=0, row=1, sticky=(N, W, E, S))
 
         self.frame2_checkbutton_content = {'background_image': {
-            'text': 'Save background images', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'laser_shot_id': {'text': 'Save shot id data', 'init_status': False}, 'MA3_QE12': {'text': 'Save MA3 QE12 data', 'init_status': False}, }
+            'text': 'Save background images', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'laser_shot_id': {'text': 'Save shot id data', 'init_status': False}, 'MA3_QE12': {'text': 'Save MA3 QE12 data', 'init_status': False}, 'Owis_positions': {'text': 'Save Owis positions', 'init_status': False}}
         item_per_column = 2
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
             checkbox_var = BooleanVar(value=value['init_status'])
@@ -374,7 +374,8 @@ class DaqGUI:
             "background_image": self.frame2_checkbutton_content['background_image']['var'].get(),
             "stitch": self.frame2_checkbutton_content['stitch']['var'].get(),
             "laser_shot_id": self.frame2_checkbutton_content['laser_shot_id']['var'].get(),
-            "MA3_QE12": self.frame2_checkbutton_content['MA3_QE12']['var'].get()
+            "MA3_QE12": self.frame2_checkbutton_content['MA3_QE12']['var'].get(),
+            "Owis_positions": self.frame2_checkbutton_content['Owis_positions']['var'].get()
         }
         with open(self.init_file_path, 'w') as jsonfile:
             json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get()},
