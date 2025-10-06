@@ -41,6 +41,7 @@ class BaslerGUI():
 
     def add_device(self, device_name):
         # this is important to exclude "is_new_image" attribute because we don't want client side periodically polling it.
+        # a dictionary containing the device info is stored in self.attr_list[device_name]
         exclude = ['is_new_image']
         device_info = {}
         device_info['dp'] = Device(device_name)
@@ -51,7 +52,7 @@ class BaslerGUI():
         self.attr_list[device_name] = device_info
 
     def create_image_panel(self, device_name, image='image', image_number=True, energy_meter=False, calibration=False, command=True):
-        '''create TaurusForm panel'''
+        '''create Taurus Image panel'''
         # panel 1
         panel1, panel1_layout = self.create_blank_panel('v')
 
@@ -90,7 +91,8 @@ class BaslerGUI():
             panel1_w1_name = f'{device_name}_{image}'
         panel1_layout.addWidget(panel1_w1)
         if command:
-            self.add_command(panel1_layout, device_name)
+            self.add_command(panel1_layout, device_name,
+                             cmd_parameters={'reset_number': [0]})
 
         self.gui.createPanel(panel1, panel1_w1_name)
 
@@ -122,30 +124,33 @@ class BaslerGUI():
                 i.setFont(Qt.QFont("Sans Serif", 16))
         layout.addWidget(panel)
 
-    def add_command(self, layout, device_name, command_list=None):
+    def add_command(self, layout, device_name, command_list=None, cmd_parameters=None):
+        '''add command buttons
+        layout: the layout to add the command buttons
+        device_name: the device name
+        command_list: list of command names to add. If None, all commands will be added
+        cmd_parameters: dictionary of command parameters. If None, no parameters will be passed.
+        '''
         panel, panel_layout = self.create_blank_panel('h')
         if command_list is None:
             command_list = [
                 i.cmd_name for i in self.attr_list[device_name]['dp'].command_list_query()[3:]]
-
+        if cmd_parameters is None:
+            cmd_parameters = {}
         for cmd in command_list:
             if cmd in self.attr_list[device_name]['commands']:
-                if cmd == "reset_number":
-                    panel_w = TaurusCommandButton(
-                        command=cmd, parameters=[0]
-                    )
-                else:
-                    panel_w = TaurusCommandButton(
-                        command=cmd
-                    )
+                panel_w = TaurusCommandButton(
+                    command=cmd, parameters=cmd_parameters.get(cmd, None)
+                )
+
                 panel_w.setCustomText(cmd)
                 panel_w.setModel(device_name)
                 panel_layout.addWidget(panel_w)
         layout.addWidget(panel)
 
-    def create_form_panel(self, device_name, exclude=['image', 'image_r', 'image_g','image_b','flux', 'energy', 'hot_spot']):
+    def create_form_panel(self, device_name, exclude=None, dropdown=None, withButtons=True):
         panel2, panel2_layout = self.create_blank_panel('v')
-        panel2_w1 = TaurusForm()
+        panel2_w1 = TaurusForm(withButtons=withButtons)
         form_model = self.attr_list[device_name]['model']
         # re-order. Move trigger to front.
         re_order_list = {'trigger_source': 12, 'filter_option': 4}
@@ -153,15 +158,15 @@ class BaslerGUI():
             if device_name+'/'+key in form_model:
                 form_model.remove(device_name+'/'+key)
                 form_model.insert(value, device_name+'/'+key)
-        if 'basler' in device_name.lower():
+        if exclude is not None:
             form_model = [i for i in form_model if i.split(
                 '/')[-1] not in exclude]
         panel2_w1.model = form_model
         panel2_layout.addWidget(panel2_w1)
-
-        # change the text write widget to dropdown list and set auto apply
-        dropdown = {'trigger_source': (('Off', 'Off'), ('Software', 'Software'), ('External', 'External')), 'trigger_selector': (
-            ('AcquisitionStart', 'AcquisitionStart'), ('FrameStart', 'FrameStart')), }
+        if not dropdown:
+            # change the text write widget to dropdown list and set auto apply
+            dropdown = {'trigger_source': (('Off', 'Off'), ('Software', 'Software'), ('External', 'External')), 'trigger_selector': (
+                ('AcquisitionStart', 'AcquisitionStart'), ('FrameStart', 'FrameStart')), }
         for idx, full_attr in enumerate(form_model):
             # change the bool write to auto apply. Only apply to writable bool widget.
             if full_attr.split('/')[-1] in self.attr_list[device_name]['attrs'] and self.attr_list[device_name]['dp'].attribute_query(full_attr.split('/')[-1]).data_type == 1 and self.attr_list[device_name]['dp'].attribute_query(full_attr.split('/')[-1]).writable == tango._tango.AttrWriteType.READ_WRITE:
@@ -172,6 +177,7 @@ class BaslerGUI():
                     full_attr.split('/')[-1], dropdown[full_attr.split('/')[-1]])
 
         self.gui.createPanel(panel2, f'{device_name}_paramters')
+        return panel2_layout
 
     def combined_panel(self, device_list, combine_form_with_onshot=False):
         panel3, panel3_layout = self.create_blank_panel('v')
@@ -196,7 +202,8 @@ class BaslerGUI():
                 self.add_label_widget(
                     widget_one_device_layout, d, 'file_number')
             panel3_layout.addWidget(widget_one_device)
-            self.add_command(panel3_layout, d)
+            self.add_command(panel3_layout, d, cmd_parameters={
+                             'reset_number': [0]})
         self.gui.createPanel(panel3, f'{len(device_list)} devices')
 
     def create_blank_panel(self, VorH='V'):
@@ -235,7 +242,8 @@ def create_app():
             pass_config1, pass_config2 = {}, {}
         basler_app.add_device(d)
         basler_app.create_image_panel(d, **pass_config1)
-        basler_app.create_form_panel(d)
+        basler_app.create_form_panel(
+            d, exclude=['image', 'image_r', 'image_g', 'image_b', 'flux', 'energy', 'hot_spot'])
     if len(args.device) == 1 and args.device[0] in image_panel_config:
         pass_config2 = ({key: value for key, value in image_panel_config[args.device[0]].items(
         ) if key == "combine_form_with_onshot"})

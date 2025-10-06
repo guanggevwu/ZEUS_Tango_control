@@ -63,7 +63,7 @@ if __name__ == "__main__":
             info = {'Basler camera':
                     {'Please enter the camera name defined in Pylon Viewer.\n': 'friendly_name',
                      "Enter Y/y to use {tango_device_name} as the device name or manually enter the device name?\n": 'name'},
-                    'Allied vision camera': {'Please enter the Tango device name in this format "**/vimba/**", for example "TA1/vimba/TA1_1" or "TA1/vimba/12345678". The last part is the user defined name or serial number.\n': 'full_name'}
+                    'Allied vision camera': {'Please enter the Tango device name in this format "**/vimba/**", for example "TA1/vimba/TA1_1" or "TA1/vimba/12345678". The last part is the user defined name or serial number.\n': 'full_name'}, 'Other': {'Please enter the class. For example, Basler.\n': "_class", 'Please enter the server/instance. For example, Basler/ta1-camera1\n': 'server', 'Please enter the device name. For example, ta1/basler/ta1-camera1\n': 'name', 'Please enter properties.\n': 'property', "Confirm to add device {dict}? Y/N\n": 'confirm'}
                     }
             # prompt for device name
             prompt_device_type = "Enter number to choose device to add:\n" + \
@@ -102,7 +102,7 @@ if __name__ == "__main__":
                 server_class_name_property_input[
                     'server'] = f'Basler/{server_class_name_property_input["property"]["friendly_name"]}'
                 server_class_name_property_input['_class'] = 'Basler'
-                # add_tango_device(server_class_name_property_input)
+                add_tango_device(server_class_name_property_input)
                 if "property" in server_class_name_property_input:
                     db.put_device_property(
                         server_class_name_property_input['name'], server_class_name_property_input['property'])
@@ -118,6 +118,40 @@ if __name__ == "__main__":
                     'server'] = f'Vimba/{user_input.split("/")[-1]}'
                 server_class_name_property_input['_class'] = 'Vimba'
                 add_tango_device(server_class_name_property_input)
+            elif device_type == "Other":
+                # prompt for properties and device name
+                for prompt, value in info[device_type].items():
+                    if user_input and value in ['_class', 'server', 'name']:
+                        user_input = input(prompt)
+                        server_class_name_property_input[value] = user_input
+                    elif value == 'property':
+                        while True:
+                            user_input = input(prompt)
+                            if not user_input:
+                                break
+                            server_class_name_property_input['property'] = {}
+                            if ': ' in user_input:
+                                user_input_split = user_input.split(': ')
+                            else:
+                                user_input_split = user_input.split(':')
+                            server_class_name_property_input['property'][user_input_split[0]
+                                                                         ] = user_input_split[1]
+                    elif value == "confirm":
+                        user_input = input(prompt.replace(
+                            '{dict}', str(server_class_name_property_input)))
+                        if user_input.lower() != 'y':
+                            confirm = False
+                            print("Cancelled. Start over.")
+                            break
+                        else:
+                            confirm = True
+                if confirm:
+                    add_tango_device(server_class_name_property_input)
+                    if "property" in server_class_name_property_input:
+                        db.put_device_property(
+                            server_class_name_property_input['name'], server_class_name_property_input['property'])
+                        print(
+                            f'Property added. {server_class_name_property_input["property"]}')
             else:
                 print("Currently only Basler camera is supported to add.")
                 continue

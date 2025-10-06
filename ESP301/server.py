@@ -13,6 +13,7 @@ from threading import Thread
 import functools
 # -----------------------------
 
+
 class LoggerAdapter(logging.LoggerAdapter):
     def __init__(self, prefix, logger):
         super(LoggerAdapter, self).__init__(logger, {})
@@ -47,7 +48,7 @@ class ESP301(Device):
         '''
         self.get_logger = logging.getLogger(self.__class__.__name__)
         if not hasattr(self, 'friendly_name'):
-            self.friendly_name=self.__class__.__name__
+            self.friendly_name = self.__class__.__name__
         self.logger = LoggerAdapter(self.friendly_name, self.get_logger)
         handlers = [logging.StreamHandler()]
         logging.basicConfig(handlers=handlers,
@@ -394,14 +395,14 @@ class ESP301(Device):
         else:
             self._customized_location = 'Not initialized'
         return self._customized_location
-    
+
     @clear_error_wrap
     def write_customized_location(self, attr):
         Thread(target=self.threaded_write_customized_location,
                args=(attr,)).start()
 
     def wait_until_arrive(self, axis, dest, interval=1):
-        while abs(dest-getattr(self, f'_ax{axis}_position'))>0.1:
+        while abs(dest-getattr(self, f'_ax{axis}_position')) > 0.1:
             time.sleep(interval)
             print(f"waiting for axis {axis}")
             if self.should_stop:
@@ -433,7 +434,7 @@ class ESP301(Device):
                 return
             self.move_relative_axis1()
         elif value.lower() == 'ta1' and self._customized_location == 'TA2':
-            #move backward and then rotate
+            # move backward and then rotate
             self._ax1_step = self.TA1[0] - self.TA2[0]
             self._ax2_step = self.TA1[1] - self.TA2[1]
             self.move_relative_axis1()
@@ -442,7 +443,7 @@ class ESP301(Device):
                 return
             self.move_relative_axis2()
         elif value.lower() == 'ta1' and self._customized_location == 'TA3':
-            #move backward and then rotate
+            # move backward and then rotate
             self._ax1_step = self.TA1[0] - self.TA3[0]
             self._ax2_step = self.TA1[1] - self.TA3[1]
             self.move_relative_axis1()
@@ -495,8 +496,6 @@ class ESP301(Device):
         self._ax1_step = ax1_previous_step
         self._ax2_step = ax2_previous_step
 
-
-
     error_message = attribute(
         label="error message",
         dtype="str",
@@ -516,7 +515,7 @@ class ESP301(Device):
         label="error message",
         dtype="str",
         access=AttrWriteType.READ,
-        polling_period = 1000,
+        polling_period=1000,
     )
 
     def read_message(self):
@@ -529,20 +528,7 @@ class ESP301(Device):
             self.should_stop = True
             self.logger.info(self._message)
         return self._message
-    
-    def disable_polling(self, attr):
-        if self.is_attribute_polled(attr):
-            self.stop_poll_attribute(attr)
-            self.logger.info(f'polling for {attr} is disabled')
 
-    def enable_polling(self, attr, polliing_period=1000):
-        if not self.is_attribute_polled(attr):
-            if not hasattr(self, '_polling') or not self._polling:
-                self._polling = polliing_period
-            self.poll_attribute(attr, self._polling)
-            self.logger.info(
-                f'polling period of {attr} is set to {self._polling}')
-            
     raw_command = attribute(
         label="raw command",
         dtype=str,
@@ -553,7 +539,7 @@ class ESP301(Device):
 
     def read_raw_command(self):
         return self._raw_command_return
-    
+
     @clear_error_wrap
     def write_raw_command(self, value):
         if value != '':
@@ -620,7 +606,6 @@ class ESP301(Device):
             self.dev.write(f"1PR{-self._ax12_step:.3f}\r".encode())
             self.dev.write(f"2PR{-self._ax12_step:.3f}\r".encode())
 
-
     def wait_until_stop(self, axis=1):
         while True:
             self.dev.write(f"{axis}MD?\r".encode())
@@ -632,7 +617,6 @@ class ESP301(Device):
                     self.stop_whole_function_due_to_error = True
                 break
             time.sleep(1)
-
 
     def threaded_reset_to_TA1(self):
         self.stop_whole_function_due_to_error = False
@@ -648,6 +632,7 @@ class ESP301(Device):
         self.dev.write(f"2DH211.05\r".encode())
         self.dev.write(f"1PA{self.TA1[0]:.3f}\r".encode())
         self.dev.write(f"2PA{self.TA1[1]:.3f}\r".encode())
+
 
 if __name__ == "__main__":
     ESP301.run_server()
