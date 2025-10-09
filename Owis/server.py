@@ -46,6 +46,7 @@ class OwisPS(Device):
         if p90_connected != 0:
             print("Could NOT connect to PS90!")
             self.set_state(DevState.OFF)
+            return
         if self.part_number:
             self.part_number_list = self.part_number.split(',')
             # iterate through all axes and find the part number from the part_number property.
@@ -62,8 +63,6 @@ class OwisPS(Device):
                 self.logger.info(
                     f"Could NOT load axis parameter file: {pn}.owd for axis {axis}! Error code: {result}")
 
-        # use absolute position mode
-        self.dev.PS90_SetTargetMode(1, 1, 1)
         # self._read_time = "N/A"
         self._user_defined_name = 'ps90_23070207'
         self._host_computer = platform.node()
@@ -239,63 +238,63 @@ class OwisPS(Device):
 
     @command
     def init_ax1(self):
-        self.logger.info(f"init axis 1")
-        self.dev.PS90_MotorInit(1, 1)
+        result = self.dev.PS90_MotorInit(1, 1)
+        self.logger.info(f"init axis 1. Result: {result}")
 
     @command
     def init_ax2(self):
-        self.logger.info(f"init axis 2")
-        self.dev.PS90_MotorInit(1, 2)
+        result = self.dev.PS90_MotorInit(1, 2)
+        self.logger.info(f"init axis 2. Result: {result}")
 
     @command
     def init_ax3(self):
-        self.logger.info(f"init axis 3")
-        self.dev.PS90_MotorInit(1, 3)
+        result = self.dev.PS90_MotorInit(1, 3)
+        self.logger.info(f"init axis 3. Result: {result}")
 
     @command
     def init_ax4(self):
-        self.logger.info(f"init axis 4")
-        self.dev.PS90_MotorInit(1, 4)
+        result = self.dev.PS90_MotorInit(1, 4)
+        self.logger.info(f"init axis 4. Result: {result}")
 
     @command
     def free_switch_ax1(self):
-        self.logger.info(f"free switch axis 1")
-        self.dev.PS90_FreeSwitch(1, 1)
+        result = self.dev.PS90_FreeSwitch(1, 1)
+        self.logger.info(f"free switch axis 1. Result: {result}")
 
     @command
     def free_switch_ax2(self):
-        self.logger.info(f"free switch axis 2")
-        self.dev.PS90_FreeSwitch(1, 2)
+        result = self.dev.PS90_FreeSwitch(1, 2)
+        self.logger.info(f"free switch axis 2. Result: {result}")
 
     @command
     def free_switch_ax3(self):
-        self.logger.info(f"free switch axis 3")
-        self.dev.PS90_FreeSwitch(1, 3)
+        result = self.dev.PS90_FreeSwitch(1, 3)
+        self.logger.info(f"free switch axis 3. Result: {result}")
 
     @command
     def free_switch_ax4(self):
-        self.logger.info(f"free switch axis 4")
-        self.dev.PS90_FreeSwitch(1, 4)
+        result = self.dev.PS90_FreeSwitch(1, 4)
+        self.logger.info(f"free switch axis 4. Result: {result}")
 
     @command
     def go_ref_ax1(self):
-        self.logger.info(f"go ref axis 1")
-        self.dev.PS90_GoRef(1, 1, 4)
+        result = self.dev.PS90_GoRef(1, 1, 4)
+        self.logger.info(f"go ref axis 1. Result: {result}")
 
     @command
     def go_ref_ax2(self):
-        self.logger.info(f"go ref axis 2")
-        self.dev.PS90_GoRef(1, 2, 4)
+        result = self.dev.PS90_GoRef(1, 2, 4)
+        self.logger.info(f"go ref axis 2. Result: {result}")
 
     @command
     def go_ref_ax3(self):
-        self.logger.info(f"go ref axis 3")
-        self.dev.PS90_GoRef(1, 3, 4)
+        result = self.dev.PS90_GoRef(1, 3, 4)
+        self.logger.info(f"go ref axis 3. Result: {result}")
 
     @command
     def go_ref_ax4(self):
-        self.logger.info(f"go ref axis 4")
-        self.dev.PS90_GoRef(1, 4, 4)
+        result = self.dev.PS90_GoRef(1, 4, 4)
+        self.logger.info(f"go ref axis 4. Result: {result}")
 
     def read_ax1_status(self, attr):
         self.dev.write(b"1MO?\r")
