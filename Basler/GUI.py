@@ -51,11 +51,8 @@ class BaslerGUI():
                                                 attr for attr in device_info['attrs'] if attr not in exclude]
         self.attr_list[device_name] = device_info
 
-    def create_image_panel(self, device_name, image='image', image_number=True, energy_meter=False, calibration=False, command=True):
+    def create_image_panel(self, layout, device_name, image='image', image_number=True, energy_meter=False, calibration=False):
         '''create Taurus Image panel'''
-        # panel 1
-        panel1, panel1_layout = self.create_blank_panel('v')
-
         panel1_shot = Qt.QWidget()
         panel1_shot_layout = Qt.QHBoxLayout()
         panel1_shot.setLayout(panel1_shot_layout)
@@ -76,7 +73,7 @@ class BaslerGUI():
                 panel1_shot_layout, 'laser/gentec/Onshot', 'shot')
             self.add_label_widget(
                 panel1_shot_layout, 'laser/gentec/Onshot', 'main_value')
-        panel1_layout.addWidget(panel1_shot)
+        layout.addWidget(panel1_shot)
 
         # sets of widgets. Image in mid.
         # Check file_reader data dimension to determine use image or plot.
@@ -84,17 +81,10 @@ class BaslerGUI():
             panel1_w1 = TaurusPlot()
             model = [(f'{device_name}/x', f'{device_name}/y')]
             panel1_w1.setModel(model)
-            panel1_w1_name = f'{device_name}_plot'
         else:
             panel1_w1 = TaurusImageDialog()
             panel1_w1.model = device_name + '/' + image
-            panel1_w1_name = f'{device_name}_{image}'
-        panel1_layout.addWidget(panel1_w1)
-        if command:
-            self.add_command(panel1_layout, device_name,
-                             cmd_parameters={'reset_number': [0]})
-
-        self.gui.createPanel(panel1, panel1_w1_name)
+        layout.addWidget(panel1_w1)
 
     def add_label_widget(self, layout, device_name, attr_name,  check_exist=False):
         # if check_exist:
@@ -124,7 +114,7 @@ class BaslerGUI():
                 i.setFont(Qt.QFont("Sans Serif", 16))
         layout.addWidget(panel)
 
-    def add_command(self, layout, device_name, command_list=None, cmd_parameters=None):
+    def add_command(self, layout, device_name, command_list=None, modified_cmd_name=None, cmd_parameters=None):
         '''add command buttons
         layout: the layout to add the command buttons
         device_name: the device name
@@ -136,20 +126,21 @@ class BaslerGUI():
             command_list = [
                 i.cmd_name for i in self.attr_list[device_name]['dp'].command_list_query()[3:]]
         if cmd_parameters is None:
-            cmd_parameters = {}
-        for cmd in command_list:
+            cmd_parameters = [None]*len(command_list)
+        if modified_cmd_name is None:
+            modified_cmd_name = command_list
+        for cmd, parameters, modified_name in zip(command_list, cmd_parameters, modified_cmd_name):
             if cmd in self.attr_list[device_name]['commands']:
                 panel_w = TaurusCommandButton(
-                    command=cmd, parameters=cmd_parameters.get(cmd, None)
+                    command=cmd, parameters=parameters
                 )
 
-                panel_w.setCustomText(cmd)
+                panel_w.setCustomText(modified_name)
                 panel_w.setModel(device_name)
                 panel_layout.addWidget(panel_w)
         layout.addWidget(panel)
 
-    def create_form_panel(self, device_name, exclude=None, dropdown=None, withButtons=True):
-        panel2, panel2_layout = self.create_blank_panel('v')
+    def create_form_panel(self, layout, device_name, exclude=None, dropdown=None, withButtons=True):
         panel2_w1 = TaurusForm(withButtons=withButtons)
         form_model = self.attr_list[device_name]['model']
         # re-order. Move trigger to front.
@@ -162,7 +153,7 @@ class BaslerGUI():
             form_model = [i for i in form_model if i.split(
                 '/')[-1] not in exclude]
         panel2_w1.model = form_model
-        panel2_layout.addWidget(panel2_w1)
+        layout.addWidget(panel2_w1)
         if not dropdown:
             # change the text write widget to dropdown list and set auto apply
             dropdown = {'trigger_source': (('Off', 'Off'), ('Software', 'Software'), ('External', 'External')), 'trigger_selector': (
@@ -175,9 +166,6 @@ class BaslerGUI():
             if full_attr.split('/')[-1] in dropdown:
                 panel2_w1[idx].writeWidgetClass = create_my_dropdown_list_class(
                     full_attr.split('/')[-1], dropdown[full_attr.split('/')[-1]])
-
-        self.gui.createPanel(panel2, f'{device_name}_paramters')
-        return panel2_layout
 
     def combined_panel(self, device_list, combine_form_with_onshot=False):
         panel3, panel3_layout = self.create_blank_panel('v')
@@ -202,8 +190,8 @@ class BaslerGUI():
                 self.add_label_widget(
                     widget_one_device_layout, d, 'file_number')
             panel3_layout.addWidget(widget_one_device)
-            self.add_command(panel3_layout, d, cmd_parameters={
-                             'reset_number': [0]})
+            self.add_command(panel3_layout, d, command_list=[
+                             'get_ready', 'relax', 'reset_number', 'send_software_trigger'],  cmd_parameters=[None, None, [0], None])
         self.gui.createPanel(panel3, f'{len(device_list)} devices')
 
     def create_blank_panel(self, VorH='V'):
@@ -237,13 +225,22 @@ def create_app():
             ) if key != "combine_form_with_onshot"})
         elif len(args.device) > 3:
             pass_config1['image_number'] = False
-            pass_config1['command'] = False
         else:
             pass_config1, pass_config2 = {}, {}
         basler_app.add_device(d)
-        basler_app.create_image_panel(d, **pass_config1)
-        basler_app.create_form_panel(
-            d, exclude=['image', 'image_r', 'image_g', 'image_b', 'flux', 'energy', 'hot_spot'])
+
+        # image panel.
+        image_panel, image_layout = basler_app.create_blank_panel('v')
+        basler_app.gui.createPanel(image_panel, f'{d}_image_plot')
+        basler_app.create_image_panel(image_layout, d, **pass_config1)
+        if not len(args.device) > 3:
+            basler_app.add_command(image_layout, d, command_list=[
+                                   'get_ready', 'relax', 'reset_number', 'send_software_trigger'], cmd_parameters=[None, None, [0], None])
+        # form panel
+        form_panel, form_layout = basler_app.create_blank_panel('v')
+        basler_app.gui.createPanel(form_panel, f'{d}_form')
+        basler_app.create_form_panel(form_layout,
+                                     d, exclude=['image', 'image_r', 'image_g', 'image_b', 'flux', 'energy', 'hot_spot'])
     if len(args.device) == 1 and args.device[0] in image_panel_config:
         pass_config2 = ({key: value for key, value in image_panel_config[args.device[0]].items(
         ) if key == "combine_form_with_onshot"})

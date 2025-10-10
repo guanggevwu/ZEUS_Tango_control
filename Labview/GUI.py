@@ -21,7 +21,9 @@ def create_app():
     # get the configuration
     for d in device_list:
         basler_app.add_device(d)
-        basler_app.create_form_panel(d)
+        form_panel, form_layout = basler_app.create_blank_panel('v')
+        basler_app.gui.createPanel(form_panel, f'{d}_form')
+        basler_app.create_form_panel(form_layout, d)
 
     basler_app.gui.removePanel('Manual')
     basler_app.gui.show()
