@@ -56,14 +56,14 @@ db = tango.Database()
 if __name__ == "__main__":
     server_class_name_property_input = {
         'server': None, '_class': None, 'name': None}
-    prompt_add_delete_show = "Add device (A/a), Delete device(D/d), or Quit (Q) ?\n"
+    prompt_add_delete_show = "Add device (A/a), Delete device(D/d), Change property (C/c) or Quit (Q) ?\n"
     while True:
         user_input = input(prompt_add_delete_show)
         if user_input.lower() == 'a':
             info = {'Basler camera':
                     {'Please enter the camera name defined in Pylon Viewer.\n': 'friendly_name',
                      "Enter Y/y to use {tango_device_name} as the device name or manually enter the device name?\n": 'name'},
-                    'Allied vision camera': {'Please enter the Tango device name in this format "**/vimba/**", for example "TA1/vimba/TA1_1" or "TA1/vimba/12345678". The last part is the user defined name or serial number.\n': 'full_name'}, 'Other': {'Please enter the class. For example, Basler.\n': "_class", 'Please enter the server/instance. For example, Basler/ta1-camera1\n': 'server', 'Please enter the device name. For example, ta1/basler/ta1-camera1\n': 'name', 'Please enter properties.\n': 'property', "Confirm to add device {dict}? Y/N\n": 'confirm'}
+                    'Allied vision camera': {'Please enter the Tango device name in this format "**/vimba/**", for example "TA1/vimba/TA1_1" or "TA1/vimba/12345678". The last part is the user defined name or serial number.\n': 'full_name'}, 'Other': {'Please enter the class. For example, Basler.\n': "_class", 'Please enter the server/instance. For example, Basler/ta1-camera1\n': 'server', 'Please enter the device name. For example, ta1/basler/ta1-camera1\n': 'name', 'Please enter property in this foramt "property_name: property_value". Press enter to stop\n': 'property', "Confirm to add device {dict}? Y/N\n": 'confirm'}
                     }
             # prompt for device name
             prompt_device_type = "Enter number to choose device to add:\n" + \
@@ -168,6 +168,20 @@ if __name__ == "__main__":
         # elif user_input.lower() == 'l':
         #     device_name = input("Enter device name to show info: ")
         #     get_properties(device_name)
+        elif user_input.lower() == 'c':
+            device_name = input("Enter device name to change properties: ")
+            property = {}
+            while True:
+                user_input = input(
+                    "enter property to change in format 'property_name: property_value'. Press enter to stop.\n")
+                if not user_input:
+                    break
+                if ': ' in user_input:
+                    user_input_split = user_input.split(': ')
+                else:
+                    user_input_split = user_input.split(':')
+                property[user_input_split[0]] = user_input_split[1]
+            db.put_device_property(device_name, property)
         elif user_input.lower() == 'q':
             break
         else:
