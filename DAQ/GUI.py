@@ -542,10 +542,9 @@ class ScanWindow(Toplevel):
             self, text='Input', padding=pad_widget, style='Sty1.TLabelframe')
         self.scan_frame4.grid(column=1, row=2, sticky="WENS")
         self.item_each_row = 4
-        # getting scannable device from db and manually specify the attr name
-        self.scannable_list = [
-            i+'/pressure_psi' for i in self.parent.db.get_device_name('*', "GXRegulator")] + [
-            i+f'/ax{axis}_position' for i in self.parent.db.get_device_name('*', "ESP301") for axis in ['1', '2', '3']] + ['sys/taurustest/1/position']
+        # read scannable attributes from file
+        with open(os.path.join(os.path.dirname(__file__), 'scannable_attributes.txt')) as f:
+            self.scannable_list = [line.strip() for line in f if line.strip()]
         # scan_table format: key is the device/attr string, value is string the scan value list.
         self.scan_table = defaultdict(list)
         self.scan_table_file = os.path.join(

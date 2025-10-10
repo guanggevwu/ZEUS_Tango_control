@@ -373,14 +373,15 @@ class Daq:
                     f"Shot {self.current_shot_for_all_cam-1} is completed.", 'green_text')
                 playsound(os.path.join(os.path.dirname(__file__), 'media',
                           'sound', 'shot_completion_1.mp3'), block=False)
+                # save scala data
+                self.csv_header = ['shot_number']
+                if self.GUI.options["laser_shot_id"] or self.GUI.options["MA3_QE12"] or self.GUI.options["Owis_positions"]:
+                    self.save_scalars(self.current_shot_for_all_cam)
                 if scan_table is not None and hasattr(self, "scan_shot_range") and self.current_shot_for_all_cam in self.scan_shot_range:
                     for device_attr_name, ap in self.scan_attr_proxies.items():
                         self.set_scan_value(
                             ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
                     self.save_scan_list(self.current_shot_for_all_cam)
-                self.csv_header = ['shot_number']
-                if self.GUI.options["laser_shot_id"] or self.GUI.options["MA3_QE12"] or self.GUI.options["Owis_positions"]:
-                    self.save_scalars(self.current_shot_for_all_cam)
 
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
                 self.logger("All shots completed!")
@@ -434,6 +435,8 @@ class Daq:
                     f'#{shot_number-1}', background='white')
 
     def save_scan_list(self, shot_number, add_header=False):
+        # TODO. This function was called immediately after setting the scan value. If it takes some time to reach the scan value, then the saved value will be an intermediate value. This function can be merged into save_scalars function.
+        return
         with open(os.path.join(self.dir, 'scan_list', 'scan.csv'), 'a') as csvfile:
             writer = csv.writer(csvfile)
             if add_header:
