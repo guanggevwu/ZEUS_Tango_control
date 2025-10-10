@@ -116,9 +116,14 @@ class OwisPS(Device):
 
     def read_user_defined_locations(self):
         try:
+            if not os.path.isfile(os.path.join(os.path.dirname(__file__), 'user_defined_locations.csv')):
+                with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.csv'), 'w', newline='') as f:
+                    writer = csv.DictWriter(
+                        f, fieldnames=['name', 'positions'], delimiter=' ')
+                    writer.writeheader()
             with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.csv'), 'r',) as f:
                 self._user_defined_locations_dict = {}
-                reader = csv.DictReader(f,  delimiter=' ')
+                reader = csv.DictReader(f, delimiter=' ')
                 for row in reader:
                     self._user_defined_locations_dict[row['name']] = [
                         float(i) for i in row['positions'].split(',') if i]
@@ -141,6 +146,8 @@ class OwisPS(Device):
         return all(abs(x - y) < tol for x, y in zip(a, b))
 
     def read_current_location(self):
+        if not hasattr(self, '_user_defined_locations_dict'):
+            self.read_user_defined_locations()
         self._current_location = 'Undefined'
         current_positions = [
             getattr(self, f'_ax{axis}_position') for axis in self.axis.split(',')]
@@ -156,6 +163,9 @@ class OwisPS(Device):
             getattr(self, f'write_ax{axis}_position')(self, target)
 
     def initialize_dynamic_attributes(self):
+        # way to add command dynamically
+        # cmd = command(f=self.test_stop)
+        # self.add_command(cmd)
         for axis in [int(i) for i in self.axis.split(',')]:
             setattr(self, f'read_ax{axis}_position',
                     self.create_read_position_function(axis))
@@ -167,9 +177,9 @@ class OwisPS(Device):
                     self.create_write_ax_step_function(axis))
             self.add_attribute(self.create_position_attribute(axis))
             self.add_attribute(self.create_ax_step_attribute(axis))
+
+            # self.add_command(self.create_command_member(axis))
             # self.add_command(self.create_init_axis_function(axis))
-            # TODO. Change command to be dynamnically added. not sure why add_command does not work.
-            # self.add_command(test_command)
 
     def create_position_attribute(self, axis):
         self.logger.info(f'created axis{axis}.')
@@ -236,101 +246,48 @@ class OwisPS(Device):
                 self.logger.error(
                     f"Error stopping axis {axis}: error code {result}")
 
-    @command
-    def init_ax1(self):
-        result = self.dev.PS90_MotorInit(1, 1)
-        self.logger.info(f"init axis 1. Result: {result}")
+    @command()
+    def init_ax(self, axis):
+        result = self.dev.PS90_MotorInit(1, axis)
+        self.logger.info(f"init axis {axis}. Result: {result}")
 
-    @command
-    def init_ax2(self):
-        result = self.dev.PS90_MotorInit(1, 2)
-        self.logger.info(f"init axis 2. Result: {result}")
+    @command(dtype_in=int)
+    def free_switch_ax(self, axis):
+        result = self.dev.PS90_FreeSwitch(1, axis)
+        self.logger.info(f"free switch axis {axis}. Result: {result}")
 
-    @command
-    def init_ax3(self):
-        result = self.dev.PS90_MotorInit(1, 3)
-        self.logger.info(f"init axis 3. Result: {result}")
+    @command(dtype_in=int)
+    def go_ref_ax(self, axis):
+        result = self.dev.PS90_GoRef(1, axis, 4)
+        self.logger.info(f"go ref axis {axis}. Result: {result}")
 
-    @command
-    def init_ax4(self):
-        result = self.dev.PS90_MotorInit(1, 4)
-        self.logger.info(f"init axis 4. Result: {result}")
-
-    @command
-    def free_switch_ax1(self):
-        result = self.dev.PS90_FreeSwitch(1, 1)
-        self.logger.info(f"free switch axis 1. Result: {result}")
-
-    @command
-    def free_switch_ax2(self):
-        result = self.dev.PS90_FreeSwitch(1, 2)
-        self.logger.info(f"free switch axis 2. Result: {result}")
-
-    @command
-    def free_switch_ax3(self):
-        result = self.dev.PS90_FreeSwitch(1, 3)
-        self.logger.info(f"free switch axis 3. Result: {result}")
-
-    @command
-    def free_switch_ax4(self):
-        result = self.dev.PS90_FreeSwitch(1, 4)
-        self.logger.info(f"free switch axis 4. Result: {result}")
-
-    @command
-    def go_ref_ax1(self):
-        result = self.dev.PS90_GoRef(1, 1, 4)
-        self.logger.info(f"go ref axis 1. Result: {result}")
-
-    @command
-    def go_ref_ax2(self):
-        result = self.dev.PS90_GoRef(1, 2, 4)
-        self.logger.info(f"go ref axis 2. Result: {result}")
-
-    @command
-    def go_ref_ax3(self):
-        result = self.dev.PS90_GoRef(1, 3, 4)
-        self.logger.info(f"go ref axis 3. Result: {result}")
-
-    @command
-    def go_ref_ax4(self):
-        result = self.dev.PS90_GoRef(1, 4, 4)
-        self.logger.info(f"go ref axis 4. Result: {result}")
-
-    def read_ax1_status(self, attr):
-        self.dev.write(b"1MO?\r")
-        reply = self.dev.readline().decode().replace('\r\n', '')
-        if reply == '1':
-            self._ax1_status = "On"
-        elif reply == '0':
-            self._ax1_status = "Off"
-        return self._ax1_status
-
-    @command(dtype_in=bool)
-    def move_relative_axis1(self, plus=True):
-        self.dev.PS90_SetTargetMode(1, 1, 0)
-        if plus:
-            self.dev.PS90_MoveEx(1, 1, c_double(self._ax1_step), 1)
+    @command()
+    def move_relative_axis1(self, input: list[int]):
+        self.dev.PS90_SetTargetMode(1, int(input[0]), 0)
+        if input[1]:
+            self.dev.PS90_MoveEx(1, int(input[0]), c_double(self._ax1_step), 1)
         else:
-            self.dev.PS90_MoveEx(1, 1, c_double(-self._ax1_step), 1)
-        self.logger.info(f'{self._ax1_step}, {plus}')
+            self.dev.PS90_MoveEx(
+                1, int(input[0]), c_double(-self._ax1_step), 1)
+        self.logger.info(f'relateive moving, {input}')
 
-    @command(dtype_in=bool)
-    def move_relative_axis2(self, plus=True):
-        self.dev.PS90_SetTargetMode(1, 2, 0)
-        if plus:
-            self.dev.PS90_MoveEx(1, 2, c_double(self._ax1_step), 1)
-        else:
-            self.dev.PS90_MoveEx(1, 2, c_double(-self._ax1_step), 1)
-        self.logger.info(f'{self._ax2_step}, {plus}')
+    # @command(dtype_in=bool)
+    # def move_relative_axis2(self, plus=True):
+    #     self.dev.PS90_SetTargetMode(1, 2, 0)
+    #     if plus:
+    #         self.dev.PS90_MoveEx(1, 2, c_double(self._ax1_step), 1)
+    #     else:
+    #         self.dev.PS90_MoveEx(1, 2, c_double(-self._ax1_step), 1)
+    #     self.logger.info(f'{self._ax2_step}, {plus}')
 
-    @command(dtype_in=bool)
-    def move_relative_axis3(self, plus=True):
-        self.dev.PS90_SetTargetMode(1, 3, 0)
-        if plus:
-            self.dev.PS90_MoveEx(1, 3, c_double(self._ax3_step), 1)
-        else:
-            self.dev.PS90_MoveEx(1, 3, c_double(-self._ax3_step), 1)
-        self.logger.info(f'{self._ax3_step}, {plus}')
+    # @command(dtype_in=bool)
+    # def move_relative_axis3(self, plus=True):
+    #     self.dev.PS90_SetTargetMode(1, 3, 0)
+    #     if plus:
+    #         self.dev.PS90_MoveEx(1, 3, c_double(self._ax3_step), 1)
+    #     else:
+    #         self.dev.PS90_MoveEx(1, 3, c_double(-self._ax3_step), 1)
+    #     self.logger.info(f'{self._ax3_step}, {plus}')
 
 
 if __name__ == "__main__":

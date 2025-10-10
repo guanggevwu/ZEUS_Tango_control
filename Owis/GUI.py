@@ -29,8 +29,10 @@ def create_app():
         dropdown = {}
         dropdown['current_location'] = (
             (locations, locations.split(':')[0]) for locations in basler_app.attr_list[d]['dp'].user_defined_locations)
-        layout = basler_app.create_form_panel(d, dropdown=dropdown, exclude=[
-                                              'ax1_step', 'ax2_step', 'ax3_step', 'ax4_step', 'ax5_step', 'ax6_step', 'ax7_step', 'ax8_step', 'ax9_step'], withButtons=False)
+        form_panel, form_layout = basler_app.create_blank_panel('v')
+        basler_app.gui.createPanel(form_panel, f'{d}_form')
+        basler_app.create_form_panel(form_layout, d, dropdown=dropdown, exclude=[
+            'ax1_step', 'ax2_step', 'ax3_step', 'ax4_step', 'ax5_step', 'ax6_step', 'ax7_step', 'ax8_step', 'ax9_step'], withButtons=False)
         for a in range(1, 10):
             if f'ax{a}_step' in basler_app.attr_list[d]['attrs']:
                 relative_panel, relative_panel_layout = basler_app.create_blank_panel(
@@ -44,12 +46,12 @@ def create_app():
                 step_widget.model = f'{d}/ax{a}_step'
 
                 button1 = TaurusCommandButton(
-                    command=f'move_relative_axis{a}', parameters=[False]
+                    command=f'move_relative_axis{a}', parameters=[a, 0]
                 )
                 button1.setCustomText(f'ax{a}-')
                 button1.setModel(d)
                 button2 = TaurusCommandButton(
-                    command=f'move_relative_axis{a}', parameters=[True]
+                    command=f'move_relative_axis{a}', parameters=[a, 1]
                 )
                 button2.setCustomText(f'ax{a}+')
                 button2.setModel(d)
@@ -57,30 +59,15 @@ def create_app():
                 relative_panel_layout.addWidget(button1)
                 relative_panel_layout.addWidget(step_widget)
                 relative_panel_layout.addWidget(button2)
-                layout.addWidget(relative_panel)
+                form_layout.addWidget(relative_panel)
 
-        cmd_list = [
-            i.cmd_name for i in basler_app.attr_list[d]['dp'].command_list_query()[3:]]
-        cmd_list = [i for i in cmd_list if 'move_relative' not in i]
-        filtered_cmd_list = []
-        # these type of commands need to be filtered out if they are not applicable. For example, if axis 2 doesn't exist, then all corresponding commands should not exist.
-        filter_list = ['init_ax', 'free_switch_ax', 'go_ref_ax']
-        for i in cmd_list:
-            if all([t not in i for t in filter_list]):
-                filtered_cmd_list.append(i)
-            elif (hasattr(basler_app.attr_list[d]['dp'], f'ax{i[-1]}_position')):
-                filtered_cmd_list.append(i)
-        # commands_per_row equals to the number of axis
-        commands_per_row = len(filtered_cmd_list) // len(filter_list)
-        if commands_per_row < 2:
-            commands_per_row = 2
-        for i in range(len(filtered_cmd_list) // commands_per_row+1):
-            if i != len(filtered_cmd_list):
-                basler_app.add_command(
-                    layout, d, command_list=filtered_cmd_list[i*commands_per_row:(i+1)*commands_per_row])
+        basler_app.add_command(form_layout, d, command_list=['stop_all_axis'])
+        for ax in range(1, 10):
+            if not hasattr(basler_app.attr_list[d]['dp'], f'ax{ax}_position'):
+                continue
             else:
-                basler_app.add_command(
-                    layout, d, command_list=filtered_cmd_list[i*commands_per_row:])
+                basler_app.add_command(form_layout, d, command_list=['init_ax', 'go_ref_ax', 'free_switch_ax'], cmd_parameters=[
+                                       [ax], [ax], [ax]], modified_cmd_name=[f'init_ax{ax}', f'go_ref_ax{ax}', f'free_switch_ax{ax}'])
 
     basler_app.gui.removePanel('Manual')
     basler_app.gui.show()

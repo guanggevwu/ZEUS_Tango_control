@@ -125,11 +125,11 @@ if __name__ == "__main__":
                         user_input = input(prompt)
                         server_class_name_property_input[value] = user_input
                     elif value == 'property':
+                        server_class_name_property_input['property'] = {}
                         while True:
                             user_input = input(prompt)
                             if not user_input:
                                 break
-                            server_class_name_property_input['property'] = {}
                             if ': ' in user_input:
                                 user_input_split = user_input.split(': ')
                             else:
