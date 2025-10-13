@@ -74,13 +74,17 @@ def create_app():
                 form_layout.addWidget(relative_panel)
 
         basler_app.add_command(form_layout, d, command_list=['stop_all_axis'])
+        command_panel, command_layout = basler_app.create_blank_panel('v')
+        basler_app.gui.createPanel(command_panel, f'{d}_commands')
+
         for ax in range(1, 10):
             if not hasattr(basler_app.attr_list[d]['dp'], f'ax{ax}_position'):
                 continue
             else:
-                basler_app.add_command(form_layout, d, command_list=['init_ax', 'go_ref_ax', 'free_switch_ax'], cmd_parameters=[
+                basler_app.add_command(command_layout, d, command_list=['init_ax', 'go_ref_ax', 'free_switch_ax'], cmd_parameters=[
                                        [ax], [ax], [ax]], modified_cmd_name=[f'init_ax{ax}', f'go_ref_ax{ax}', f'free_switch_ax{ax}'])
-
+        basler_app.add_command(
+            command_layout, d, command_list=['stop_all_axis'])
     basler_app.gui.removePanel('Manual')
     basler_app.gui.show()
     basler_app.app.exec_()
