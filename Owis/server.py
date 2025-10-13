@@ -118,9 +118,8 @@ class OwisPS(Device):
         return self._user_defined_locations
 
     def write_user_defined_locations(self, value):
-        self.logger.info(f"start Write user_defined_locations: {value}")
+        self.logger.info(f"Write user_defined_locations: {value}")
         self._user_defined_locations = value
-        self.logger.info(f"end Write user_defined_locations: {value}")
 
     current_location = attribute(
         label="current location",
@@ -238,7 +237,7 @@ class OwisPS(Device):
                 self.logger.error(
                     f"Error stopping axis {axis}: error code {result}")
 
-    @command()
+    @command(dtype_in=int)
     def init_ax(self, axis):
         result = self.dev.PS90_MotorInit(1, axis)
         self.logger.info(f"init axis {axis}. Result: {result}")
