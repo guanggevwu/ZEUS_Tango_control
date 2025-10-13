@@ -111,28 +111,16 @@ class OwisPS(Device):
         label="user defined locations",
         dtype=(str,),
         max_dim_x=100,
-        access=AttrWriteType.READ,
+        access=AttrWriteType.READ_WRITE,
     )
 
     def read_user_defined_locations(self):
-        try:
-            if not os.path.isfile(os.path.join(os.path.dirname(__file__), 'user_defined_locations.csv')):
-                with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.csv'), 'w', newline='') as f:
-                    writer = csv.DictWriter(
-                        f, fieldnames=['name', 'positions'], delimiter=' ')
-                    writer.writeheader()
-            with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.csv'), 'r',) as f:
-                self._user_defined_locations_dict = {}
-                reader = csv.DictReader(f, delimiter=' ')
-                for row in reader:
-                    self._user_defined_locations_dict[row['name']] = [
-                        float(i) for i in row['positions'].split(',') if i]
-
-                self._user_defined_locations = [
-                    f'{k}: ({",".join([str(i) for i in v])})' for k, v in self._user_defined_locations_dict.items()]
-        except Exception as e:
-            self.logger.info(f"Error reading user_defined_locations.csv: {e}")
         return self._user_defined_locations
+
+    def write_user_defined_locations(self, value):
+        self.logger.info(f"start Write user_defined_locations: {value}")
+        self._user_defined_locations = value
+        self.logger.info(f"end Write user_defined_locations: {value}")
 
     current_location = attribute(
         label="current location",
@@ -146,19 +134,23 @@ class OwisPS(Device):
         return all(abs(x - y) < tol for x, y in zip(a, b))
 
     def read_current_location(self):
-        if not hasattr(self, '_user_defined_locations_dict'):
-            self.read_user_defined_locations()
         self._current_location = 'Undefined'
         current_positions = [
             getattr(self, f'_ax{axis}_position') for axis in self.axis.split(',')]
-        for k, v in self._user_defined_locations_dict.items():
-            if self.is_position_close(current_positions, v):
-                self._current_location = f'{k}: ({",".join([str(i) for i in v])})'
+        for loc in self._user_defined_locations:
+            name, positions = loc.split(': ')
+            p = [float(i) for i in positions.strip('()').split(',')]
+            if self.is_position_close(current_positions, p):
+                self._current_location = loc
                 break
         return self._current_location
 
     def write_current_location(self, value):
-        target_positions = self._user_defined_locations_dict[value]
+        for loc in self._user_defined_locations:
+            name, positions = loc.split(': ')
+            if name == value:
+                target_positions = [float(i)
+                                    for i in positions.strip('()').split(',')]
         for axis, target in zip(self.axis.split(','), target_positions):
             getattr(self, f'write_ax{axis}_position')(self, target)
 
