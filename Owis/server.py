@@ -208,6 +208,7 @@ class OwisPS(Device):
             unit='mm',
             format='6.3f',
             memorized=True,
+            hw_memorized=True,
             access=AttrWriteType.READ_WRITE,
         )
         return attr
@@ -250,10 +251,11 @@ class OwisPS(Device):
     def move_relative_axis(self, input: list[int]):
         self.dev.PS90_SetTargetMode(1, int(input[0]), 0)
         if input[1]:
-            self.dev.PS90_MoveEx(1, int(input[0]), c_double(self._ax1_step), 1)
+            self.dev.PS90_MoveEx(1, int(input[0]), c_double(
+                getattr(self, f'_ax{input[0]}_step')), 1)
         else:
             self.dev.PS90_MoveEx(
-                1, int(input[0]), c_double(-self._ax1_step), 1)
+                1, int(input[0]), c_double(-getattr(self, f'_ax{input[0]}_step')), 1)
         self.logger.info(f'relateive moving, {input}')
 
 
