@@ -2,18 +2,12 @@
 # -*- coding: utf-8 -*-
 from tango import AttrWriteType, DevState
 from tango.server import Device, attribute, command, device_property
-import time
 import datetime
 import logging
-import serial
 import time
 import platform
-from threading import Thread
-import functools
 from ctypes import windll, c_double
-import sys
 import os
-import csv
 # -----------------------------
 
 

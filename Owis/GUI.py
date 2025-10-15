@@ -4,7 +4,6 @@ from taurus.qt.qtgui.display import TaurusLabel
 import tango
 import os
 import sys
-import csv
 from taurus.qt.qtgui.button import TaurusCommandButton
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -28,16 +27,17 @@ def create_app():
         basler_app.add_device(d)
         if not os.path.isfile(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt')):
             with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt'), 'w', newline='') as f:
-                writer = csv.DictWriter(
-                    f, fieldnames=['name', 'positions'], delimiter=' ')
-                writer.writeheader()
+                f.write("name positions\n")
         with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt'), 'r',) as f:
-            reader = csv.DictReader(f, delimiter='\t')
             tmp = []
-            for row in reader:
-                tmp.append(f"{row['name']}: ({row['positions']})")
+            next(f)
+            for line in f:
+                name, positions = line.replace(
+                    '\t', ' ').strip().replace('"', '').split(' ', 1)
+                tmp.append(f"{name}: ({positions})")
         # somehow Taurus.Device does not update the attribute
-        tango.DeviceProxy(d).user_defined_locations = tmp
+        if tmp:
+            tango.DeviceProxy(d).user_defined_locations = tmp
         dropdown = {}
         dropdown['current_location'] = (
             (locations, locations.split(':')[0]) for locations in basler_app.attr_list[d]['dp'].user_defined_locations)
