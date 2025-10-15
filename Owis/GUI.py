@@ -27,13 +27,13 @@ def create_app():
         basler_app.add_device(d)
         if not os.path.isfile(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt')):
             with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt'), 'w', newline='') as f:
-                f.write("name positions\n")
+                f.write("name positions(#_no_space_in_name_or_positoins.Can_use_space_or_tab_to_seperate_name_and_positioins)\n")
         with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt'), 'r',) as f:
             tmp = []
             next(f)
             for line in f:
-                name, positions = line.replace(
-                    '\t', ' ').strip().replace('"', '').split(' ', 1)
+                name, positions = [e for e in line.replace(
+                    '\t', ' ').strip().replace('"', '').split(' ') if e]
                 tmp.append(f"{name}: ({positions})")
         # somehow Taurus.Device does not update the attribute
         if tmp:
