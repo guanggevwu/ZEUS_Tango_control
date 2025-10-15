@@ -247,7 +247,7 @@ class OwisPS(Device):
         self.logger.info(f"go ref axis {axis}. Result: {result}")
 
     @command()
-    def move_relative_axis1(self, input: list[int]):
+    def move_relative_axis(self, input: list[int]):
         self.dev.PS90_SetTargetMode(1, int(input[0]), 0)
         if input[1]:
             self.dev.PS90_MoveEx(1, int(input[0]), c_double(self._ax1_step), 1)
@@ -255,24 +255,6 @@ class OwisPS(Device):
             self.dev.PS90_MoveEx(
                 1, int(input[0]), c_double(-self._ax1_step), 1)
         self.logger.info(f'relateive moving, {input}')
-
-    # @command(dtype_in=bool)
-    # def move_relative_axis2(self, plus=True):
-    #     self.dev.PS90_SetTargetMode(1, 2, 0)
-    #     if plus:
-    #         self.dev.PS90_MoveEx(1, 2, c_double(self._ax1_step), 1)
-    #     else:
-    #         self.dev.PS90_MoveEx(1, 2, c_double(-self._ax1_step), 1)
-    #     self.logger.info(f'{self._ax2_step}, {plus}')
-
-    # @command(dtype_in=bool)
-    # def move_relative_axis3(self, plus=True):
-    #     self.dev.PS90_SetTargetMode(1, 3, 0)
-    #     if plus:
-    #         self.dev.PS90_MoveEx(1, 3, c_double(self._ax3_step), 1)
-    #     else:
-    #         self.dev.PS90_MoveEx(1, 3, c_double(-self._ax3_step), 1)
-    #     self.logger.info(f'{self._ax3_step}, {plus}')
 
 
 if __name__ == "__main__":

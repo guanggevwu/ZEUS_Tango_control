@@ -27,7 +27,8 @@ def create_app():
         basler_app.add_device(d)
         if not os.path.isfile(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt')):
             with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt'), 'w', newline='') as f:
-                f.write("name positions(#_no_space_in_name_or_positoins.Can_use_space_or_tab_to_seperate_name_and_positioins)\n")
+                f.write(
+                    "name positions(#_no_space_in_name_or_positoins.Can_use_space_or_tab_to_seperate_name_and_positioins)\n")
         with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt'), 'r',) as f:
             tmp = []
             next(f)
@@ -58,12 +59,12 @@ def create_app():
                 step_widget.model = f'{d}/ax{a}_step'
 
                 button1 = TaurusCommandButton(
-                    command=f'move_relative_axis{a}', parameters=[a, 0]
+                    command=f'move_relative_axis', parameters=[a, 0]
                 )
                 button1.setCustomText(f'ax{a}-')
                 button1.setModel(d)
                 button2 = TaurusCommandButton(
-                    command=f'move_relative_axis{a}', parameters=[a, 1]
+                    command=f'move_relative_axis', parameters=[a, 1]
                 )
                 button2.setCustomText(f'ax{a}+')
                 button2.setModel(d)
