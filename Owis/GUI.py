@@ -28,7 +28,7 @@ def create_app():
         if not os.path.isfile(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt')):
             with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt'), 'w', newline='') as f:
                 f.write(
-                    "name positions(#_no_space_in_name_or_positoins.Can_use_space_or_tab_to_seperate_name_and_positioins)\n")
+                    "name positions\n")
         with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt'), 'r',) as f:
             tmp = []
             next(f)

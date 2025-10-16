@@ -1,0 +1,10 @@
+{
+  "ax1": {
+    "min_value": 0,
+    "max_value": 80
+  },
+  "ax2": {
+    "min_value": 0,
+    "max_value": 80
+  }
+}
