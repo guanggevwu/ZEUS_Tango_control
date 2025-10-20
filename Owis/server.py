@@ -8,7 +8,6 @@ import time
 import platform
 from ctypes import windll, c_double
 import os
-import json
 # -----------------------------
 
 
@@ -58,19 +57,6 @@ class OwisPS(Device):
                         continue
                 self.logger.info(
                     f"Could NOT load axis parameter file: {pn}.owd for axis {axis}! Error code: {result}")
-
-        # load software limit
-        if os.path.isfile(os.path.join(os.path.dirname(__file__), 'attribute_config.json')):
-            with open(os.path.join(os.path.dirname(__file__), 'attribute_config.json'), 'r') as f:
-                self.attribute_config = json.load(f)
-        else:
-            with open(os.path.join(os.path.dirname(__file__), 'attribute_config.json'), 'w') as f:
-                template = {
-                    "ax1": {"min_value": -10000, "max_value": 10000},
-                    "ax2": {"min_value": -10000, "max_value": 10000}
-                }
-                json.dump(template, f, indent=4)
-            self.attribute_config = template
 
         # self._read_time = "N/A"
         self._user_defined_name = 'ps90_23070207'
@@ -190,10 +176,6 @@ class OwisPS(Device):
             unit='mm',
             format='6.3f',
             memorized=True,
-            min_value=self.attribute_config.get(
-                f'ax{axis}', {}).get('min_value', ''),
-            max_value=self.attribute_config.get(
-                f'ax{axis}', {}).get('max_value', ''),
             access=AttrWriteType.READ_WRITE,
         )
         return attr
