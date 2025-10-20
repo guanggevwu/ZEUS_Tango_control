@@ -158,9 +158,11 @@ class FileReader(Device):
     def read_file_list(self):
         if self._debug:
             t0 = time.perf_counter()
+        self.file_extension_list = self._file_extension.split(',')
         try:
             # only count files that meet the file extension requirement and that has a size larger than 0.
-            self._file_list = [i.name  for i in os.scandir(self._folder_path) if i.is_file() and i.stat().st_size and i.name.split('.')[-1] == self._file_extension]
+            self._file_list = [i.name for i in os.scandir(self._folder_path) if i.is_file(
+            ) and i.stat().st_size and i.name.split('.')[-1] in self.file_extension_list]
         except FileNotFoundError:
             self._file_list = []
         if self._debug:
@@ -229,18 +231,20 @@ class FileReader(Device):
             while True:
                 try:
                     if self.file_type == "image":
-                        if self._file_extension == 'sif':
-                            # read file 
-                            self._image, info = sif_parser.np_open(os.path.join(self._folder_path, self._current_file))
+                        if '.sif' in self._current_file:
+                            # read file
+                            self._image, info = sif_parser.np_open(
+                                os.path.join(self._folder_path, self._current_file))
                             self._image = np.squeeze(self._image)
                             self._format_pixel = '16'
                         else:
                             image_PIL = Image.open(
                                 os.path.join(self._folder_path, self._current_file))
-                            self._image = np.array(image_PIL)                                                                                                                                   
+                            self._image = np.array(image_PIL)
                             self._format_pixel = str(
                                 self.mode_to_bpp[image_PIL.mode])
-                        self.push_change_event("image", self.read_image("placeholder"))
+                        self.push_change_event(
+                            "image", self.read_image("placeholder"))
                     elif self._data_structure == 0:
                         with open(os.path.join(self._folder_path, self._current_file), newline='') as csvfile:
                             reader = csv.reader(csvfile)
@@ -254,11 +258,12 @@ class FileReader(Device):
                                     # if the delimiter is not the default ',', then the row has only one element and I need to split the row manually.
                                     if len(row) == 1:
                                         if not hasattr(self, 'delimiter'):
-                                            potential_delimiters = [';',' ']
+                                            potential_delimiters = [';', ' ']
                                             for d in potential_delimiters:
                                                 if d in row[0]:
                                                     self.delimiter = d
-                                        self._x.append(float(row[0].split(self.delimiter)[0]))
+                                        self._x.append(
+                                            float(row[0].split(self.delimiter)[0]))
                                         self._y.append(
                                             float(row[0].split(self.delimiter)[-1]))
                                     else:
