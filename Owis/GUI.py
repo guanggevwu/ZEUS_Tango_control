@@ -46,9 +46,13 @@ def create_app():
         basler_app.gui.createPanel(form_panel, f'{d}_form')
         basler_app.create_form_panel(form_layout, d, dropdown=dropdown, exclude=[
             'ax1_step', 'ax2_step', 'ax3_step', 'ax4_step', 'ax5_step', 'ax6_step', 'ax7_step', 'ax8_step', 'ax9_step'], withButtons=False)
+        basler_app.add_command(form_layout, d, command_list=['stop_all_axis'])
+
+        relative_panel, relative_layout = basler_app.create_blank_panel('v')
+        basler_app.gui.createPanel(relative_panel, f'{d}_relative')
         for a in range(1, 10):
             if f'ax{a}_step' in basler_app.attr_list[d]['attrs']:
-                relative_panel, relative_panel_layout = basler_app.create_blank_panel(
+                one_relative, one_relative_layout = basler_app.create_blank_panel(
                     VorH='h')
                 step_widget = TaurusReadWriteSwitcher()
                 r_widget = TaurusLabel()
@@ -69,12 +73,13 @@ def create_app():
                 button2.setCustomText(f'ax{a}+')
                 button2.setModel(d)
 
-                relative_panel_layout.addWidget(button1)
-                relative_panel_layout.addWidget(step_widget)
-                relative_panel_layout.addWidget(button2)
-                form_layout.addWidget(relative_panel)
+                one_relative_layout.addWidget(button1)
+                one_relative_layout.addWidget(step_widget)
+                one_relative_layout.addWidget(button2)
+                relative_layout.addWidget(one_relative)
+        basler_app.add_command(
+            relative_layout, d, command_list=['stop_all_axis'])
 
-        basler_app.add_command(form_layout, d, command_list=['stop_all_axis'])
         command_panel, command_layout = basler_app.create_blank_panel('v')
         basler_app.gui.createPanel(command_panel, f'{d}_commands')
 
