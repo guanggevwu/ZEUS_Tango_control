@@ -25,11 +25,13 @@ def create_app():
     # get the configuration
     for d in device_list:
         basler_app.add_device(d)
-        if not os.path.isfile(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt')):
-            with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt'), 'w', newline='') as f:
+        location_file_path = os.path.join(os.path.dirname(
+            __file__), f'{d.replace("/", "_")}_locations.txt')
+        if not os.path.isfile(location_file_path):
+            with open(location_file_path, 'w', newline='') as f:
                 f.write(
                     "name positions\n")
-        with open(os.path.join(os.path.dirname(__file__), 'user_defined_locations.txt'), 'r',) as f:
+        with open(location_file_path, 'r',) as f:
             tmp = []
             next(f)
             for line in f:
