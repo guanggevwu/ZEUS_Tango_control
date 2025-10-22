@@ -168,7 +168,7 @@ class OwisPS(Device):
             # self.add_command(self.create_init_axis_function(axis))
 
     def create_position_attribute(self, axis):
-        self.logger.info(f'created axis{axis}.')
+        self.logger.info(f'created axis{axis} position.')
         attr = attribute(
             name=f"ax{axis}_position",
             label=f"axis {axis} position",
@@ -201,7 +201,7 @@ class OwisPS(Device):
         return write_position
 
     def create_ax_step_attribute(self, axis):
-        self.logger.info(f'created axis{axis}.')
+        self.logger.info(f'created axis{axis} step.')
         attr = attribute(
             name=f"ax{axis}_step",
             label=f"axis {axis} step",
@@ -258,7 +258,7 @@ class OwisPS(Device):
         else:
             self.dev.PS90_MoveEx(
                 1, int(input[0]), c_double(-getattr(self, f'_ax{input[0]}_step')), 1)
-        self.logger.info(f'relateive moving, {input}')
+        self.logger.info(f'relative moving, [direction, axis], {input}')
 
 
 if __name__ == "__main__":

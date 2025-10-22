@@ -1,11 +1,10 @@
 from taurus.qt.qtgui.input import TaurusValueComboBox, TaurusValueCheckBox, TaurusValueLineEdit
 from taurus.qt.qtgui.compact import TaurusReadWriteSwitcher
 from taurus.qt.qtgui.display import TaurusLabel
-
+import tango
 import os
 import sys
 from taurus.qt.qtgui.button import TaurusCommandButton
-
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 if True:
@@ -26,28 +25,16 @@ def create_app():
     # get the configuration
     for d in device_list:
         basler_app.add_device(d)
-        panel, panel1_layout = basler_app.create_blank_panel('v')
-        attr_list = basler_app.attr_list[d]['attrs']
-        for attr in attr_list:
-            if attr not in ['message','ax1_position', 'ax2_position', 'ax3_position', 'ax1_step', 'ax2_step', 'ax3_step', 'ax12_step', 'ax12_distance', 'State', 'Status']:
-                basler_app.add_label_widget(panel1_layout, d, attr)
-        # basler_app.add_label_widget(
-        #     panel1_layout, d, f'eval:new={{{d}/ax1_position}}-{{{d}/ax2_position}};new')
-        if d == 'laser/esp301/esp300_test':
-            axis_index = ['12', '1', '2', '3']
-        elif d == 'test/esp300/esp300_turning_box3':
-            axis_index = ['1', '2']
-        else:
-            axis_index = ['1', '2', '3']
-        for a in axis_index:
-            if f'ax{a}_position' in attr_list:
-                basler_app.add_label_widget(
-                    panel1_layout, d, f'ax{a}_position')
-            if f'ax{a}_distance' in attr_list:
-                basler_app.add_label_widget(
-                    panel1_layout, d, f'ax{a}_distance')
-            if f'ax{a}_step' in attr_list:
-                relative_panel, relative_panel_layout = basler_app.create_blank_panel(
+        form_panel, form_layout = basler_app.create_blank_panel('v')
+        basler_app.gui.createPanel(form_panel, f'{d}_form')
+        basler_app.create_form_panel(form_layout, d, exclude=[
+            'ax1_step', 'ax2_step', 'ax3_step', 'ax4_step', 'ax5_step', 'ax6_step', 'ax7_step', 'ax8_step', 'ax9_step'], withButtons=False)
+        command_list, modified_cmd_name, cmd_parameters = [], [], []
+        command_with_axis_parameters = [
+            'move_to_negative_limit', 'move_to_positive_limit', 'set_as_zero']
+        for idx, axis in enumerate(range(1, 4)):
+            if f'ax{axis}_step' in basler_app.attr_list[d]['attrs']:
+                one_relative, one_relative_layout = basler_app.create_blank_panel(
                     VorH='h')
                 step_widget = TaurusReadWriteSwitcher()
                 r_widget = TaurusLabel()
@@ -55,29 +42,43 @@ def create_app():
 
                 step_widget.setReadWidget(r_widget)
                 step_widget.setWriteWidget(w_widget)
-                step_widget.model = f'{d}/ax{a}_step'
+                step_widget.model = f'{d}/ax{axis}_step'
 
                 button1 = TaurusCommandButton(
-                    command=f'move_relative_axis{a}', parameters=[False]
+                    command=f'move_relative_axis', parameters=[axis, 0]
                 )
-                button1.setCustomText(f'ax{a}-')
+                button1.setCustomText(f'ax{axis}-')
                 button1.setModel(d)
                 button2 = TaurusCommandButton(
-                    command=f'move_relative_axis{a}', parameters=[True]
+                    command=f'move_relative_axis', parameters=[axis, 1]
                 )
-                button2.setCustomText(f'ax{a}+')
+                button2.setCustomText(f'ax{axis}+')
                 button2.setModel(d)
 
-                relative_panel_layout.addWidget(button1)
-                relative_panel_layout.addWidget(step_widget)
-                relative_panel_layout.addWidget(button2)
-                panel1_layout.addWidget(relative_panel)
+                one_relative_layout.addWidget(button1)
+                one_relative_layout.addWidget(step_widget)
+                one_relative_layout.addWidget(button2)
+                form_layout.addWidget(one_relative)
+                command_list.append([])
+                modified_cmd_name.append([])
+                cmd_parameters.append([])
+                for cmd in command_with_axis_parameters:
+                    command_list[-1].append(cmd)
+                    modified_cmd_name[-1].append(f'ax{axis}_{cmd}')
+                    cmd_parameters[-1].append([axis])
+        for axis in range(len(command_list)):
+            basler_app.add_command(
+                form_layout, d, command_list=command_list[axis], modified_cmd_name=modified_cmd_name[axis], cmd_parameters=cmd_parameters[axis])
+        basler_app.add_command(
+            form_layout, d, command_list=['stop'])
+        # command_panel, command_layout = basler_app.create_blank_panel('v')
+        # basler_app.gui.createPanel(command_panel, f'{d}_commands')
 
-        cmd_list = basler_app.attr_list[d]['commands']
-        cmd_list = [i for i in cmd_list[3:] if 'move_relative' not in i]
-        basler_app.add_command(panel1_layout, d, cmd_list)
-        basler_app.gui.createPanel(panel, d)
-
+        # for ax in range(1, 4):
+        #     if not hasattr(basler_app.attr_list[d]['dp'], f'ax{ax}_position'):
+        #         continue
+        #     else:
+        #         basler_app.add_command(command_layout, d)
     basler_app.gui.removePanel('Manual')
     basler_app.gui.show()
     basler_app.app.exec_()
@@ -85,6 +86,6 @@ def create_app():
 
 if __name__ == "__main__":
     parser = TaurusArgparse(
-        description='GUI for ESP301', device_default='laser/esp301/esp301', polling_default=500)
+        description='GUI for ESP device', device_default='test/esp301/esp302_test', polling_default=1000)
     args = parser.parse_args()
     create_app()

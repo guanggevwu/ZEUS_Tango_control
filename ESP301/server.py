@@ -11,6 +11,8 @@ import serial.tools.list_ports
 import platform
 from threading import Thread
 import functools
+import socket
+
 # -----------------------------
 
 
@@ -26,7 +28,7 @@ class LoggerAdapter(logging.LoggerAdapter):
 class ESP301(Device):
 
     com = device_property(dtype=str, default_value='COM1')
-    axis = device_property(dtype=str, default_value='1,2,3')
+    ip = device_property(dtype=str, default_value='')
     extra_script = device_property(dtype=str, default_value='')
 
     @staticmethod
@@ -36,11 +38,23 @@ class ESP301(Device):
         This decorator is applied to all write functions, except for "stop" and change relative move steps.
         '''
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            args[0]._error_message = None
-            args[0].should_stop = False
-            func(*args, **kwargs)
+        def wrapper(self, *args, **kwargs):
+            self._error_message = None
+            self.should_stop = False
+            func(self, *args, **kwargs)
         return wrapper
+
+    def dev_write(self, *args, **kwargs):
+        if self.ip:
+            return self.controller_socket.sendall(*args, **kwargs)
+        else:
+            return self.dev_write(*args, **kwargs)
+
+    def dev_read(self, *args, **kwargs):
+        if self.ip:
+            return self.controller_socket.recv(1024).decode().strip()
+        else:
+            return self.dev.readline().decode().strip()
 
     def init_device(self):
         '''
@@ -56,8 +70,17 @@ class ESP301(Device):
         super().init_device()
         self.set_state(DevState.INIT)
         try:
-            self.dev = serial.Serial(
-                port=self.com, baudrate=19200, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
+            if self.ip:
+                self.controller_socket = socket.socket(
+                    socket.AF_INET, socket.SOCK_STREAM)
+                # Set a timeout for the connection
+                self.controller_socket.settimeout(5)
+                self.controller_socket.connect((self.ip, 5001))
+                self.logger.info(
+                    f"Successfully connected to ESP302 at {self.ip}")
+            else:
+                self.dev = serial.Serial(
+                    port=self.com, baudrate=19200, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
             self.set_state(DevState.ON)
             self.should_stop = False
             self._read_time = "N/A"
@@ -67,21 +90,22 @@ class ESP301(Device):
             self._raw_command_return = ''
             self.unit_code = {0: "unknown",
                               1: "unknown", 2: "mm", 3: "um", 7: "deg"}
-            self.dev.write(b"1SN?\r")
-            self._axis1_unit = self.unit_code[
-                int(self.dev.readline().decode().replace('\r\n', ''))]
-            self.dev.write(b"2SN?\r")
-            self._axis2_unit = self.unit_code[
-                int(self.dev.readline().decode().replace('\r\n', ''))]
-            self.dev.write(b"3SN?\r")
-            self._axis3_unit = self.unit_code[
-                int(self.dev.readline().decode().replace('\r\n', ''))]
+            self.axis = []
+            for axis in range(1, 4):
+                self.dev_write(f"{axis}ID?\r".encode())
+                reply = self.dev_read()
+                if "NO STAGE" not in reply:
+                    self.axis.append(axis)
+                    self.dev_write(f"{axis}SN?\r".encode())
+                    setattr(self, f"_axis{axis}_unit", self.unit_code[
+                        int(self.dev_read())])
+                    self.dev_write(f"{axis}ZS00H\r".encode())
             self._error_message = None
             # print(
             #     f'ESP301 is connected. Model: {self._model}. Serial number: {self._serial_number}')
             self.set_status("ESP301 device is connected.")
         except:
-            print("Could NOT connect to  ESP301")
+            print("Could NOT connect to  ESP device.")
             self.set_state(DevState.OFF)
 
     user_defined_name = attribute(
@@ -119,105 +143,85 @@ class ESP301(Device):
         self._read_time = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
         return self._read_time
 
-    def initialize_dynamic_attributes(self):
-        ax1_position = attribute(
-            name="ax1_position",
-            label="axis 1 position",
+    def create_position_attribute(self, axis):
+        self.logger.info(f'created axis{axis} position.')
+        attr = attribute(
+            name=f"ax{axis}_position",
+            label=f"axis {axis} position",
             dtype=float,
-            unit=self._axis1_unit,
+            unit=getattr(self, f"_axis{axis}_unit"),
             format='6.3f',
             memorized=True,
             access=AttrWriteType.READ_WRITE,
         )
-        ax2_position = attribute(
-            name="ax2_position",
-            label="axis 2 position",
-            dtype=float,
-            unit=self._axis2_unit,
-            format='6.3f',
-            memorized=True,
-            access=AttrWriteType.READ_WRITE,
-        )
-        ax3_position = attribute(
-            name="ax3_position",
-            label="axis 3 position",
-            dtype=float,
-            unit=self._axis3_unit,
-            format='6.3f',
-            memorized=True,
-            access=AttrWriteType.READ_WRITE,
-        )
+        return attr
 
-        ax12_distance = attribute(
-            name="ax12_distance",
-            label="ax12 distance",
+    def create_read_position_function(self, axis):
+        def read_position(self, attr):
+            self.dev_write(f"{axis}TP\r".encode())
+            setattr(self, f'_ax{axis}_position', float(self.dev_read()))
+            return getattr(self, f'_ax{axis}_position')
+        self.logger.info(f'created read function for axis {axis} position')
+        return read_position
+
+    def create_write_position_function(self, axis):
+        @ESP301.clear_error_wrap
+        def write_position(self, attr):
+            value = attr.get_write_value()
+            setattr(self, f'_ax{axis}_position', value)
+            self.dev_write(f"{axis}PA{value:.3f}\r".encode())
+        self.logger.info(f'created write function for axis {axis} position')
+        return write_position
+
+    def create_ax_step_attribute(self, axis):
+        self.logger.info(f'created axis{axis} step.')
+        attr = attribute(
+            name=f"ax{axis}_step",
+            label=f"axis {axis} step",
             dtype=float,
-            unit=self._axis1_unit,
-            format='6.3f',
-            access=AttrWriteType.READ,
-        )
-        ax1_step = attribute(
-            name="ax1_step",
-            label="axis 1 step",
-            dtype=float,
-            unit=self._axis1_unit,
-            format='6.3f',
-            memorized=True,
-            hw_memorized=True,
-            access=AttrWriteType.READ_WRITE,
-        )
-        ax2_step = attribute(
-            name="ax2_step",
-            label="axis 2 step",
-            dtype=float,
-            unit=self._axis2_unit,
-            format='6.3f',
-            memorized=True,
-            hw_memorized=True,
-            access=AttrWriteType.READ_WRITE,
-        )
-        ax3_step = attribute(
-            name="ax3_step",
-            label="axis 3 step",
-            dtype=float,
-            unit=self._axis3_unit,
+            unit=getattr(self, f"_axis{axis}_unit"),
             format='6.3f',
             memorized=True,
             hw_memorized=True,
             access=AttrWriteType.READ_WRITE,
         )
-        ax12_step = attribute(
-            name="ax12_step",
-            label="ax12 step",
-            dtype=float,
-            unit=self._axis1_unit,
-            format='6.3f',
-            memorized=True,
-            hw_memorized=True,
-            access=AttrWriteType.READ_WRITE,
-            doc='steps for axis 1 and axis 2 are the same, so this attribute is used for both axes.',
-        )
-        ax1_status = attribute(
-            name="ax1_status",
-            label="axis 1 status",
-            dtype=str,
+        return attr
+
+    def create_ax_status(self, axis):
+        self.logger.info(f'created axis{axis} status.')
+        attr = attribute(
+            name=f"ax{axis}_status",
+            label=f"axis {axis} status",
+            dtype=bool,
             memorized=True,
             access=AttrWriteType.READ_WRITE,
         )
-        ax2_status = attribute(
-            name="ax2_status",
-            label="axis 2 status",
-            dtype=str,
-            memorized=True,
-            access=AttrWriteType.READ_WRITE,
-        )
-        ax3_status = attribute(
-            name="ax3_status",
-            label="axis 3 status",
-            dtype=str,
-            memorized=True,
-            access=AttrWriteType.READ_WRITE,
-        )
+        return attr
+
+    def create_read_status_function(self, axis):
+        def read_status(self, attr):
+            self.dev_write(f"{axis}MO?\r".encode())
+            reply = self.dev_read()
+            if reply == '1':
+                setattr(self, f'_ax{axis}_status', True)
+            elif reply == '0':
+                setattr(self, f'_ax{axis}_status', False)
+            return getattr(self, f'_ax{axis}_status')
+        self.logger.info(f'created read function for axis {axis} status')
+        return read_status
+
+    def create_write_status_function(self, axis):
+        def write_status(self, attr):
+            value = attr.get_write_value()
+            setattr(self, f'_ax{axis}_status', value)
+            if value:
+                self.dev_write(f"{axis}MO\r".encode())
+            else:
+                self.dev_write(f"{axis}MF\r".encode())
+        self.logger.info(f'created write function for axis {axis} status')
+        return write_status
+
+    def initialize_dynamic_attributes(self):
         customized_location = attribute(
             name="customized_location",
             label="customized location",
@@ -226,36 +230,70 @@ class ESP301(Device):
             access=AttrWriteType.READ_WRITE,
         )
 
-        @command()
-        @ESP301.clear_error_wrap
-        def ax1_negative_limit(self):
-            self.dev.write(f"1MT-\r".encode())
+        cmd_move_relative_axis12 = command(
+            f=self.move_relative_axis12,
+            dtype_in=bool,)
+
+        cmd_move_to_negative_limit = command(
+            f=self.move_to_negative_limit, dtype_in=int,)
+        cmd_move_to_positive_limit = command(
+            f=self.move_to_positive_limit, dtype_in=int,)
+
+        cmd_set_as_zero = command(
+            f=self.set_as_zero, dtype_in=int,)
 
         @command()
         @ESP301.clear_error_wrap
         def ax2_positive_limit(self):
-            self.dev.write(f"2MT+\r".encode())
+            self.dev_write(f"2MT+\r".encode())
 
         @command()
         @ESP301.clear_error_wrap
         def reset_to_TA1(self):
             Thread(target=self.threaded_reset_to_TA1).start()
 
-        if '1' in self.axis:
-            self.add_attribute(ax1_position)
-            self.add_attribute(ax1_step)
-            self.add_attribute(ax1_status)
-        if '2' in self.axis:
-            self.add_attribute(ax2_position)
-            self.add_attribute(ax2_step)
-            self.add_attribute(ax2_status)
-        if '3' in self.axis:
-            self.add_attribute(ax3_position)
-            self.add_attribute(ax3_step)
-            self.add_attribute(ax3_status)
-        if '1' in self.axis and '2' in self.axis and self._axis1_unit == self._axis2_unit:
-            self.add_attribute(ax12_distance)
-            self.add_attribute(ax12_step)
+        for axis in range(1, 4):
+            if axis in self.axis:
+                setattr(self, f'read_ax{axis}_position',
+                        self.create_read_position_function(axis))
+                setattr(self, f'write_ax{axis}_position',
+                        self.create_write_position_function(axis))
+                self.add_attribute(self.create_position_attribute(axis))
+                self.add_attribute(self.create_ax_step_attribute(axis))
+                setattr(self, f'read_ax{axis}_status',
+                        self.create_read_status_function(axis))
+                setattr(self, f'write_ax{axis}_status',
+                        self.create_write_status_function(axis))
+                self.add_attribute(self.create_ax_status(axis))
+                self.add_command(cmd_move_to_negative_limit)
+                self.add_command(cmd_move_to_positive_limit)
+                self.add_command(cmd_set_as_zero)
+                # self.add_command(cmd_move_relative_axis12)
+        # only for a special case
+        # if 1 in self.axis and 2 in self.axis and self._axis1_unit == self._axis2_unit:
+            # ax12_distance = attribute(
+            #     name="ax12_distance",
+            #     label="ax12 distance",
+            #     dtype=float,
+            #     unit=self._axis1_unit,
+            #     format='6.3f',
+            #     access=AttrWriteType.READ,
+            # )
+
+            # ax12_step = attribute(
+            #     name="ax12_step",
+            #     label="ax12 step",
+            #     dtype=float,
+            #     unit=self._axis1_unit,
+            #     format='6.3f',
+            #     memorized=True,
+            #     hw_memorized=True,
+            #     access=AttrWriteType.READ_WRITE,
+            #     doc='steps for axis 1 and axis 2 are the same, so this attribute is used for both axes.',
+            # )
+        #     self.add_attribute(ax12_distance)
+        #     self.add_attribute(ax12_step)
+            # self.add_command(cmd)
         if hasattr(self, "extra_script"):
             if self.extra_script == "turning_box_3":
                 # axis 1: -88 to 14 mm. axis 2: 0 to 135 deg. When axis 1 is in -88 to -46 (limit might be close to -30), axis 2 is free to rotate.
@@ -265,42 +303,7 @@ class ESP301(Device):
                 # ta_test position is not fixed, it is set when the user clicks the button.
                 self.TA_test = [0, 2.5]
                 self.add_attribute(customized_location)
-                self.add_command(ax1_negative_limit)
-                self.add_command(ax2_positive_limit)
                 self.add_command(reset_to_TA1)
-
-    def read_ax1_position(self, attr):
-        self.dev.write(b"1TP\r")
-        self._ax1_position = float(
-            self.dev.readline().decode().replace('\r\n', ''))
-        return self._ax1_position
-
-    @clear_error_wrap
-    def write_ax1_position(self, attr):
-        self._ax1_position = attr.get_write_value()
-        self.dev.write(f"1PA{self._ax1_position:.3f}\r".encode())
-
-    def read_ax2_position(self, attr):
-        self.dev.write(b"2TP\r")
-        self._ax2_position = float(
-            self.dev.readline().decode().replace('\r\n', ''))
-        return self._ax2_position
-
-    @clear_error_wrap
-    def write_ax2_position(self, attr):
-        self._ax2_position = attr.get_write_value()
-        self.dev.write(f"2PA{self._ax2_position:.3f}\r".encode())
-
-    def read_ax3_position(self, attr):
-        self.dev.write(b"3TP\r")
-        self._ax3_position = float(
-            self.dev.readline().decode().replace('\r\n', ''))
-        return self._ax3_position
-
-    @clear_error_wrap
-    def write_ax3_position(self, attr):
-        self._ax3_position = attr.get_write_value()
-        self.dev.write(f"3PA{self._ax3_position:.3f}\r".encode())
 
     def read_ax12_distance(self, attr):
         return float(f'{(self._ax1_position-self._ax2_position):.3f}')
@@ -328,57 +331,6 @@ class ESP301(Device):
 
     def write_ax12_step(self, attr):
         self._ax12_step = float(attr.get_write_value())
-
-    def read_ax1_status(self, attr):
-        self.dev.write(b"1MO?\r")
-        reply = self.dev.readline().decode().replace('\r\n', '')
-        if reply == '1':
-            self._ax1_status = "On"
-        elif reply == '0':
-            self._ax1_status = "Off"
-        return self._ax1_status
-
-    @clear_error_wrap
-    def write_ax1_status(self, attr):
-        self._ax1_status = attr.get_write_value()
-        if attr.get_write_value().lower() == "on":
-            self.dev.write(b"1MO\r")
-        elif attr.get_write_value().lower() == "off":
-            self.dev.write(b"1MF\r")
-
-    def read_ax2_status(self, attr):
-        self.dev.write(b"2MO?\r")
-        reply = self.dev.readline().decode().replace('\r\n', '')
-        if reply == '1':
-            self._ax2_status = "On"
-        elif reply == '0':
-            self._ax2_status = "Off"
-        return self._ax2_status
-
-    @clear_error_wrap
-    def write_ax2_status(self, attr):
-        self._ax2_status = attr.get_write_value()
-        if attr.get_write_value().lower() == "on":
-            self.dev.write(b"2MO\r")
-        elif attr.get_write_value().lower() == "off":
-            self.dev.write(b"2MF\r")
-
-    def read_ax3_status(self, attr):
-        self.dev.write(b"3MO?\r")
-        reply = self.dev.readline().decode().replace('\r\n', '')
-        if reply == '1':
-            self._ax3_status = "On"
-        elif reply == '0':
-            self._ax3_status = "Off"
-        return self._ax3_status
-
-    @clear_error_wrap
-    def write_ax3_status(self, attr):
-        self._ax3_status = attr.get_write_value()
-        if attr.get_write_value().lower() == "on":
-            self.dev.write(b"3MO\r")
-        elif attr.get_write_value().lower() == "off":
-            self.dev.write(b"3MF\r")
 
     def read_customized_location(self, attr):
         if hasattr(self, '_ax1_position'):
@@ -419,76 +371,76 @@ class ESP301(Device):
             # rotate and then move forward
             self._ax1_step = self.TA2[0] - self.TA1[0]
             self._ax2_step = self.TA2[1] - self.TA1[1]
-            self.move_relative_axis2()
+            self.move_relative_axis([2, True])
             self.wait_until_arrive(2, ax2_previous_position+self._ax2_step)
             if self.should_stop:
                 return
-            self.move_relative_axis1()
+            self.move_relative_axis([1, True])
         elif value.lower() == 'ta3' and self._customized_location == 'TA1':
             # rotate and then move forward
             self._ax1_step = self.TA3[0] - self.TA1[0]
             self._ax2_step = self.TA3[1] - self.TA1[1]
-            self.move_relative_axis2()
+            self.move_relative_axis([2, True])
             self.wait_until_arrive(2, ax2_previous_position+self._ax2_step)
             if self.should_stop:
                 return
-            self.move_relative_axis1()
+            self.move_relative_axis([1, True])
         elif value.lower() == 'ta1' and self._customized_location == 'TA2':
             # move backward and then rotate
             self._ax1_step = self.TA1[0] - self.TA2[0]
             self._ax2_step = self.TA1[1] - self.TA2[1]
-            self.move_relative_axis1()
+            self.move_relative_axis([1, True])
             self.wait_until_arrive(1, ax1_previous_position+self._ax1_step)
             if self.should_stop:
                 return
-            self.move_relative_axis2()
+            self.move_relative_axis([2, True])
         elif value.lower() == 'ta1' and self._customized_location == 'TA3':
             # move backward and then rotate
             self._ax1_step = self.TA1[0] - self.TA3[0]
             self._ax2_step = self.TA1[1] - self.TA3[1]
-            self.move_relative_axis1()
+            self.move_relative_axis([1, True])
             self.wait_until_arrive(1, ax1_previous_position+self._ax1_step)
             if self.should_stop:
                 return
-            self.move_relative_axis2()
+            self.move_relative_axis([2, True])
         elif value.lower() == 'ta2' and self._customized_location == 'TA3':
             # move backward, rotate and then move forward. Note the procedure is different.
             self._ax1_step = -60
             self._ax2_step = self.TA2[1] - self.TA3[1]
-            self.move_relative_axis1()
+            self.move_relative_axis([1, True])
             self.wait_until_arrive(1, ax1_previous_position+self._ax1_step)
             if self.should_stop:
                 return
-            self.move_relative_axis2()
+            self.move_relative_axis([2, True])
             self.wait_until_arrive(2, ax2_previous_position+self._ax2_step)
             if self.should_stop:
                 return
             self._ax1_step = 48
-            self.move_relative_axis1()
+            self.move_relative_axis([1, True])
         elif value.lower() == 'ta3' and self._customized_location == 'TA2':
             # move backward, rotate and then move forward.
             self._ax1_step = -48
             self._ax2_step = self.TA3[1] - self.TA2[1]
-            self.move_relative_axis1()
+            self.move_relative_axis([1, True])
             self.wait_until_arrive(1, ax1_previous_position+self._ax1_step)
             if self.should_stop:
                 return
-            self.move_relative_axis2()
+            self.move_relative_axis([2, True])
             self.wait_until_arrive(2, ax2_previous_position+self._ax2_step)
             if self.should_stop:
                 return
             self._ax1_step = 60
-            self.move_relative_axis1()
+            self.move_relative_axis([1, True])
         elif value == 'TA_test':
             self.TA_test[0] = self._ax1_position
             self.TA_test[1] = self._ax2_position + 5
             self._ax1_step = 5
             self._ax2_step = 5
-            self.move_relative_axis1()
+            self.move_relative_axis([1, True])
             self.wait_until_arrive(1, ax1_previous_position+self._ax1_step)
             if self.should_stop:
                 return
-            self.move_relative_axis2()
+            self.move_relative_axis([2, True])
             self.wait_until_arrive(2, ax2_previous_position+self._ax2_step)
             if self.should_stop:
                 return
@@ -512,15 +464,15 @@ class ESP301(Device):
         return f'{self._error_message}'
 
     message = attribute(
-        label="error message",
+        label="message",
         dtype="str",
         access=AttrWriteType.READ,
         polling_period=1000,
     )
 
     def read_message(self):
-        self.dev.write(b"TB?\r")
-        reply = self.dev.readline().decode().replace('\r\n', '')
+        self.dev_write(b"TB?\r")
+        reply = self.dev_read()
         current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self._message = f"{current_datetime} {reply.split(', ')[-1]}"
         if reply.split(', ')[0] != '0':
@@ -543,73 +495,71 @@ class ESP301(Device):
     @clear_error_wrap
     def write_raw_command(self, value):
         if value != '':
-            self.dev.write(f"{value}\r".encode())
-            self._raw_command_return = self.dev.readline().decode().replace('\r\n', '')
+            self.dev_write(f"{value}\r".encode())
+            self._raw_command_return = self.dev_read()
 
     # @command(dtype_in=int)
     # def home(self, axis=1):
-    #     self.dev.write(f"{axis}OR\r".encode())
+    #     self.dev_write(f"{axis}OR\r".encode())
 
     # @command
     # def home(self,):
     #     axis = self.axis.split(',')
     #     for a in axis:
-    #         self.dev.write(f"{a}ST\r".encode())
-    #     self.dev.write(f"{1}OR\r".encode())
+    #         self.dev_write(f"{a}ST\r".encode())
+    #     self.dev_write(f"{1}OR\r".encode())
 
     # @command(dtype_in=int)
     # def emergency_stop(self):
     #     axis = self.axis.split(',')
     #     for a in axis:
-    #         self.dev.write(f"{a}AB\r".encode())
+    #         self.dev_write(f"{a}AB\r".encode())
 
     @command()
     def stop(self):
-        axis = self.axis.split(',')
-        for a in axis:
-            self.dev.write(f"{a}ST\r".encode())
+        for a in self.axis:
+            self.dev_write(f"{a}ST\r".encode())
         self.should_stop = True
 
-    @command(dtype_in=bool)
-    @clear_error_wrap
-    def move_relative_axis1(self, plus=True):
-        if plus:
-            self.dev.write(f"1PR{self._ax1_step:.3f}\r".encode())
+    @command()
+    def move_relative_axis(self, input: list[int]):
+        if input[1]:
+            self.dev_write(
+                f"{input[0]}PR{getattr(self, f'_ax{input[0]}_step'):.3f}\r".encode())
         else:
-            self.dev.write(f"1PR{-self._ax1_step:.3f}\r".encode())
-        print(f'{self._ax1_step}, {plus}')
-        # self.dev.write(f"1PR{rel:.3f}\r".encode())
+            self.dev_write(
+                f"{input[0]}PR{-getattr(self, f'_ax{input[0]}_step'):.3f}\r".encode())
+        self.logger.info(f'relative moving, [direction, axis], {input}')
 
-    @command(dtype_in=bool)
     @clear_error_wrap
-    def move_relative_axis2(self, plus=True):
-        if plus:
-            self.dev.write(f"2PR{self._ax2_step:.3f}\r".encode())
-        else:
-            self.dev.write(f"2PR{-self._ax2_step:.3f}\r".encode())
+    def move_relative_axis12(self, plus: bool = True):
+        self.logger.info(f'relative moving of axis 1 and 2')
+        # if plus:
+        #     self.dev_write(f"1PR{self._ax12_step:.3f}\r".encode())
+        #     self.dev_write(f"2PR{self._ax12_step:.3f}\r".encode())
+        # else:
+        #     self.dev_write(f"1PR{-self._ax12_step:.3f}\r".encode())
+        #     self.dev_write(f"2PR{-self._ax12_step:.3f}\r".encode())
 
-    @command(dtype_in=bool)
     @clear_error_wrap
-    def move_relative_axis3(self, plus=True):
-        if plus:
-            self.dev.write(f"3PR{self._ax3_step:.3f}\r".encode())
-        else:
-            self.dev.write(f"3PR{-self._ax3_step:.3f}\r".encode())
+    def move_to_negative_limit(self, axis):
+        self.logger.info(f'negative limit of axis {axis}')
+        self.dev_write(f"{axis}MT-\r".encode())
 
-    @command(dtype_in=bool)
     @clear_error_wrap
-    def move_relative_axis12(self, plus=True):
-        if plus:
-            self.dev.write(f"1PR{self._ax12_step:.3f}\r".encode())
-            self.dev.write(f"2PR{self._ax12_step:.3f}\r".encode())
-        else:
-            self.dev.write(f"1PR{-self._ax12_step:.3f}\r".encode())
-            self.dev.write(f"2PR{-self._ax12_step:.3f}\r".encode())
+    def move_to_positive_limit(self, axis):
+        self.logger.info(f'positive limit of axis {axis}')
+        self.dev_write(f"{axis}MT+\r".encode())
+
+    @clear_error_wrap
+    def set_as_zero(self, axis):
+        self.logger.info(f'setting axis {axis} as zero')
+        self.dev_write(f"{axis}DH0\r".encode())
 
     def wait_until_stop(self, axis=1):
         while True:
-            self.dev.write(f"{axis}MD?\r".encode())
-            reply = self.dev.readline().decode().replace('\r\n', '')
+            self.dev_write(f"{axis}MD?\r".encode())
+            reply = self.dev_read()
             # if reply is one, this means the motion has stopped. There can be two cases. One is the stage is at the desired location and the other is the stage stopped by an error. It is noted that a manual stop command will also cause an error during move to limit process.
             if reply == "1":
                 self.read_message()
@@ -620,18 +570,18 @@ class ESP301(Device):
 
     def threaded_reset_to_TA1(self):
         self.stop_whole_function_due_to_error = False
-        self.ax1_negative_limit()
+        self.move_to_negative_limit(axis=1)
         self.wait_until_stop(axis=1)
         if self.stop_whole_function_due_to_error:
             return
-        self.ax2_positive_limit()
+        self.move_to_positive_limit(axis=2)
         self.wait_until_stop(axis=2)
         if self.stop_whole_function_due_to_error:
             return
-        self.dev.write(f"1DH-1\r".encode())
-        self.dev.write(f"2DH211.05\r".encode())
-        self.dev.write(f"1PA{self.TA1[0]:.3f}\r".encode())
-        self.dev.write(f"2PA{self.TA1[1]:.3f}\r".encode())
+        self.dev_write(f"1DH-1\r".encode())
+        self.dev_write(f"2DH211.05\r".encode())
+        self.dev_write(f"1PA{self.TA1[0]:.3f}\r".encode())
+        self.dev_write(f"2PA{self.TA1[1]:.3f}\r".encode())
 
 
 if __name__ == "__main__":

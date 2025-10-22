@@ -231,7 +231,7 @@ class FileReader(Device):
             while True:
                 try:
                     if self.file_type == "image":
-                        if '.sif' in self._current_file:
+                        if self._current_file.endswith('.sif'):
                             # read file
                             self._image, info = sif_parser.np_open(
                                 os.path.join(self._folder_path, self._current_file))

@@ -1,24 +1,21 @@
-import serial
+import socket
 import time
-dev = serial.Serial(port="COM1", baudrate=19200, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
-# dev.write(b"wrong\r")
-# print(dev.readline())
-# dev.write(b"TE?\r")
-# print(dev.readline())
 
-dev.write(b"1TP\r")
-print(dev.readline().decode().replace('\r\n', ''))
-dev.write(b"2TP\r")
-print(dev.readline().decode().replace('\r\n', ''))
+# --- Configuration ---
+ESP302_IP = "192.168.131.75"  # Replace with your controller's IP address
+ESP302_PORT = 5001  # Default port for Newport Ethernet communication
 
-axis1_value = 7.124
-dev.write(f"1PA{axis1_value:.4f}\r".encode())
-# print(dev.readline())
-time.sleep(0.1)
-dev.write(f"1ST\r".encode())
-print(dev.readline())
-dev.write(b"1TP\r")
-print(dev.readline())
-dev.write(b"2TP\r")
-print(dev.readline())
-a =1
+# --- Connection function ---
+
+
+try:
+    controller_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    controller_socket.settimeout(5)  # Set a timeout for the connection
+    controller_socket.connect((ESP302_IP, ESP302_PORT))
+    print(f"Successfully connected to ESP302 at {ESP302_IP}")
+except socket.error as e:
+    print(f"Error connecting to ESP302: {e}")
+cmd_string = b"3TP\r"
+controller_socket.sendall(cmd_string)
+response = controller_socket.recv(1024).decode('ascii').strip()
+a = 1

@@ -68,6 +68,7 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "dg535_test": {'server': 'DG535/testsr', '_class': 'DG535', 'name': 'test/dg535/1'},
             "esp300_test": {'server': 'ESP301/test', '_class': 'ESP301', 'name': 'test/esp300/esp300_test'},
             "esp300_turning_box3": {'server': 'ESP301/esp300_turning_box3', '_class': 'ESP301', 'name': 'test/esp300/esp300_turning_box3'},
+            "esp302_test": {'server': 'ESP301/esp302_test', '_class': 'ESP301', 'name': 'test/esp301/esp302_test', 'property': {'ip': '192.168.131.75'}},
             "file_reader_1": {'server': 'FileReader/file_reader_1', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_1'},
             "file_reader_2": {'server': 'FileReader/image_reader_2', '_class': 'FileReader', 'name': 'facility/file_reader/image_reader_2', 'property': {'file_type': 'image'}},
             "file_reader_3": {'server': 'FileReader/xy_reader', '_class': 'FileReader', 'name': 'facility/file_reader/xy_reader', 'property': {'file_type': 'xy'}},
