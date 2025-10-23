@@ -257,7 +257,7 @@ class Daq:
                 "laser/gentec/MA3_QE12")
         if self.GUI.options["Owis_positions"]:
             self.Owis = tango.DeviceProxy(
-                "test/OwisPs/test")
+                "TA1/owisps/TA1-owis1")
         resulting_fps_dict = {}
         if len(self.cam_info) < 2:
             stitch = False
@@ -453,7 +453,7 @@ class Daq:
                 ['MA3_QE12_read_time', 'MA3_QE12_main_value', 'MA3_QE12_multiplier'])
         if self.GUI.options["Owis_positions"]:
             self.csv_header.extend(
-                ['Owis_read_time', 'Owis_ax1_position', 'Owis_ax2_position'])
+                ['Owis_read_time', 'Owis_ax1_position', 'Owis_ax2_position', 'Owis_ax3_position'])
         file_exists = os.path.isfile(os.path.join(self.dir, 'shot_id.csv'))
         with open(os.path.join(self.dir, 'shot_id.csv'), 'a') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=self.csv_header)
@@ -469,14 +469,14 @@ class Daq:
             if self.GUI.options["Owis_positions"]:
                 # not sure if the attribute always exists
                 attr_temp = {}
-                for axis in range(1, 3):
+                for axis in range(1, 4):
                     if not hasattr(self.Owis, f'ax{axis}_position'):
                         attr_temp[f'ax{axis}_position'] = 'N/A'
                     else:
                         attr_temp[f'ax{axis}_position'] = getattr(
                             self.Owis, f'ax{axis}_position')
                 data_to_write.update({'Owis_read_time': self.Owis.read_time,
-                                      'Owis_ax1_position': attr_temp['ax1_position'], 'Owis_ax2_position': attr_temp['ax2_position']})
+                                      'Owis_ax1_position': attr_temp['ax1_position'], 'Owis_ax2_position': attr_temp['ax2_position'], 'Owis_ax3_position': attr_temp['ax3_position']})
             writer.writerow(data_to_write)
             self.logger(f'Wrote scalars: {data_to_write}')
 
