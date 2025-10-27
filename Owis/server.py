@@ -105,7 +105,7 @@ class OwisPS(Device):
     user_defined_locations = attribute(
         label="user defined locations",
         dtype=(str,),
-        max_dim_x=100,
+        max_dim_x=1000,
         access=AttrWriteType.READ_WRITE,
     )
 
