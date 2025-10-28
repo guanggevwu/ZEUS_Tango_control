@@ -18,6 +18,7 @@ import ctypes
 import csv
 from collections import defaultdict
 from queue import Queue
+from tango import AttributeProxy
 
 logging.basicConfig(
     format="%(asctime)s %(message)s",
@@ -60,6 +61,10 @@ class DaqGUI:
                         font=('Helvetica', self.font_mid))
         s.configure('Sty1.TCheckbutton', font=(
             'Helvetica', self.font_small))
+        s.configure('highlight.TCheckbutton', font=(
+            'Helvetica', self.font_small))
+        s.map("highlight.TCheckbutton",
+              background=[('selected', 'lightgreen'), ('!selected', 'lightgrey')])
         s.configure('Sty2_offline.TButton', font=(
             'Helvetica', self.font_mid), background='#85929e')
         s.configure('Sty2_connecting.TButton', font=(
@@ -87,7 +92,8 @@ class DaqGUI:
 
         self.frame1 = ttk.Labelframe(
             root, text='Devices', padding=pad_widget, style='Sty1.TLabelframe')
-        self.frame1.grid_columnconfigure(2, weight=1)
+        for i in range(4):  # 4 columns
+            self.frame1.columnconfigure(i, weight=1, uniform='g1')
         self.frame1.grid(column=0, row=0, sticky=(N, W, E, S))
         ttk.Button(self.frame1, text='Select', command=self.open_device_list, style='Sty1.TButton').grid(
             column=0, row=0, sticky='W')
@@ -104,15 +110,22 @@ class DaqGUI:
         self.frame2.grid(column=0, row=1, sticky=(N, W, E, S))
 
         self.frame2_checkbutton_content = {'background_image': {
-            'text': 'Save background images', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'laser_shot_id': {'text': 'Save shot id data', 'init_status': False}, 'MA3_QE12': {'text': 'Save MA3 QE12 data', 'init_status': False}, 'Owis_positions': {'text': 'Save Owis positions', 'init_status': False}}
+            'text': 'Save background images', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'save_metadata': {'text': 'Save metadata', 'init_status': False}}
         item_per_column = 2
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
             checkbox_var = BooleanVar(value=value['init_status'])
             checkbox = ttk.Checkbutton(self.frame2, text=value['text'],
                                        variable=checkbox_var, style='Sty1.TCheckbutton')
-            checkbox.grid(
-                column=idx % item_per_column, row=int(idx/item_per_column), sticky=W)
+            if idx == len(self.frame2_checkbutton_content) - 1:
+                checkbox.grid(
+                    column=0, row=int((idx-1)/item_per_column)+1, sticky=W)
+            else:
+                checkbox.grid(
+                    column=idx % item_per_column, row=int(idx/item_per_column), sticky=W)
             value['var'] = checkbox_var
+
+        ttk.Button(self.frame2, text='Metadata', command=self.open_metadata_window, style='Sty1.TButton').grid(
+            column=1, row=int((idx-1)/item_per_column)+1, sticky='W')
 
         # ---------------------frame 3
 
@@ -176,17 +189,13 @@ class DaqGUI:
         # self.selected_devices structure. self.selected_devices = {'[device name]': {'checkbutton': ttk.Button, 'server_pid': [int/string?], 'connection_try_times': [int], 'tango_dp': tango.DeviceProxy}, }
         self.init_file_path = os.path.join(
             os.path.dirname(__file__), 'init.json')
-        self.class_name = ['Basler', 'FileReader', 'Vimba']
-        self.device_names_in_db = []
-        for c in self.class_name:
-            self.device_names_in_db.extend(self.db.get_device_name('*', c))
         if os.path.isfile(self.init_file_path) and os.stat(self.init_file_path).st_size:
             with open(self.init_file_path) as jsonfile:
                 self.init_dict = json.load(jsonfile)
                 self.selected_devices = self.init_dict['selected_devices'] if 'selected_devices' in self.init_dict else dict(
                 )
-                self.selected_devices = {key: value for key, value in self.selected_devices.items(
-                ) if key in self.device_names_in_db}
+                self.checked_savable_attributes = self.init_dict[
+                    'checked_savable_attributes'] if 'checked_savable_attributes' in self.init_dict else []
                 self.options = self.init_dict['options'] if 'options' in self.init_dict and self.init_dict['options'] is not None else dict(
                 )
                 self.path_var.set(
@@ -208,11 +217,18 @@ class DaqGUI:
     def open_device_list(self):
         '''Command for the select button in frame1. It opens a new window with a list of devices.'''
         if not (hasattr(self, "device_list_window") and self.device_list_window.winfo_exists()):
-            self.device_list_window = DeviceListWindow(
-                update_selected_devices=self.update_selected_devices, selected_devices=self.selected_devices, device_names_in_db=self.device_names_in_db)
+            self.device_list_window = DeviceListWindow(self)
         self.device_list_window.deiconify()
         self.device_list_window.attributes('-topmost', True)
         self.device_list_window.attributes('-topmost', False)
+
+    def open_metadata_window(self):
+        '''Command for the metadata button in frame2. It opens a new window with the save attributes list.'''
+        if not (hasattr(self, "metadata_window") and self.metadata_window.winfo_exists()):
+            self.metadata_window = MetadataWindow(self)
+        self.metadata_window.deiconify()
+        self.metadata_window.attributes('-topmost', True)
+        self.metadata_window.attributes('-topmost', False)
 
     def open_scan_list(self):
         '''Command for the scan button in frame3. It opens a new window with a scan list.'''
@@ -330,8 +346,11 @@ class DaqGUI:
     def update_selected_devices(self, device_name, checkbox_var):
         '''The function is called when check or uncheck the devices in the device list window. Update the selected devices based on the checkbox state. If the checkbox is checked, it will create a button for the device. If it is unchecked, it will remove the button and delete the device from the selected devices dictionary.'''
         if checkbox_var.get():
+            text = device_name.split('/')[-1]
+            if len(text) > 12:
+                text = text[:5]+'...'+text[-5:]
             device_button = ttk.Button(
-                self.frame1, command=lambda device_name=device_name: self.connect_to_device(device_name), text=device_name.split('/')[-1], style='Sty2_offline.TButton')
+                self.frame1, command=lambda device_name=device_name: self.connect_to_device(device_name), text=text, style='Sty2_offline.TButton')
             device_button.grid(
                 column=len(self.selected_devices) % self.selected_device_per_row, row=self.device_row+int(len(self.selected_devices)/self.selected_device_per_row), sticky='W')
             self.selected_devices[device_name] = dict()
@@ -349,6 +368,13 @@ class DaqGUI:
                     column=idx % self.selected_device_per_row, row=self.device_row+int(idx/self.selected_device_per_row), sticky='W')
         self.pad_space(self.frame1)
 
+    def update_checked_savable_attributes(self, attr, checkbox_var):
+        '''The function is called when check or uncheck the attributes in the attribute list window. Update the checked attributes based on the checkbox state. If the checkbox is checked, it will add the attribute to the list. If it is unchecked, it will remove the attribute from the list.'''
+        if checkbox_var.get():
+            self.checked_savable_attributes.append(attr)
+        else:
+            self.checked_savable_attributes.remove(attr)
+
     def toggle_acquisition(self):
         '''Command for the start/stop button in frame3. It toggles the acquisition status. If the acquisition is running, it will stop it. If it is not running, it will start it in a new thread.'''
         if self.acquisition['status']:
@@ -356,7 +382,7 @@ class DaqGUI:
             self.acquisition['status'] = False
             self.acquisition['button']['style'] = 'Sty3_start.TButton'
             self.acquisition['button']['text'] = 'Start'
-            self.daq.termination()
+            del self.daq
             self.insert_to_disabled("Stopped acquisition.", 'red_text')
         else:
             self.acquisition['status'] = True
@@ -370,15 +396,11 @@ class DaqGUI:
 
     def start_acquisition(self):
         '''Start the acquisition in a new thread. It will create a Daq object and call its acquisition method. It will also save the options and selected devices to a json file. It is called by the toggle_acquisition function.'''
-        self.options = {
-            "background_image": self.frame2_checkbutton_content['background_image']['var'].get(),
-            "stitch": self.frame2_checkbutton_content['stitch']['var'].get(),
-            "laser_shot_id": self.frame2_checkbutton_content['laser_shot_id']['var'].get(),
-            "MA3_QE12": self.frame2_checkbutton_content['MA3_QE12']['var'].get(),
-            "Owis_positions": self.frame2_checkbutton_content['Owis_positions']['var'].get()
-        }
+        self.options = dict()
+        for opt in self.frame2_checkbutton_content.keys():
+            self.options[opt] = self.frame2_checkbutton_content[opt]['var'].get()
         with open(self.init_file_path, 'w') as jsonfile:
-            json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get()},
+            json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get(), "checked_savable_attributes": self.checked_savable_attributes},
                       jsonfile)
         # if the checkbox is checked, then we use the config saved in config.py file and we pass None here. If it is unchecked, then we pass the basic configuration and ignore the configuration in the file.
         self.daq = Daq(self.selected_devices,
@@ -426,10 +448,13 @@ class DaqGUI:
 
 
 class DeviceListWindow(Toplevel):
-    def __init__(self, update_selected_devices, selected_devices, device_names_in_db: list):
-        self.update_selected_devices = update_selected_devices
-        self.selected_devices = selected_devices
-        self.device_names_in_db = device_names_in_db
+    def __init__(self, parent):
+        self.parent = parent
+        self.device_names_in_db = []
+        self.class_name = ['Basler', 'FileReader', 'Vimba']
+        for c in self.class_name:
+            self.device_names_in_db.extend(
+                self.parent.db.get_device_name('*', c))
         super().__init__(master=root)
         self.title("Device List")
         newframe1 = ttk.Frame(self)
@@ -445,6 +470,8 @@ class DeviceListWindow(Toplevel):
             else:
                 devices_seperated_by_location[locations[-1]].append(
                     device_name)
+        devices_seperated_by_location = dict(sorted(
+            devices_seperated_by_location.items(), key=lambda x: locations.index(x[0])))
         checkboxes = dict()
         for col, (location, device_sub_list) in enumerate(devices_seperated_by_location.items()):
             sub_frame = ttk.Labelframe(
@@ -452,9 +479,9 @@ class DeviceListWindow(Toplevel):
             sub_frame.grid(column=col, row=0, sticky=N)
             for row, device_name in enumerate(device_sub_list):
                 checkbox_var = BooleanVar(
-                    value=True) if device_name in self.selected_devices else BooleanVar(value=False)
-                checkbox = ttk.Checkbutton(sub_frame, text=device_name, command=lambda device_name=device_name, checkbox_var=checkbox_var: self.update_selected_devices(device_name, checkbox_var),
-                                           variable=checkbox_var, style='Sty1.TCheckbutton')
+                    value=True) if device_name in self.parent.selected_devices else BooleanVar(value=False)
+                checkbox = ttk.Checkbutton(sub_frame, text=device_name, command=lambda device_name=device_name, checkbox_var=checkbox_var: self.parent.update_selected_devices(device_name, checkbox_var),
+                                           variable=checkbox_var, style='highlight.TCheckbutton')
                 checkbox.grid(
                     column=0, row=row, sticky=W)
                 checkboxes[device_name] = checkbox_var
@@ -523,6 +550,58 @@ class BandwidthWindow(Toplevel):
         self.update_bandwidth_tree()
 
 
+class MetadataWindow(Toplevel):
+    def __init__(self, parent):
+        super().__init__(master=root)
+        self.title("Metadata Module")
+        self.parent = parent
+        items_per_column = 20
+        ttk.Button(self, text='Validate', command=self.show_attr_value,
+                   style='Sty1.TButton').grid(column=0, row=0)
+        with open(os.path.join(os.path.dirname(__file__), 'list.json')) as jsonfile:
+            # self.savable_attributes is a dict with key is attribute name.
+            self.savable_attributes = {i: {} for i in json.load(
+                jsonfile)['savable_attributes_list']}
+            self.parent.checked_savable_attributes = [
+                i for i in self.parent.checked_savable_attributes if i in self.savable_attributes]
+        for frame_idx in range(len(self.savable_attributes)//items_per_column+1):
+            sub_frame = ttk.Labelframe(
+                self, padding="0 0 10 0", style='Sty1.TLabelframe')
+            sub_frame.grid(column=frame_idx, row=1, sticky="NW")
+            sub_frame.columnconfigure(0, weight=1)
+            sub_frame.columnconfigure(1, weight=1)
+            start = frame_idx*items_per_column
+            end = min((frame_idx+1)*items_per_column,
+                      len(self.savable_attributes))
+            for idx, attr in enumerate(list(self.savable_attributes.keys())[start:end]):
+                checkbox_var = BooleanVar(
+                    value=True) if attr in self.parent.checked_savable_attributes else BooleanVar(value=False)
+                checkbox = ttk.Checkbutton(sub_frame, text=attr, command=lambda to_be_saved_attr=attr, checkbox_var=checkbox_var: self.parent.update_checked_savable_attributes(
+                    to_be_saved_attr, checkbox_var), variable=checkbox_var, style='highlight.TCheckbutton')
+                checkbox.grid(
+                    column=0, row=idx % items_per_column, sticky=W)
+                self.savable_attributes[attr]['label'] = ttk.Label(
+                    sub_frame, text='', foreground="black")
+                self.savable_attributes[attr]['label'].grid(
+                    column=1, row=idx % items_per_column, sticky=E)
+
+    def show_attr_value(self):
+        '''Button command: show the current value of the attributes'''
+        for attr in self.parent.checked_savable_attributes:
+            try:
+                tango_attr_value = str(AttributeProxy(attr).read(
+                ).value) + AttributeProxy(attr).get_config().unit
+                color = "green"
+            except Exception as e:
+                tango_attr_value = f'{type(e)}'
+                color = "red"
+            self.savable_attributes[attr]['label']['text'] = tango_attr_value
+            self.savable_attributes[attr]['label']['foreground'] = color
+        for attr in self.savable_attributes:
+            if attr not in self.parent.checked_savable_attributes:
+                self.savable_attributes[attr]['label']['text'] = ''
+
+
 class ScanWindow(Toplevel):
     def __init__(self, parent):
         super().__init__(master=root)
@@ -543,13 +622,13 @@ class ScanWindow(Toplevel):
         self.scan_frame4.grid(column=1, row=2, sticky="WENS")
         self.item_each_row = 4
         # read scannable attributes from file
-        with open(os.path.join(os.path.dirname(__file__), 'scannable_attributes.txt')) as f:
-            self.scannable_list = [line.strip() for line in f if line.strip()]
+        with open(os.path.join(os.path.dirname(__file__), 'list.json')) as jsonfile:
+            self.scannable_list = json.load(jsonfile)['scannable_attributes']
         # scan_table format: key is the device/attr string, value is string the scan value list.
         self.scan_table = defaultdict(list)
         self.scan_table_file = os.path.join(
             os.path.dirname(__file__), 'scan_table.csv')
-        with open(self.scan_table_file, 'a+') as csvfile:
+        with open(self.scan_table_file, 'a+', newline='') as csvfile:
             csvfile.seek(0)
             reader = csv.DictReader(csvfile)
             header = reader.fieldnames
@@ -565,7 +644,7 @@ class ScanWindow(Toplevel):
             checkbox_var = BooleanVar(
                 value=True) if device_attr_name in self.scan_table else BooleanVar(value=False)
             checkbox = ttk.Checkbutton(self.scan_frame1, text='/'.join(device_attr_name.split('/')[2:]), command=lambda device_attr_name=device_attr_name, checkbox_var=checkbox_var: self.add_device_to_scan(device_attr_name, checkbox_var),
-                                       variable=checkbox_var, style='Sty1.TCheckbutton')
+                                       variable=checkbox_var, style='highlight.TCheckbutton')
             checkbox.grid(
                 column=col, row=self.scannable_list_row, sticky=W)
 

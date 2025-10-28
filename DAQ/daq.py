@@ -74,7 +74,7 @@ class Daq:
                 else:
                     raise Exception(f"{c} is not found!")
         self.debug = debug
-        atexit.register(self.termination)
+        # atexit.register(self.termination)
 
     def set_camera_configuration(self, config_dict=None, saving=True, default_config_dict=default_config_dict):
         # list of user defined names of the cameras
@@ -129,11 +129,6 @@ class Daq:
                 info['file_name'] = '%s'
             else:
                 info['file_name'] = info['config_dict']['saving_format']
-            # if laser_shot_id:
-            #     info['file_name'] = info['file_name'].replace(
-            #         '.%f', '') + '_%id.%f'
-            #     self.labview = tango.DeviceProxy(
-            #         'laser/labview/labview_programe')
         if saving:
             Key_list = ['model', 'format_pixel', "exposure", "gain",
                         "trigger_selector", "trigger_source"]
@@ -248,16 +243,8 @@ class Daq:
                 if shot_start in self.scan_shot_range:
                     self.set_scan_value(
                         self.scan_attr_proxies[device_attr_name], value, shot_start)
-            self.save_scan_list(shot_start, add_header=True)
-        if self.GUI.options["laser_shot_id"]:
-            self.yellow_programe = tango.DeviceProxy(
-                "laser/labview/labview_programe")
-        if self.GUI.options["MA3_QE12"]:
-            self.MA3_QE12 = tango.DeviceProxy(
-                "laser/gentec/MA3_QE12")
-        if self.GUI.options["Owis_positions"]:
-            self.Owis = tango.DeviceProxy(
-                "TA1/owisps/TA1-owis1")
+        self.scalars = {attr: tango.AttributeProxy(
+            attr) for attr in self.GUI.checked_savable_attributes}
         resulting_fps_dict = {}
         if len(self.cam_info) < 2:
             stitch = False
@@ -374,14 +361,13 @@ class Daq:
                 playsound(os.path.join(os.path.dirname(__file__), 'media',
                           'sound', 'shot_completion_1.mp3'), block=False)
                 # save scala data
-                self.csv_header = ['shot_number']
-                if self.GUI.options["laser_shot_id"] or self.GUI.options["MA3_QE12"] or self.GUI.options["Owis_positions"]:
+                if self.GUI.options["save_metadata"]:
+                    self.csv_header = ['shot_number', 'time']
                     self.save_scalars(self.current_shot_for_all_cam)
                 if scan_table is not None and hasattr(self, "scan_shot_range") and self.current_shot_for_all_cam in self.scan_shot_range:
                     for device_attr_name, ap in self.scan_attr_proxies.items():
                         self.set_scan_value(
                             ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
-                    self.save_scan_list(self.current_shot_for_all_cam)
 
             if not False in [value['is_completed'] for value in self.cam_info.values()]:
                 self.logger("All shots completed!")
@@ -402,8 +388,8 @@ class Daq:
             rep = rep.replace('%e', f'Energy{bs.energy:.3f}J')
         if '%h' in rep:
             rep = rep.replace('%h', f'HotSpot{bs.hot_spot:.4f}Jcm-2')
-        if '%id' in rep:
-            rep = rep.replace('%id', f'id{self.labview.shot_id}')
+        # if '%id' in rep:
+        #     rep = rep.replace('%id', f'id{self.labview.shot_id}')
         if '%o' in rep:
             rep = rep.replace('%o', f'{bs.current_file}')
         return rep
@@ -434,49 +420,19 @@ class Daq:
                 self.GUI.scan_window.tree.tag_configure(
                     f'#{shot_number-1}', background='white')
 
-    def save_scan_list(self, shot_number, add_header=False):
-        # TODO. This function was called immediately after setting the scan value. If it takes some time to reach the scan value, then the saved value will be an intermediate value. This function can be merged into save_scalars function.
-        return
-        with open(os.path.join(self.dir, 'scan_list', 'scan.csv'), 'a') as csvfile:
-            writer = csv.writer(csvfile)
-            if add_header:
-                writer.writerow(['shot_number', 'time'] +
-                                [f'{key} ({value.get_config().unit})' for key, value in self.scan_attr_proxies.items()])
-            writer.writerow([shot_number, datetime.now().strftime(
-                "%H:%M:%S.%f")]+[i.read().value for i in self.scan_attr_proxies.values()])
-
     def save_scalars(self, shot_number,):
-        if self.GUI.options["laser_shot_id"]:
-            self.csv_header.extend(['shot_id_time', 'shot_id'])
-        if self.GUI.options["MA3_QE12"]:
-            self.csv_header.extend(
-                ['MA3_QE12_read_time', 'MA3_QE12_main_value', 'MA3_QE12_multiplier'])
-        if self.GUI.options["Owis_positions"]:
-            self.csv_header.extend(
-                ['Owis_read_time', 'Owis_ax1_position', 'Owis_ax2_position', 'Owis_ax3_position'])
-        file_exists = os.path.isfile(os.path.join(self.dir, 'shot_id.csv'))
-        with open(os.path.join(self.dir, 'shot_id.csv'), 'a') as csvfile:
+        self.csv_header.extend(self.scalars.keys())
+        with open(os.path.join(self.dir, 'scalars.csv'), 'a+', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=self.csv_header)
-            if not file_exists:
+            csvfile.seek(0)
+            current_header = csvfile.readline()
+            if (not current_header) or (current_header.strip() != ','.join(self.csv_header)):
                 writer.writeheader()
-            data_to_write = {'shot_number': shot_number-1}
-            if self.GUI.options["laser_shot_id"]:
-                data_to_write.update(
-                    {'shot_id': self.yellow_programe.shot_id, 'shot_id_time': self.yellow_programe.read_time})
-            if self.GUI.options["MA3_QE12"]:
-                data_to_write.update({'MA3_QE12_read_time': self.MA3_QE12.read_time,
-                                      'MA3_QE12_main_value': self.MA3_QE12.main_value, 'MA3_QE12_multiplier': self.MA3_QE12.multiplier})
-            if self.GUI.options["Owis_positions"]:
-                # not sure if the attribute always exists
-                attr_temp = {}
-                for axis in range(1, 4):
-                    if not hasattr(self.Owis, f'ax{axis}_position'):
-                        attr_temp[f'ax{axis}_position'] = 'N/A'
-                    else:
-                        attr_temp[f'ax{axis}_position'] = getattr(
-                            self.Owis, f'ax{axis}_position')
-                data_to_write.update({'Owis_read_time': self.Owis.read_time,
-                                      'Owis_ax1_position': attr_temp['ax1_position'], 'Owis_ax2_position': attr_temp['ax2_position'], 'Owis_ax3_position': attr_temp['ax3_position']})
+                csvfile.seek(0, os.SEEK_END)
+            data_to_write = {'shot_number': shot_number-1,
+                             'time': datetime.now().strftime("%Y-%m-%d_%H:%M:%S.%f")}
+            data_to_write.update({key: str(value.read(
+            ).value)+value.get_config().unit for key, value in self.scalars.items()})
             writer.writerow(data_to_write)
             self.logger(f'Wrote scalars: {data_to_write}')
 
@@ -547,8 +503,8 @@ class Daq:
         data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))
         return data[:, :, 0]
 
-    def termination(self, config_dict=None):
-        if config_dict is None:
-            config_dict = {'all': {"is_polling_periodically": True}}
+    def __del__(self):
+        logging.info("destroying Daq() in daq.py")
+        config_dict = {'all': {"is_polling_periodically": True}}
         self.set_camera_configuration(
             config_dict=config_dict, saving=False, default_config_dict={})

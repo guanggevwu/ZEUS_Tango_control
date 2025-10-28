@@ -1160,7 +1160,7 @@ class Basler(Device):
             self.i = 0
             # Previous we use a very large number for _grab_number, but it caused some memory problem when we have many camera.
             self._grab_number = max(
-                [self._repetition*self._frames_per_trigger, 200])
+                [self._repetition*self._frames_per_trigger, 500])
             self.camera.StartGrabbingMax(
                 self._grab_number, pylon.GrabStrategy_OneByOne)
             self.logger.info(
