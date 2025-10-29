@@ -313,9 +313,7 @@ class Daq:
                         info['cam_dir'], file_name)
                     message = f"Shot {info['shot_num']} for {info['user_defined_name']} is saved."
                     Thread(target=self.thread_copy, args=(
-                        source_path, destination_path, message))
-                    shutil.copy(os.path.join(bs.folder_path, bs.current_file), os.path.join(
-                        info['cam_dir'], file_name))
+                        source_path, destination_path, message)).start()
                     xy_reader_count += 1
                     if xy_reader_count == bs.files_per_shot:
                         data_array = self.save_plot_data(bs.x, bs.y)
