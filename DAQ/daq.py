@@ -107,8 +107,10 @@ class Daq:
                 info['config_dict'] = combined_config['all']
             else:
                 info['config_dict'] = dict()
-            if any([cam_type in bs.dev_name() for cam_type in ['basler', 'vimba']]):
+            if bs.info().dev_class.lower() in ['basler', 'vimba']:
                 bs.relax()
+            elif bs.info().dev_class.lower() == 'filereader':
+                bs.read_files()
             for key, value in info['config_dict'].items():
                 if hasattr(bs, key):
                     try:
@@ -134,7 +136,7 @@ class Daq:
                         "trigger_selector", "trigger_source"]
             full_configuration = dict()
             for c, info in self.cam_info.items():
-                if any([cam_type in info['device_proxy'].dev_name() for cam_type in ['basler', 'vimba']]):
+                if info['device_proxy'].info().dev_class.lower() in ['basler', 'vimba']:
                     full_configuration[c] = {key: getattr(
                         info['device_proxy'], key, None) for key in Key_list}
             json_object = json.dumps(full_configuration)
@@ -168,7 +170,7 @@ class Daq:
         '''take a background image'''
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
-            if any([cam_type in bs.dev_name() for cam_type in ['basler', 'vimba']]):
+            if bs.info().dev_class.lower() in ['basler', 'vimba']:
                 trigger_source = bs.trigger_source
                 bs.trigger_source = "software"
                 time.sleep(0.5)
@@ -193,7 +195,7 @@ class Daq:
                             f"Background for stitching {back_image.size} is saved.")
             else:
                 self.logger('Error when taking background image.')
-            if any([cam_type in bs.dev_name() for cam_type in ['basler', 'vimba']]):
+            if bs.info().dev_class.lower() in ['basler', 'vimba']:
                 bs.trigger_source = trigger_source
 
     def set_acquisition_start_mode(self):
@@ -211,7 +213,7 @@ class Daq:
         test the camera using software trigger
         """
         for c, info in self.cam_info.items():
-            if any([cam_type in info['device_proxy'].dev_name() for cam_type in ['basler', 'vimba']]):
+            if info['device_proxy'].info().dev_class.lower() in ['basler', 'vimba']:
                 info['device_proxy'].trigger_source = "software"
 
     def simulate_send_software_trigger(self, interval, shots=1):
@@ -292,7 +294,7 @@ class Daq:
             if info['shot_num'] > shot_end:
                 info['is_completed'] = True
             elif bs.is_new_image:
-                if any([cam_type in bs.dev_name() for cam_type in ['basler', 'vimba']]) or bs.data_type == "image":
+                if (bs.info().dev_class.lower() in ['basler', 'vimba']) or (bs.info().dev_class.lower() == 'filereader' and bs.data_type == "image"):
                     data, data_array = self.get_image(bs)
                     file_name = self.generate_file_name(info, bs)
                     file_name = file_name.replace('%f', 'tiff')
@@ -305,9 +307,9 @@ class Daq:
                     add_number = 1
                     # For scope, it saves multiple files per shot. stitch_local set to True only every bs.files_per_shot.
                     stitch_local = True
-                elif 'file_reader' in bs.dev_name() or bs.data_type == "xy":
+                elif bs.info().dev_class.lower() == 'filereader' and bs.data_type == "xy":
                     file_name = self.generate_file_name(info, bs)
-                    file_name = file_name.replace('%f', '.csv')
+                    file_name = file_name.replace('%f', 'csv')
                     source_path = os.path.join(bs.folder_path, bs.current_file)
                     destination_path = os.path.join(
                         info['cam_dir'], file_name)

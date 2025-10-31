@@ -115,6 +115,7 @@ class BaslerGUI():
         layout.addWidget(panel)
 
     def add_command(self, layout, device_name, command_list=None, modified_cmd_name=None, cmd_parameters=None):
+        # TODO add an add_all argument so that all the commands are added by default but it can still take the cmd_parameters for a specific command. For example, I want to add all commands but only set parameters for 'reset_number'.
         '''add command buttons
         layout: the layout to add the command buttons
         device_name: the device name
@@ -191,7 +192,7 @@ class BaslerGUI():
                     widget_one_device_layout, d, 'file_number')
             panel3_layout.addWidget(widget_one_device)
             self.add_command(panel3_layout, d, command_list=[
-                             'get_ready', 'relax', 'reset_number', 'send_software_trigger'],  cmd_parameters=[None, None, [0], None])
+                             'get_ready', 'relax', 'reset_number', 'send_software_trigger', 'read_files'],  cmd_parameters=[None, None, [0], None, None])
         self.gui.createPanel(panel3, f'{len(device_list)} devices')
 
     def create_blank_panel(self, VorH='V'):
@@ -235,7 +236,7 @@ def create_app():
         basler_app.create_image_panel(image_layout, d, **pass_config1)
         if not len(args.device) > 3:
             basler_app.add_command(image_layout, d, command_list=[
-                                   'get_ready', 'relax', 'reset_number', 'send_software_trigger'], cmd_parameters=[None, None, [0], None])
+                                   'get_ready', 'relax', 'reset_number', 'send_software_trigger', 'read_files'], cmd_parameters=[None, None, [0], None, None])
         # form panel
         form_panel, form_layout = basler_app.create_blank_panel('v')
         basler_app.gui.createPanel(form_panel, f'{d}_form')
