@@ -53,6 +53,7 @@
     "laser/labview/labview_programe/shot_id",
     "laser/esp300/esp300_turning_box3/ax1_position",
     "laser/esp300/esp300_turning_box3/ax2_position",
-    "laser/esp300/esp300_turning_box3/ax3_position"
+    "laser/esp300/esp300_turning_box3/ax3_position",
+    "laser/gentec/MA2_QE95LP-H-MB-QED-INT/main_value"
   ]
 }

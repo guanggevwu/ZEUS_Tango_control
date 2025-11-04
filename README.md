@@ -15,7 +15,7 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-- Set the environment variables. Search "Environment" and select "Edit the system environment variables". On the pop-up window, select "Environment variables", then "New..". Enter "Variable name": TANGO_HOST. Enter "Variable value": 192.168.131.90:10000.
+- Set the environment variables. Search "Environment" and select "Edit the system environment variables". On the pop-up window, select "Environment variables", then "New..". Enter "Variable name": TANGO_HOST. Enter "Variable value": 192.168.131.39:10000.
 
 ### Unix computer
 
@@ -37,7 +37,7 @@ pip install -r requirements.txt
 - Then insert the following code to the top of the file.
 
 ```
-TANGO_HOST = 192.168.131.90:10000
+TANGO_HOST = 192.168.131.39:10000
 ```
 
 ## Introduction

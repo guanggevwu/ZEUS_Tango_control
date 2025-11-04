@@ -75,12 +75,6 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "file_reader_2": {'server': 'FileReader/image_reader_2', '_class': 'FileReader', 'name': 'facility/file_reader/image_reader_2', 'property': {'file_type': 'image'}},
             "file_reader_3": {'server': 'FileReader/xy_reader', '_class': 'FileReader', 'name': 'facility/file_reader/xy_reader', 'property': {'file_type': 'xy'}},
             "file_reader_4": {'server': 'FileReader/TA1-wr9254', '_class': 'FileReader', 'name': 'facility/file_reader/TA1-wr9254', 'property': {'file_type': 'xy'}},
-            "file_reader_5": {'server': 'FileReader/WinXP_cam', '_class': 'FileReader', 'name': 'facility/file_reader/WinXP_cam', 'property': {'file_type': 'image'}},
-            "file_reader_6": {'server': 'FileReader/laser_axis', '_class': 'FileReader', 'name': 'facility/file_reader/laser_axis', 'property': {'file_type': 'image'}},
-            "file_reader_7": {'server': 'FileReader/transverse', '_class': 'FileReader', 'name': 'facility/file_reader/transverse', 'property': {'file_type': 'image'}},
-            "file_reader_8": {'server': 'FileReader/spectrometer', '_class': 'FileReader', 'name': 'facility/file_reader/spectrometer', 'property': {'file_type': 'xy'}},
-            "file_reader_9": {'server': 'FileReader/TA3-Xray', '_class': 'FileReader', 'name': 'TA3/file_reader/TA3-Xray', 'property': {'file_type': 'image'}},
-
             "asyncio_device_1": {'server': 'AsyncioDevice/asyncio_device_1', '_class': 'AsyncioDevice', 'name': 'test/asyncio_device/asyncio_device_1'},
             "TA1_regulator_1": {'server': 'GXRegulator/TA1_regulator_1', '_class': 'GXRegulator', 'name': 'TA1/gx_regulator/TA1_regulator_1', 'property': {'high_voltage_channel': '0', 'low_voltage_channel': '1'}},
             "TA1_regulator_2": {'server': 'GXRegulator/TA1_regulator_2', '_class': 'GXRegulator', 'name': 'TA1/gx_regulator/TA1_regulator_2', 'property': {'high_voltage_channel': '2', 'low_voltage_channel': '3'}},
@@ -90,7 +84,8 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "taurus_test": {'server': 'TaurusTest/taurustest', '_class': 'TaurusTest', 'name': 'sys/taurustest/1'},
             "Vimba_TA2_1": {'server': 'Vimba/TA2-1', '_class': 'Vimba', 'name': 'TA2/vimba/TA2-1'},
             "owis_test": {'server': 'OwisPS/test', '_class': 'OwisPS', 'name': 'test/owisps/test', 'property': {'axis': '1,2', 'part_number': 'S41.N29.08BH.V6'}},
-            "owis_TA1_1": {'server': 'OwisPS/TA1-owis1', '_class': 'OwisPS', 'name': 'TA!/owisps/TA1-owis1', 'property': {'axis': '1,2,3,4,5,6,7,8,9', 'part_number': 'S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6'}},
+            "owis_TA1_1": {'server': 'OwisPS/TA1-owis1', '_class': 'OwisPS', 'name': 'TA1/owisps/TA1-owis1', 'property': {'axis': '1,2,3,4,5,6,7,8,9', 'part_number': 'S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6'}},
+            "clock": {'server': 'Clock/clock', '_class': 'Clock', 'name': 'other/Clock/clock'},
             }
 
 
