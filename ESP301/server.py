@@ -48,7 +48,7 @@ class ESP301(Device):
         if self.ip:
             return self.controller_socket.sendall(*args, **kwargs)
         else:
-            return self.dev_write(*args, **kwargs)
+            return self.dev.write(*args, **kwargs)
 
     def dev_read(self, *args, **kwargs):
         if self.ip:
