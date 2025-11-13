@@ -10,6 +10,7 @@ import os
 import json
 import time
 import platform
+import sys
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
 Base = declarative_base()
 
@@ -27,6 +28,8 @@ class AttributeLogger:
         self.db_path = db_path
         self.attributes_dict = self.read_attributes_dictionary()
         self.time_attr = tango.AttributeProxy("other/Clock/clock/time")
+        self.daytime_start = datetime.time(6, 0, 0)  # 6:00 AM
+        self.daytime_end = datetime.time(22, 0, 0)  # 10:00 PM
         self.connect_db()
 
     def connect_db(self):
@@ -59,15 +62,20 @@ class AttributeLogger:
             return datetime.datetime.strptime(value, '%Y/%m/%d %H:%M:%S.%f')
 
     def log_attribute_value(self, attr_name, config):
-        t = threading.Timer(config['interval'],
-                            self.log_attribute_value, args=[attr_name, config])
+        current_time = self.get_time()
+        if current_time.time() > self.daytime_start and current_time.time() < self.daytime_end:
+            t = threading.Timer(config['interval'],
+                                self.log_attribute_value, args=[attr_name, config])
+        else:
+            t = threading.Timer(600,
+                                self.log_attribute_value, args=[attr_name, config])
         t.daemon = True
         t.start()
         session = self.Session()
         try:
             attr_proxy = tango.AttributeProxy(attr_name)
             value = attr_proxy.read().value
-            new_log = Logs(timestamp=self.get_time(),
+            new_log = Logs(timestamp=current_time,
                            attr=attr_name, value=value)
             session.add(new_log)
             session.commit()
@@ -77,11 +85,12 @@ class AttributeLogger:
 
 
 if __name__ == "__main__":
-
-    if platform.system() == "Windows":
+    if sys.argv and len(sys.argv) > 1:
+        db_file = sys.argv[1]
+    elif platform.system() == "Windows":
         db_file = r'Z:\ZEUS_website_resources\lab_log\lab_log.db'
     else:
-        db_file = '/mnt/coe-ZEUS1/ZEUS_website_resources/lab_log/lab_log.db'
+        db_file = '/mnt/coe-zeus1/ZEUS_website_resources/lab_log/lab_log.db'
     attribute_logger = AttributeLogger(db_file)
     attribute_logger.start_threading()
     while True:

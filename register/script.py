@@ -53,6 +53,7 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "basler_TA3-NearField": {'server': 'Basler/TA3-NearField', '_class': 'Basler', 'name': 'TA3/basler/TA3-NearField', 'property': {'friendly_name': 'TA3-NearField'}},
             "basler_TA3-Eprofile": {'server': 'Basler/TA3-Eprofile', '_class': 'Basler', 'name': 'TA3/basler/TA3-Eprofile', 'property': {'friendly_name': 'TA3-Eprofile'}},
             "basler_test": {'server': 'Basler/basler_test', '_class': 'Basler', 'name': 'test/basler/basler_test', 'property': {'friendly_name': 'test'}},
+            "basler_test_serial_number": {'server': 'Basler/40222934', '_class': 'Basler', 'name': 'other/basler/40222934', 'property': {'serial_number': '40222934'}},
 
 
             "camera": {'server': 'Camera/test', '_class': 'Camera', 'name': 'test/camera/1'},
@@ -66,11 +67,12 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "waverunner_104mxi_1": {'server': 'LeCroy/old_scope', '_class': 'LeCroy', 'name': 'facility/lecroy/waverunner_104mxi_1'},
             "wavesurfer_3034z_1": {'server': 'LeCroy/wavesurfer_3034z_1', '_class': 'LeCroy', 'name': 'facility/lecroy/wavesurfer_3034z_1'},
             "dg535_test": {'server': 'DG535/testsr', '_class': 'DG535', 'name': 'test/dg535/1'},
-            "dg645_1": {'server': 'DG535/DG645_control_room', '_class': 'DG535', 'name': 'other/dg535/DG645_control_room'},
+            "dg645_1": {'server': 'DG645/DG645_control_room', '_class': 'DG645', 'name': 'other/dg645/DG645_control_room'},
             "esp300_test": {'server': 'ESP301/test', '_class': 'ESP301', 'name': 'test/esp300/esp300_test'},
             "esp300_grating": {'server': 'ESP301/esp300_grating', '_class': 'ESP301', 'name': 'laser/esp301/esp300_grating'},
             "esp300_turning_box3": {'server': 'ESP301/esp300_turning_box3', '_class': 'ESP301', 'name': 'laser/esp300/esp300_turning_box3'},
             "esp302_test": {'server': 'ESP301/esp302_test', '_class': 'ESP301', 'name': 'test/esp301/esp302_test', 'property': {'ip': '192.168.131.75'}},
+            "esp302_ta2_2": {'server': 'ESP301/esp302_ta2_2', '_class': 'ESP301', 'name': 'TA2/esp301/esp302_ta2_2', 'property': {'ip': '192.168.131.142'}},
             "file_reader_1": {'server': 'FileReader/file_reader_1', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_1'},
             "file_reader_2": {'server': 'FileReader/image_reader_2', '_class': 'FileReader', 'name': 'facility/file_reader/image_reader_2', 'property': {'file_type': 'image'}},
             "file_reader_3": {'server': 'FileReader/xy_reader', '_class': 'FileReader', 'name': 'facility/file_reader/xy_reader', 'property': {'file_type': 'xy'}},
@@ -90,6 +92,16 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
 
 
 if __name__ == "__main__":
+    TA2_serial_numbers = ['40645425', ]
+    for sn in TA2_serial_numbers:
+        dev_info = tango.DbDevInfo()
+        setattr(dev_info, 'server', f'Basler/TA2_{sn}')
+        setattr(dev_info, '_class', 'Basler')
+        setattr(dev_info, 'name', f'TA2/basler/TA2_{sn}')
+        db.add_device(dev_info)
+
+        db.put_device_property(
+            f'TA2/basler/TA2_{sn}', {'serial_number': sn})
     if len(sys.argv) == 1:
         print("not enough input arguments")
     elif sys.argv[1] == "add":

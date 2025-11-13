@@ -84,7 +84,7 @@ class LaserWarningSign(Device):
     def read_ta1(self):
         for i in self._status_list:
             if "ta1" in i[0] and i[1] == '1':
-                for s in ['safe', 'caution', 'danger', 'radiation']:
+                for s in ['safe', 'caution', 'radiation', 'danger']:
                     if s in i[0]:
                         return s
 
@@ -97,7 +97,7 @@ class LaserWarningSign(Device):
     def read_ta2(self):
         for i in self._status_list:
             if "ta2" in i[0] and i[1] == '1':
-                for s in ['safe', 'caution', 'danger', 'radiation']:
+                for s in ['safe', 'caution', 'radiation', 'danger']:
                     if s in i[0]:
                         return s
 
@@ -110,7 +110,7 @@ class LaserWarningSign(Device):
     def read_ta3(self):
         for i in self._status_list:
             if "ta3" in i[0] and i[1] == '1':
-                for s in ['safe', 'caution', 'danger', 'radiation']:
+                for s in ['safe', 'caution', 'radiation', 'danger']:
                     if s in i[0]:
                         return s
 
@@ -123,7 +123,7 @@ class LaserWarningSign(Device):
     def read_mezzanine(self):
         for i in self._status_list:
             if "mezzanine" in i[0] and i[1] == '1':
-                for s in ['safe', 'caution', 'danger', 'radiation']:
+                for s in ['safe', 'caution', 'radiation', 'danger']:
                     if s in i[0]:
                         return s
 
@@ -136,7 +136,7 @@ class LaserWarningSign(Device):
     def read_clean_room(self):
         for i in self._status_list:
             if "clean-room" in i[0] and i[1] == '1':
-                for s in ['safe', 'caution', 'danger', 'radiation']:
+                for s in ['safe', 'caution', 'radiation', 'danger']:
                     if s in i[0]:
                         return s
 
