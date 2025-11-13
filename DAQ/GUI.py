@@ -19,6 +19,7 @@ import csv
 from collections import defaultdict
 from queue import Queue
 from tango import AttributeProxy
+from pypylon import pylon
 
 logging.basicConfig(
     format="%(asctime)s %(message)s",
@@ -207,6 +208,11 @@ class DaqGUI:
         else:
             self.selected_devices = dict()
             self.options = None
+        # only applied to basler cameras
+        self.serial_number_vs_friendly_name = dict()
+        for device in pylon.TlFactory.GetInstance().EnumerateDevices():
+            self.serial_number_vs_friendly_name[device.GetSerialNumber(
+            )] = device.GetUserDefinedName()
         for key in self.selected_devices:
             self.update_selected_devices(key, BooleanVar(value=True))
 
@@ -347,6 +353,8 @@ class DaqGUI:
         '''The function is called when check or uncheck the devices in the device list window. Update the selected devices based on the checkbox state. If the checkbox is checked, it will create a button for the device. If it is unchecked, it will remove the button and delete the device from the selected devices dictionary.'''
         if checkbox_var.get():
             text = device_name.split('/')[-1]
+            if text.split('_')[-1] in self.serial_number_vs_friendly_name:
+                text = self.serial_number_vs_friendly_name[text.split('_')[-1]]
             if len(text) > 12:
                 text = text[:5]+'...'+text[-5:]
             device_button = ttk.Button(
@@ -453,6 +461,8 @@ class DeviceListWindow(Toplevel):
         self.device_names_in_db = []
         self.class_name = ['Basler', 'FileReader', 'Vimba']
         for c in self.class_name:
+            if c == 'Basler':
+                Basler_class_device = self.parent.db.get_device_name('*', c)
             self.device_names_in_db.extend(
                 self.parent.db.get_device_name('*', c))
         super().__init__(master=root)
@@ -480,7 +490,13 @@ class DeviceListWindow(Toplevel):
             for row, device_name in enumerate(device_sub_list):
                 checkbox_var = BooleanVar(
                     value=True) if device_name in self.parent.selected_devices else BooleanVar(value=False)
-                checkbox = ttk.Checkbutton(sub_frame, text=device_name, command=lambda device_name=device_name, checkbox_var=checkbox_var: self.parent.update_selected_devices(device_name, checkbox_var),
+                # If this is a basler camera and its serial name has a friendly name. The serial number is obtained by parse the device name, i.e., xxx/xxx/xxx_[serial_number]
+                if device_name in Basler_class_device and device_name.split('/')[-1].split('_')[-1] in self.parent.serial_number_vs_friendly_name:
+                    checkbox_text = self.parent.serial_number_vs_friendly_name[device_name.split(
+                        '/')[-1].split('_')[-1]]
+                else:
+                    checkbox_text = device_name
+                checkbox = ttk.Checkbutton(sub_frame, text=checkbox_text, command=lambda device_name=device_name, checkbox_var=checkbox_var: self.parent.update_selected_devices(device_name, checkbox_var),
                                            variable=checkbox_var, style='highlight.TCheckbutton')
                 checkbox.grid(
                     column=0, row=row, sticky=W)
