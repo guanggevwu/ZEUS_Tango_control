@@ -44,6 +44,9 @@ class Menu:
         if 'server' in key and input_txt in self.instance_table:
             input_txts = self.instance_table[input_txt]
         else:
+            if self.class_name == 'Basler':
+                idx = self.menu_dict[key][3].index(input_txt)
+                input_txt = self.menu_dict[key][1][idx]
             input_txts = [input_txt]
         i = 0
         for input_txt in input_txts:

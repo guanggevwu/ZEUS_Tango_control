@@ -637,15 +637,15 @@ class Basler(Device):
         self._repetition = 50
         super().init_device()
         self.set_state(DevState.INIT)
-        logger = logging.getLogger(self.__class__.__name__)
-        self.logger = LoggerAdapter(self.friendly_name, logger)
-        handlers = [logging.StreamHandler()]
-        logging.basicConfig(handlers=handlers,
-                            format="%(asctime)s %(message)s", level=logging.INFO)
         # force disable polling for "image" in DB
         self.disable_polling('image')
         try:
             self.device = self.get_camera_device()
+            logger = logging.getLogger(self.__class__.__name__)
+            self.logger = LoggerAdapter(self.friendly_name, logger)
+            handlers = [logging.StreamHandler()]
+            logging.basicConfig(handlers=handlers,
+                                format="%(asctime)s %(message)s", level=logging.INFO)
             if self.device is not None:
                 instance = pylon.TlFactory.GetInstance()
                 self.camera = pylon.InstantCamera(
@@ -704,10 +704,9 @@ class Basler(Device):
                 print(
                     f'Camera is connected. {self.device.GetUserDefinedName()}: {self.device.GetSerialNumber()}')
                 self.set_state(DevState.ON)
-        except:
-            print("Could not open camera with serial: {:s}".format(
-                self.serial_number))
+        except Exception as e:
             self.set_state(DevState.OFF)
+            raise e
 
     def delete_device(self):
         self.camera.Close()
@@ -716,6 +715,8 @@ class Basler(Device):
 
     def get_camera_device(self):
         for device in pylon.TlFactory.GetInstance().EnumerateDevices():
+            if device.GetSerialNumber() == self.serial_number:
+                self.friendly_name = device.GetUserDefinedName()
             if device.GetSerialNumber() == self.serial_number or device.GetUserDefinedName() == self.friendly_name:
                 return device
         # factory = pylon.TlFactory.GetInstance()
