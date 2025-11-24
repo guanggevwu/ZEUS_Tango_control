@@ -217,6 +217,13 @@ def create_app():
     else:
         device_list = [args.device]
     basler_app = BaslerGUI(device_list, args.polling)
+    # check Basler camera friendly name
+    if any(['basler' in d for d in device_list]):
+        from pypylon import pylon
+        serial_number_vs_friendly_name = dict()
+        for device in pylon.TlFactory.GetInstance().EnumerateDevices():
+            serial_number_vs_friendly_name[device.GetSerialNumber(
+            )] = device.GetUserDefinedName()
 
     # get the configuration
     for d in device_list:
@@ -232,14 +239,19 @@ def create_app():
 
         # image panel.
         image_panel, image_layout = basler_app.create_blank_panel('v')
-        basler_app.gui.createPanel(image_panel, f'{d}_image_plot')
+        if d.split('/')[-1].split('_')[-1] in serial_number_vs_friendly_name:
+            friendly_name = serial_number_vs_friendly_name[d.split(
+                '/')[-1].split('_')[-1]]
+        else:
+            friendly_name = d
+        basler_app.gui.createPanel(image_panel, f'{friendly_name}')
         basler_app.create_image_panel(image_layout, d, **pass_config1)
         if not len(args.device) > 3:
             basler_app.add_command(image_layout, d, command_list=[
                                    'get_ready', 'relax', 'reset_number', 'send_software_trigger', 'read_files'], cmd_parameters=[None, None, [0], None, None])
         # form panel
         form_panel, form_layout = basler_app.create_blank_panel('v')
-        basler_app.gui.createPanel(form_panel, f'{d}_form')
+        basler_app.gui.createPanel(form_panel, f'{friendly_name}_form')
         basler_app.create_form_panel(form_layout,
                                      d, exclude=['image', 'image_r', 'image_g', 'image_b', 'flux', 'energy', 'hot_spot'])
     if len(args.device) == 1 and args.device[0] in image_panel_config:
