@@ -83,7 +83,7 @@ class AttributeLogger:
         except Exception as e:
             logging.error(f"Error getting attribute {attr_name}")
         finally:
-            session.close()
+            self.Session.remove()
 
 
 if __name__ == "__main__":

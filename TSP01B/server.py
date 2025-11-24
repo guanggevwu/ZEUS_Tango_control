@@ -67,6 +67,8 @@ class TSP01B(Device):
         dtype=float,
         polling_period=1000,
         access=AttrWriteType.READ,
+        format='6.3f',
+        doc="Returns temperature in Celsius"
     )
 
     def read_temperature(self):
@@ -78,6 +80,7 @@ class TSP01B(Device):
         dtype=float,
         access=AttrWriteType.READ,
         polling_period=1000,
+        format='6.3f',
         doc="Returns humidity in %RH"
     )
 
