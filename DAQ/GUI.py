@@ -68,10 +68,12 @@ class DaqGUI:
               background=[('selected', 'lightgreen'), ('!selected', 'lightgrey')])
         s.configure('Sty2_offline.TButton', font=(
             'Helvetica', self.font_mid), background='#85929e')
+        s.configure('Sty2_offline_text_small.TButton', font=(
+            'Helvetica', self.font_small), background='#85929e')
         s.configure('Sty2_connecting.TButton', font=(
-            'Helvetica', self.font_mid), background='yellow')
-        s.configure('Sty2_online.TButton', font=(
-            'Helvetica', self.font_mid), background='#5dade2')
+            'Helvetica', self.font_small), background='yellow')
+        s.configure('Sty2_online_text_small.TButton', font=(
+            'Helvetica', self.font_small), background='#5dade2')
         s.configure('Sty2_client_offline.TButton', font=(
             'Helvetica', self.font_mid), background='#85929e')
         s.configure('Sty2_client_online.TButton', font=(
@@ -97,13 +99,13 @@ class DaqGUI:
             self.frame1.columnconfigure(i, weight=1, uniform='g1')
         self.frame1.grid(column=0, row=0, sticky=(N, W, E, S))
         ttk.Button(self.frame1, text='Select', command=self.open_device_list, style='Sty1.TButton').grid(
-            column=0, row=0, sticky='W')
+            column=0, row=0, sticky='WE')
         self.client_GUI['button'] = ttk.Button(
             self.frame1, text='Device GUI', command=self.start_device_GUI, style='Sty2_client_offline.TButton')
-        self.client_GUI['button'].grid(column=1, row=0, sticky='W')
+        self.client_GUI['button'].grid(column=1, row=0, sticky='WE')
         self.device_row, self.selected_device_per_row = 1, 4
         ttk.Button(self.frame1, text='Bandwidth', command=self.open_bandwidth_table, style='Sty1.TButton').grid(
-            column=3, row=0, sticky='W')
+            column=3, row=0, sticky='WE')
 
         # ---------------------frame 2
         self.frame2 = ttk.Labelframe(
@@ -212,7 +214,7 @@ class DaqGUI:
         self.serial_number_vs_friendly_name = dict()
         for device in pylon.TlFactory.GetInstance().EnumerateDevices():
             self.serial_number_vs_friendly_name[device.GetSerialNumber(
-            )] = device.GetUserDefinedName()
+            )] = f'{device.GetUserDefinedName()}({device.GetSerialNumber()})'
         for key in self.selected_devices:
             self.update_selected_devices(key, BooleanVar(value=True))
 
@@ -287,7 +289,7 @@ class DaqGUI:
                 f"{self.selected_devices[device_name]['server_pid']}  doesn't exist.")
         del self.selected_devices[device_name]['server_pid']
         del self.selected_devices[device_name]['connection_try_times']
-        self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_offline.TButton'
+        self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_offline_text_small.TButton'
         self.insert_to_disabled(f'{device_name} server is killed.')
 
     def check_device_server_status(self, device_name):
@@ -298,7 +300,7 @@ class DaqGUI:
         try:
             dp = tango.DeviceProxy(device_name)
             dp.ping()
-            self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_online.TButton'
+            self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_online_text_small.TButton'
             self.selected_devices[device_name]['tango_dp'] = dp
             self.insert_to_disabled(f'{device_name} is connected.')
         except (tango.DevFailed, tango.ConnectionFailed) as e:
@@ -355,12 +357,12 @@ class DaqGUI:
             text = device_name.split('/')[-1]
             if text.split('_')[-1] in self.serial_number_vs_friendly_name:
                 text = self.serial_number_vs_friendly_name[text.split('_')[-1]]
-            if len(text) > 12:
-                text = text[:5]+'...'+text[-5:]
+                if '(' in text:
+                    text = text.split('(')[0]
+            if len(text) > 20:
+                text = text[:8]+'...'+text[-8:]
             device_button = ttk.Button(
-                self.frame1, command=lambda device_name=device_name: self.connect_to_device(device_name), text=text, style='Sty2_offline.TButton')
-            device_button.grid(
-                column=len(self.selected_devices) % self.selected_device_per_row, row=self.device_row+int(len(self.selected_devices)/self.selected_device_per_row), sticky='W')
+                self.frame1, command=lambda device_name=device_name: self.connect_to_device(device_name), text=text, style='Sty2_offline_text_small.TButton')
             self.selected_devices[device_name] = dict()
             self.selected_devices[device_name]['checkbutton'] = device_button
         elif 'server_pid' in self.selected_devices[device_name]:
@@ -373,7 +375,7 @@ class DaqGUI:
         for idx, value in enumerate(self.selected_devices.values()):
             if value is not None:
                 value['checkbutton'].grid(
-                    column=idx % self.selected_device_per_row, row=self.device_row+int(idx/self.selected_device_per_row), sticky='W')
+                    column=idx % self.selected_device_per_row, row=self.device_row+int(idx/self.selected_device_per_row), sticky='WE')
         self.pad_space(self.frame1)
 
     def update_checked_savable_attributes(self, attr, checkbox_var):
