@@ -71,6 +71,8 @@ def create_app():
                 form_layout, d, command_list=command_list[axis], modified_cmd_name=modified_cmd_name[axis], cmd_parameters=cmd_parameters[axis])
         basler_app.add_command(
             form_layout, d, command_list=['stop'])
+        basler_app.add_command(
+            form_layout, d, command_list=['reset_to_TA1'])
         # command_panel, command_layout = basler_app.create_blank_panel('v')
         # basler_app.gui.createPanel(command_panel, f'{d}_commands')
 

@@ -88,20 +88,15 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "owis_test": {'server': 'OwisPS/test', '_class': 'OwisPS', 'name': 'test/owisps/test', 'property': {'axis': '1,2', 'part_number': 'S41.N29.08BH.V6'}},
             "owis_TA1_1": {'server': 'OwisPS/TA1-owis1', '_class': 'OwisPS', 'name': 'TA1/owisps/TA1-owis1', 'property': {'axis': '1,2,3,4,5,6,7,8,9', 'part_number': 'S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6'}},
             "clock": {'server': 'Clock/clock', '_class': 'Clock', 'name': 'other/Clock/clock'},
+            "laser_2_TSP01B": {'server': 'TSP01B/laser_2_TSP01B', '_class': 'TSP01B', 'name': 'laser/TSP01B/laser_2_TSP01B', 'property': {'serial_number': 'M01259107'}},
+            "laser_3_TSP01B": {'server': 'TSP01B/laser_3_TSP01B', '_class': 'TSP01B', 'name': 'laser/TSP01B/laser_3_TSP01B', 'property': {'serial_number': 'M01259108'}},
+            "TA1_TSP01B": {'server': 'TSP01B/TA1_TSP01B', '_class': 'TSP01B', 'name': 'TA1/TSP01B/TA1_TSP01B', 'property': {'serial_number': 'M01259104'}},
+            "TA2_TSP01B": {'server': 'TSP01B/TA2_TSP01B', '_class': 'TSP01B', 'name': 'TA2/TSP01B/TA2_TSP01B', 'property': {'serial_number': 'M01259102'}},
+            "TA3_TSP01B": {'server': 'TSP01B/TA3_TSP01B', '_class': 'TSP01B', 'name': 'TA3/TSP01B/TA3_TSP01B', 'property': {'serial_number': 'M01268079'}},
             }
 
 
 if __name__ == "__main__":
-    TA2_serial_numbers = ['40645425', ]
-    for sn in TA2_serial_numbers:
-        dev_info = tango.DbDevInfo()
-        setattr(dev_info, 'server', f'Basler/TA2_{sn}')
-        setattr(dev_info, '_class', 'Basler')
-        setattr(dev_info, 'name', f'TA2/basler/TA2_{sn}')
-        db.add_device(dev_info)
-
-        db.put_device_property(
-            f'TA2/basler/TA2_{sn}', {'serial_number': sn})
     if len(sys.argv) == 1:
         print("not enough input arguments")
     elif sys.argv[1] == "add":
