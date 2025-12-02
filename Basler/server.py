@@ -481,7 +481,7 @@ class Basler(Device):
             access=AttrWriteType.READ,
         )
 
-        if self._model != 'a2A1920-51gcBAS':
+        if self._model not in  ['a2A1920-51gcBAS', 'acA2500-20gc']:
             self.add_attribute(binning_horizontal)
             self.add_attribute(binning_vertical)
         if self.friendly_name == "3PW_Grating-4_NF" or self.friendly_name == "3PW_Screen" or self.friendly_name == "test":
