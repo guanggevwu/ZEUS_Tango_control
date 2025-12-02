@@ -247,10 +247,8 @@ class ESP301(Device):
         def ax2_positive_limit(self):
             self.dev_write(f"2MT+\r".encode())
 
-        @command()
-        @ESP301.clear_error_wrap
-        def reset_to_TA1(self):
-            Thread(target=self.threaded_reset_to_TA1).start()
+        cmd_reset_to_TA1 = command(
+            f=self.reset_to_TA1)
 
         for axis in range(1, 4):
             if axis in self.axis:
@@ -303,7 +301,7 @@ class ESP301(Device):
                 # ta_test position is not fixed, it is set when the user clicks the button.
                 self.TA_test = [0, 2.5]
                 self.add_attribute(customized_location)
-                self.add_command(reset_to_TA1)
+                self.add_command(cmd_reset_to_TA1)
 
     def read_ax12_distance(self, attr):
         return float(f'{(self._ax1_position-self._ax2_position):.3f}')
@@ -555,6 +553,10 @@ class ESP301(Device):
     def set_as_zero(self, axis):
         self.logger.info(f'setting axis {axis} as zero')
         self.dev_write(f"{axis}DH0\r".encode())
+
+    @clear_error_wrap
+    def reset_to_TA1(self):
+        Thread(target=self.threaded_reset_to_TA1).start()
 
     def wait_until_stop(self, axis=1):
         while True:
