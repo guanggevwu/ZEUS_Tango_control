@@ -717,7 +717,9 @@ class Basler(Device):
         for device in pylon.TlFactory.GetInstance().EnumerateDevices():
             if device.GetSerialNumber() == self.serial_number:
                 self.friendly_name = device.GetUserDefinedName()
-            if device.GetSerialNumber() == self.serial_number or device.GetUserDefinedName() == self.friendly_name:
+                return device
+            if self.friendly_name and device.GetUserDefinedName() == self.friendly_name :
+                self.serial_number = device.GetUserDefinedName()
                 return device
         # factory = pylon.TlFactory.GetInstance()
         # empty_camera_info = pylon.DeviceInfo()

@@ -54,6 +54,9 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "basler_TA3-Eprofile": {'server': 'Basler/TA3-Eprofile', '_class': 'Basler', 'name': 'TA3/basler/TA3-Eprofile', 'property': {'friendly_name': 'TA3-Eprofile'}},
             "basler_test": {'server': 'Basler/basler_test', '_class': 'Basler', 'name': 'test/basler/basler_test', 'property': {'friendly_name': 'test'}},
             "basler_test_serial_number": {'server': 'Basler/40222934', '_class': 'Basler', 'name': 'other/basler/40222934', 'property': {'serial_number': '40222934'}},
+            "ta3_40330527": {'server': 'Basler/40330527', '_class': 'Basler', 'name': 'TA3/basler/40330527', 'property': {'serial_number': '40330527'}},
+            "ta3_40448893": {'server': 'Basler/40448893', '_class': 'Basler', 'name': 'TA3/basler/40448893', 'property': {'serial_number': '40448893'}},
+
 
 
             "camera": {'server': 'Camera/test', '_class': 'Camera', 'name': 'test/camera/1'},
