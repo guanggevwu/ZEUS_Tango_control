@@ -12,7 +12,15 @@
     "TA3/gx_regulator/TA3_regulator_1/pressure_bar",
     "TA3/gx_regulator/TA3_regulator_2/pressure_bar",
     "test/owisps/test/current_location",
-    "sys/taurustest/1/position"
+    "sys/taurustest/1/position",
+    "other/dg645/DG645_control_room/A_relative_delay",
+    "other/dg645/DG645_control_room/B_relative_delay",
+    "other/dg645/DG645_control_room/C_relative_delay",
+    "other/dg645/DG645_control_room/D_relative_delay",
+    "other/dg645/DG645_control_room/E_relative_delay",
+    "other/dg645/DG645_control_room/F_relative_delay",
+    "other/dg645/DG645_control_room/G_relative_delay",
+    "other/dg645/DG645_control_room/H_relative_delay"
   ],
   "savable_attributes_list": [
     "test/owisps/test/ax1_position",
