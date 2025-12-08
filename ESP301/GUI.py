@@ -28,11 +28,11 @@ def create_app():
         form_panel, form_layout = basler_app.create_blank_panel('v')
         basler_app.gui.createPanel(form_panel, f'{d}_form')
         basler_app.create_form_panel(form_layout, d, exclude=[
-            'ax1_step', 'ax2_step', 'ax3_step', 'ax4_step', 'ax5_step', 'ax6_step', 'ax7_step', 'ax8_step', 'ax9_step'], withButtons=False)
+            'ax1_step', 'ax2_step', 'ax3_step', 'ax4_step', 'ax5_step', 'ax6_step', 'ax7_step', 'ax8_step', 'ax9_step', 'ax12_step'], withButtons=False)
         command_list, modified_cmd_name, cmd_parameters = [], [], []
         command_with_axis_parameters = [
             'move_to_negative_limit', 'move_to_positive_limit', 'set_as_zero']
-        for idx, axis in enumerate(range(1, 4)):
+        for idx, axis in enumerate([1,2,3,'12']):
             if f'ax{axis}_step' in basler_app.attr_list[d]['attrs']:
                 one_relative, one_relative_layout = basler_app.create_blank_panel(
                     VorH='h')
@@ -43,15 +43,22 @@ def create_app():
                 step_widget.setReadWidget(r_widget)
                 step_widget.setWriteWidget(w_widget)
                 step_widget.model = f'{d}/ax{axis}_step'
-
-                button1 = TaurusCommandButton(
-                    command=f'move_relative_axis', parameters=[axis, 0]
-                )
+                if axis == "12":
+                    button1 = TaurusCommandButton(
+                        command='move_relative_axis12', parameters=[0]
+                    )
+                    button2 = TaurusCommandButton(
+                        command='move_relative_axis12', parameters=[1]
+                    )
+                else:
+                    button1 = TaurusCommandButton(
+                        command='move_relative_axis', parameters=[axis, 0]
+                    )
+                    button2 = TaurusCommandButton(
+                        command='move_relative_axis', parameters=[axis, 1]
+                    )
                 button1.setCustomText(f'ax{axis}-')
                 button1.setModel(d)
-                button2 = TaurusCommandButton(
-                    command=f'move_relative_axis', parameters=[axis, 1]
-                )
                 button2.setCustomText(f'ax{axis}+')
                 button2.setModel(d)
 
@@ -59,13 +66,14 @@ def create_app():
                 one_relative_layout.addWidget(step_widget)
                 one_relative_layout.addWidget(button2)
                 form_layout.addWidget(one_relative)
-                command_list.append([])
-                modified_cmd_name.append([])
-                cmd_parameters.append([])
-                for cmd in command_with_axis_parameters:
-                    command_list[-1].append(cmd)
-                    modified_cmd_name[-1].append(f'ax{axis}_{cmd}')
-                    cmd_parameters[-1].append([axis])
+                if axis != "12":
+                    command_list.append([])
+                    modified_cmd_name.append([])
+                    cmd_parameters.append([])
+                    for cmd in command_with_axis_parameters:
+                        command_list[-1].append(cmd)
+                        modified_cmd_name[-1].append(f'ax{axis}_{cmd}')
+                        cmd_parameters[-1].append([axis])
         for axis in range(len(command_list)):
             basler_app.add_command(
                 form_layout, d, command_list=command_list[axis], modified_cmd_name=modified_cmd_name[axis], cmd_parameters=cmd_parameters[axis])

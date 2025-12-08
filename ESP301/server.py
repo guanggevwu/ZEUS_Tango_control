@@ -30,6 +30,7 @@ class ESP301(Device):
     com = device_property(dtype=str, default_value='COM1')
     ip = device_property(dtype=str, default_value='')
     extra_script = device_property(dtype=str, default_value='')
+    axis_property = device_property(dtype=str, default_value='')
 
     @staticmethod
     def clear_error_wrap(func):
@@ -90,16 +91,20 @@ class ESP301(Device):
             self._raw_command_return = ''
             self.unit_code = {0: "unknown",
                               1: "unknown", 2: "mm", 3: "um", 7: "deg"}
-            self.axis = []
-            for axis in range(1, 4):
-                self.dev_write(f"{axis}ID?\r".encode())
-                reply = self.dev_read()
-                if "NO STAGE" not in reply:
-                    self.axis.append(axis)
-                    self.dev_write(f"{axis}SN?\r".encode())
-                    setattr(self, f"_axis{axis}_unit", self.unit_code[
-                        int(self.dev_read())])
-                    self.dev_write(f"{axis}ZS00H\r".encode())
+            if hasattr(self, "axis_property") and self.axis_property:
+                self.axis=[int(i) for i in self.axis_property.split(',')]
+            else:
+                self.axis = []
+                for axis in range(1, 4):
+                    self.dev_write(f"{axis}ID?\r".encode())
+                    reply = self.dev_read()
+                    if "NO STAGE" not in reply:
+                        self.axis.append(axis)
+            for axis in self.axis:
+                self.dev_write(f"{axis}SN?\r".encode())
+                setattr(self, f"_axis{axis}_unit", self.unit_code[
+                    int(self.dev_read())])
+                self.dev_write(f"{axis}ZS00H\r".encode())
             self._error_message = None
             # print(
             #     f'ESP301 is connected. Model: {self._model}. Serial number: {self._serial_number}')
@@ -266,31 +271,30 @@ class ESP301(Device):
                 self.add_command(cmd_move_to_negative_limit)
                 self.add_command(cmd_move_to_positive_limit)
                 self.add_command(cmd_set_as_zero)
-                # self.add_command(cmd_move_relative_axis12)
         # only for a special case
-        # if 1 in self.axis and 2 in self.axis and self._axis1_unit == self._axis2_unit:
-            # ax12_distance = attribute(
-            #     name="ax12_distance",
-            #     label="ax12 distance",
-            #     dtype=float,
-            #     unit=self._axis1_unit,
-            #     format='6.3f',
-            #     access=AttrWriteType.READ,
-            # )
+        ax12_distance = attribute(
+            name="ax12_distance",
+            label="ax12 distance",
+            dtype=float,
+            unit=self._axis1_unit,
+            format='6.3f',
+            access=AttrWriteType.READ,
+            doc='ax12_distance = ax1_position - ax2_position. I.e., distance between ax1 and ax2.',
 
-            # ax12_step = attribute(
-            #     name="ax12_step",
-            #     label="ax12 step",
-            #     dtype=float,
-            #     unit=self._axis1_unit,
-            #     format='6.3f',
-            #     memorized=True,
-            #     hw_memorized=True,
-            #     access=AttrWriteType.READ_WRITE,
-            #     doc='steps for axis 1 and axis 2 are the same, so this attribute is used for both axes.',
-            # )
-        #     self.add_attribute(ax12_distance)
-        #     self.add_attribute(ax12_step)
+        )
+
+        ax12_step = attribute(
+            name="ax12_step",
+            label="ax12 step",
+            dtype=float,
+            unit=self._axis1_unit,
+            format='6.3f',
+            memorized=True,
+            hw_memorized=True,
+            access=AttrWriteType.READ_WRITE,
+            doc='steps for axis 1 and axis 2 are the same, so this attribute is used for both axes.',
+        )
+
             # self.add_command(cmd)
         if hasattr(self, "extra_script"):
             if self.extra_script == "turning_box_3":
@@ -302,6 +306,10 @@ class ESP301(Device):
                 self.TA_test = [0, 2.5]
                 self.add_attribute(customized_location)
                 self.add_command(cmd_reset_to_TA1)
+            if self.extra_script == "grating":
+                self.add_attribute(ax12_distance)
+                self.add_attribute(ax12_step)
+                self.add_command(cmd_move_relative_axis12)
 
     def read_ax12_distance(self, attr):
         return float(f'{(self._ax1_position-self._ax2_position):.3f}')
@@ -527,17 +535,19 @@ class ESP301(Device):
         else:
             self.dev_write(
                 f"{input[0]}PR{-getattr(self, f'_ax{input[0]}_step'):.3f}\r".encode())
-        self.logger.info(f'relative moving, [direction, axis], {input}')
+        self.logger.info(f'relative moving, [axis, direction], {input}')
+
+
 
     @clear_error_wrap
     def move_relative_axis12(self, plus: bool = True):
-        self.logger.info(f'relative moving of axis 1 and 2')
-        # if plus:
-        #     self.dev_write(f"1PR{self._ax12_step:.3f}\r".encode())
-        #     self.dev_write(f"2PR{self._ax12_step:.3f}\r".encode())
-        # else:
-        #     self.dev_write(f"1PR{-self._ax12_step:.3f}\r".encode())
-        #     self.dev_write(f"2PR{-self._ax12_step:.3f}\r".encode())
+        if plus:
+            self.dev_write(f"1PR{self._ax12_step:.3f}\r".encode())
+            self.dev_write(f"2PR{self._ax12_step:.3f}\r".encode())
+        else:
+            self.dev_write(f"1PR{-self._ax12_step:.3f}\r".encode())
+            self.dev_write(f"2PR{-self._ax12_step:.3f}\r".encode())
+        self.logger.info(f'relative moving of axis 1 and axis 2: {plus=}, {self._ax12_step}')
 
     @clear_error_wrap
     def move_to_negative_limit(self, axis):
