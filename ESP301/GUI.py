@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 if True:
     from common.config import device_name_table, image_panel_config
     from common.TaurusGUI_Argparse import TaurusArgparse
+    from common.taurus_widget import RelativeMotion
     from Basler.GUI import BaslerGUI, create_app
 
 
@@ -20,78 +21,77 @@ def create_app():
         device_list = args.device
     else:
         device_list = [args.device]
-    basler_app = BaslerGUI(device_list, args.polling)
+    esp_app = BaslerGUI(device_list, args.polling)
 
     # get the configuration
     for d in device_list:
-        basler_app.add_device(d)
-        form_panel, form_layout = basler_app.create_blank_panel('v')
-        basler_app.gui.createPanel(form_panel, f'{d}_form')
-        basler_app.create_form_panel(form_layout, d, exclude=[
+        esp_app.add_device(d)
+        location_file_path = os.path.join(os.path.dirname(
+            __file__), f'{d.replace("/", "_")}_locations.txt')
+        if not os.path.isfile(location_file_path):
+            with open(location_file_path, 'w', newline='') as f:
+                f.write(
+                    "name positions\n")
+        with open(location_file_path, 'r',) as f:
+            tmp = []
+            next(f)
+            for line in f:
+                name, positions = [e for e in line.replace(
+                    '\t', ' ').strip().replace('"', '').split(' ') if e]
+                tmp.append(f"{name}: ({positions})")
+        # somehow Taurus.Device does not update the attribute
+        if tmp:
+            tango.DeviceProxy(d).user_defined_locations = tmp
+        else:
+            tango.DeviceProxy(d).load_server_side_list()
+        dropdown = {}
+        dropdown['current_location'] = (
+            (locations, locations.split(':')[0]) for locations in esp_app.attr_list[d]['dp'].user_defined_locations)
+        form_panel, form_layout = esp_app.create_blank_panel('v')
+        esp_app.gui.createPanel(form_panel, f'{d}_form')
+        esp_app.create_form_panel(form_layout, d,  dropdown=dropdown, exclude=[
             'ax1_step', 'ax2_step', 'ax3_step', 'ax4_step', 'ax5_step', 'ax6_step', 'ax7_step', 'ax8_step', 'ax9_step', 'ax12_step'], withButtons=False)
         command_list, modified_cmd_name, cmd_parameters = [], [], []
         command_with_axis_parameters = [
             'move_to_negative_limit', 'move_to_positive_limit', 'set_as_zero']
-        for idx, axis in enumerate([1,2,3,'12']):
-            if f'ax{axis}_step' in basler_app.attr_list[d]['attrs']:
-                one_relative, one_relative_layout = basler_app.create_blank_panel(
-                    VorH='h')
-                step_widget = TaurusReadWriteSwitcher()
-                r_widget = TaurusLabel()
-                w_widget = TaurusValueLineEdit()
+        if 'grating' in d:
+            relative_motion = RelativeMotion(esp_app, f'{d}/ax12_step', {
+                'name': 'move_relative_axis12',
+                'label': [f'ax12-', f'ax12+'],
+                'params': [[0], [1]]
+            })
 
-                step_widget.setReadWidget(r_widget)
-                step_widget.setWriteWidget(w_widget)
-                step_widget.model = f'{d}/ax{axis}_step'
-                if axis == "12":
-                    button1 = TaurusCommandButton(
-                        command='move_relative_axis12', parameters=[0]
-                    )
-                    button2 = TaurusCommandButton(
-                        command='move_relative_axis12', parameters=[1]
-                    )
-                else:
-                    button1 = TaurusCommandButton(
-                        command='move_relative_axis', parameters=[axis, 0]
-                    )
-                    button2 = TaurusCommandButton(
-                        command='move_relative_axis', parameters=[axis, 1]
-                    )
-                button1.setCustomText(f'ax{axis}-')
-                button1.setModel(d)
-                button2.setCustomText(f'ax{axis}+')
-                button2.setModel(d)
-
-                one_relative_layout.addWidget(button1)
-                one_relative_layout.addWidget(step_widget)
-                one_relative_layout.addWidget(button2)
-                form_layout.addWidget(one_relative)
-                if axis != "12":
-                    command_list.append([])
-                    modified_cmd_name.append([])
-                    cmd_parameters.append([])
-                    for cmd in command_with_axis_parameters:
-                        command_list[-1].append(cmd)
-                        modified_cmd_name[-1].append(f'ax{axis}_{cmd}')
-                        cmd_parameters[-1].append([axis])
-        for axis in range(len(command_list)):
-            basler_app.add_command(
-                form_layout, d, command_list=command_list[axis], modified_cmd_name=modified_cmd_name[axis], cmd_parameters=cmd_parameters[axis])
-        basler_app.add_command(
+            form_layout.addWidget(relative_motion.widget)
+        esp_app.add_command(
             form_layout, d, command_list=['stop'])
-        basler_app.add_command(
-            form_layout, d, command_list=['reset_to_TA1'])
-        # command_panel, command_layout = basler_app.create_blank_panel('v')
-        # basler_app.gui.createPanel(command_panel, f'{d}_commands')
-
-        # for ax in range(1, 4):
-        #     if not hasattr(basler_app.attr_list[d]['dp'], f'ax{ax}_position'):
-        #         continue
-        #     else:
-        #         basler_app.add_command(command_layout, d)
-    basler_app.gui.removePanel('Manual')
-    basler_app.gui.show()
-    basler_app.app.exec_()
+        relative_panel, relative_layout = esp_app.create_blank_panel('v')
+        esp_app.gui.createPanel(relative_panel, f'{d}_relative')
+        for idx, axis in enumerate([1, 2, 3]):
+            if f'ax{axis}_step' in esp_app.attr_list[d]['attrs']:
+                relative_motion = RelativeMotion(esp_app, f'{d}/ax{axis}_step', {
+                    'name': 'move_relative_axis',
+                    'label': [f'ax{axis}-', f'ax{axis}+'],
+                    'params': [[axis, 0], [axis, 1]]
+                })
+                relative_layout.addWidget(relative_motion.widget)
+                command_list.append([])
+                modified_cmd_name.append([])
+                cmd_parameters.append([])
+                for cmd in command_with_axis_parameters:
+                    command_list[-1].append(cmd)
+                    modified_cmd_name[-1].append(f'ax{axis}_{cmd}')
+                    cmd_parameters[-1].append([axis])
+        for axis in range(len(command_list)):
+            esp_app.add_command(
+                relative_layout, d, command_list=command_list[axis], modified_cmd_name=modified_cmd_name[axis], cmd_parameters=cmd_parameters[axis])
+        esp_app.add_command(
+            relative_layout, d, command_list=['stop'])
+        if 'turning_box3' in d:
+            esp_app.add_command(
+                relative_layout, d, command_list=['reset_to_TA1'])
+    esp_app.gui.removePanel('Manual')
+    esp_app.gui.show()
+    esp_app.app.exec_()
 
 
 if __name__ == "__main__":

@@ -7,12 +7,12 @@ import datetime
 import logging
 import serial
 import time
-import serial.tools.list_ports
+import os
 import platform
 from threading import Thread
 import functools
 import socket
-
+import sys
 # -----------------------------
 
 
@@ -84,7 +84,7 @@ class ESP301(Device):
                     port=self.com, baudrate=19200, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
             self.set_state(DevState.ON)
             self.should_stop = False
-            self._read_time = "N/A"
+            self._user_defined_locations = []
             self._user_defined_name = 'esp301'
             self._host_computer = platform.node()
             self._ax1_step, self._ax2_step, self._ax3_step, self._ax12_step, self._ax1_status, self._ax2_status, self._ax3_status = 0, 0, 0, 0, False, False, False
@@ -92,7 +92,7 @@ class ESP301(Device):
             self.unit_code = {0: "unknown",
                               1: "unknown", 2: "mm", 3: "um", 7: "deg"}
             if hasattr(self, "axis_property") and self.axis_property:
-                self.axis=[int(i) for i in self.axis_property.split(',')]
+                self.axis = [int(i) for i in self.axis_property.split(',')]
             else:
                 self.axis = []
                 for axis in range(1, 4):
@@ -138,15 +138,54 @@ class ESP301(Device):
     def read_host_computer(self):
         return self._host_computer
 
-    read_time = attribute(
-        label="read time",
-        dtype="str",
-        access=AttrWriteType.READ,
+    user_defined_locations = attribute(
+        label="user defined locations",
+        dtype=(str,),
+        max_dim_x=1000,
+        access=AttrWriteType.READ_WRITE,
     )
 
-    def read_read_time(self):
-        self._read_time = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
-        return self._read_time
+    def read_user_defined_locations(self):
+        return self._user_defined_locations
+
+    def write_user_defined_locations(self, value):
+        self.logger.info(f"Write user_defined_locations: {value}")
+        self._user_defined_locations = value
+
+    current_location = attribute(
+        label="current location",
+        dtype=str,
+        memorized=True,
+        access=AttrWriteType.READ_WRITE,
+        doc='Use dev.current_location = "location_name" to move to the predefined location'
+    )
+
+    def is_position_close(self, a: list[float], b: list[float], tol=1e-3):
+        return all(abs(x - y) < tol for x, y in zip(a, b))
+
+    def read_current_location(self):
+        self._current_location = 'Undefined'
+        try:
+            current_positions = [
+                getattr(self, f'_ax{axis}_position') for axis in self.axis]
+            for loc in self._user_defined_locations:
+                name, positions = loc.split(': ')
+                p = [float(i) for i in positions.strip('()').split(',')]
+                if self.is_position_close(current_positions, p):
+                    self._current_location = loc
+                    break
+        except Exception as e:
+            pass
+        return self._current_location
+
+    def write_current_location(self, value):
+        for loc in self._user_defined_locations:
+            name, positions = loc.split(': ')
+            if name == value:
+                target_positions = [float(i)
+                                    for i in positions.strip('()').split(',')]
+        for axis, target in zip(self.axis, target_positions):
+            getattr(self, f'write_ax{axis}_position')(self, target)
 
     def create_position_attribute(self, axis):
         self.logger.info(f'created axis{axis} position.')
@@ -172,9 +211,10 @@ class ESP301(Device):
     def create_write_position_function(self, axis):
         @ESP301.clear_error_wrap
         def write_position(self, attr):
-            value = attr.get_write_value()
-            setattr(self, f'_ax{axis}_position', value)
-            self.dev_write(f"{axis}PA{value:.3f}\r".encode())
+            if hasattr(attr, 'get_write_value()'):
+                attr = attr.get_write_value()
+            setattr(self, f'_ax{axis}_position', attr)
+            self.dev_write(f"{axis}PA{attr:.3f}\r".encode())
         self.logger.info(f'created write function for axis {axis} position')
         return write_position
 
@@ -295,7 +335,7 @@ class ESP301(Device):
             doc='steps for axis 1 and axis 2 are the same, so this attribute is used for both axes.',
         )
 
-            # self.add_command(cmd)
+        # self.add_command(cmd)
         if hasattr(self, "extra_script"):
             if self.extra_script == "turning_box_3":
                 # axis 1: -88 to 14 mm. axis 2: 0 to 135 deg. When axis 1 is in -88 to -46 (limit might be close to -30), axis 2 is free to rotate.
@@ -537,8 +577,6 @@ class ESP301(Device):
                 f"{input[0]}PR{-getattr(self, f'_ax{input[0]}_step'):.3f}\r".encode())
         self.logger.info(f'relative moving, [axis, direction], {input}')
 
-
-
     @clear_error_wrap
     def move_relative_axis12(self, plus: bool = True):
         if plus:
@@ -547,7 +585,8 @@ class ESP301(Device):
         else:
             self.dev_write(f"1PR{-self._ax12_step:.3f}\r".encode())
             self.dev_write(f"2PR{-self._ax12_step:.3f}\r".encode())
-        self.logger.info(f'relative moving of axis 1 and axis 2: {plus=}, {self._ax12_step}')
+        self.logger.info(
+            f'relative moving of axis 1 and axis 2: {plus=}, {self._ax12_step}')
 
     @clear_error_wrap
     def move_to_negative_limit(self, axis):
@@ -567,6 +606,32 @@ class ESP301(Device):
     @clear_error_wrap
     def reset_to_TA1(self):
         Thread(target=self.threaded_reset_to_TA1).start()
+
+    @command
+    def load_server_side_list(self):
+        '''
+        Load the server side saved list of user defined locations.
+        '''
+        try:
+            server_list_path = os.path.join(os.path.dirname(
+                __file__), f'{sys.argv[1]}_server_locations.txt')
+            if not os.path.isfile(server_list_path):
+                with open(server_list_path, 'w', newline='') as f:
+                    f.write(
+                        "name positions\n")
+            with open(server_list_path, 'r',) as f:
+                tmp = []
+                next(f)
+                for line in f:
+                    name, positions = [e for e in line.replace(
+                        '\t', ' ').strip().replace('"', '').split(' ') if e]
+                    tmp.append(f"{name}: ({positions})")
+                self._user_defined_locations = tmp
+                self.logger.info(
+                    f'Loaded server side saved user defined locations: {tmp}')
+        except Exception as e:
+            self.logger.info(
+                "Server side saved user defined locations file not found.")
 
     def wait_until_stop(self, axis=1):
         while True:
