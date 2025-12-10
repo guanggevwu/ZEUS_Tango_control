@@ -269,7 +269,7 @@ class DaqGUI:
                 [f'{self.python_path}', f'{script_path}', device_instance])
             self.selected_devices[device_name]['server_pid'] = p.pid
             self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_connecting.TButton'
-            self.insert_to_disabled(f'Connecting {device_name}...')
+            self.insert_to_disabled(f'Start device server {device_name}...')
             # Thread(target=self.check_device_server_status,
             #        args=(device_name,)).start()
             # self.check_device_server_status(device_name)

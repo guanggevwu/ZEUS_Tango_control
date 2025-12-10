@@ -263,7 +263,10 @@ def create_app():
         pass_config2 = {}
     if 'combination' in args.device[0] or len(args.device) > 1:
         basler_app.combined_panel(device_list, **pass_config2)
-    basler_app.gui.removePanel('Manual')
+    if len(device_list) > 1:
+        basler_app.gui.helpManualURI = "https://github.com/guanggevwu/ZEUS_Tango_control/blob/main/DAQ/README.md"
+    else:
+        basler_app.gui.removePanel('Manual')
     basler_app.gui.show()
     basler_app.app.exec_()
 
