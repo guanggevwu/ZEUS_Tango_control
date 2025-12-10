@@ -1,4 +1,4 @@
-Here is how to acquire data using the ZEUS DAQ app.
+Instructions on how to acquire data using the ZEUS DAQ app.
 
 # 1 Start the program
 
