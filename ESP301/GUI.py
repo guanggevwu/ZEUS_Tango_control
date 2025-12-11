@@ -50,7 +50,7 @@ def create_app():
         form_panel, form_layout = esp_app.create_blank_panel('v')
         esp_app.gui.createPanel(form_panel, f'{d}_form')
         esp_app.create_form_panel(form_layout, d,  dropdown=dropdown, exclude=[
-            'ax1_step', 'ax2_step', 'ax3_step', 'ax4_step', 'ax5_step', 'ax6_step', 'ax7_step', 'ax8_step', 'ax9_step', 'ax12_step'], withButtons=False)
+            'ax1_step', 'ax2_step', 'ax3_step', 'set_ax1_as', 'set_ax2_as', 'set_ax3_as', 'ax12_step'], withButtons=False)
         command_list, modified_cmd_name, cmd_parameters = [], [], []
         command_with_axis_parameters = [
             'move_to_negative_limit', 'move_to_positive_limit', 'set_as_zero']
@@ -81,6 +81,9 @@ def create_app():
                     command_list[-1].append(cmd)
                     modified_cmd_name[-1].append(f'ax{axis}_{cmd}')
                     cmd_parameters[-1].append([axis])
+                esp_app.add_label_widget(
+                    relative_layout, d, f'set_ax{axis}_as')
+
         for axis in range(len(command_list)):
             esp_app.add_command(
                 relative_layout, d, command_list=command_list[axis], modified_cmd_name=modified_cmd_name[axis], cmd_parameters=cmd_parameters[axis])

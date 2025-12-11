@@ -205,21 +205,51 @@ class ESP301(Device):
             self.dev_write(f"{axis}TP\r".encode())
             setattr(self, f'_ax{axis}_position', float(self.dev_read()))
             return getattr(self, f'_ax{axis}_position')
-        self.logger.info(f'created read function for axis {axis} position')
         return read_position
 
     def create_write_position_function(self, axis):
         @ESP301.clear_error_wrap
         def write_position(self, attr):
-            if hasattr(attr, 'get_write_value()'):
+            if hasattr(attr, 'get_write_value'):
                 attr = attr.get_write_value()
             setattr(self, f'_ax{axis}_position', attr)
             self.dev_write(f"{axis}PA{attr:.3f}\r".encode())
-        self.logger.info(f'created write function for axis {axis} position')
         return write_position
 
+    def create_set_as_attribute(self, axis):
+        attr = attribute(
+            name=f"set_ax{axis}_as",
+            label=f"set axis {axis} as",
+            dtype=str,
+            memorized=True,
+            access=AttrWriteType.READ_WRITE,
+        )
+        return attr
+
+    def create_read_set_as_function(self, axis):
+        def read_set_as(self, attr):
+            if hasattr(self, f'_ax{axis}_old'):
+                setattr(self, f'_set_ax{axis}_as',
+                        f"set {getattr(self, f'_ax{axis}_old'):.3f} to {getattr(self, f'_ax{axis}_position'):.3f}")
+            else:
+                setattr(self, f'_set_ax{axis}_as',
+                        "------------N/A-----------")
+            return getattr(self, f'_set_ax{axis}_as')
+        return read_set_as
+
+    def create_write_set_as_function(self, axis):
+        @ESP301.clear_error_wrap
+        def write_set_as(self, attr):
+            if hasattr(attr, 'get_write_value'):
+                attr = attr.get_write_value()
+            self.logger.info(f"{attr}")
+            setattr(self, f'_ax{axis}_old', getattr(
+                self, f'_ax{axis}_position'))
+            self.dev_write(f"{axis}DH{attr}\r".encode())
+            setattr(self, f'_ax{axis}_position', float(attr))
+        return write_set_as
+
     def create_ax_step_attribute(self, axis):
-        self.logger.info(f'created axis{axis} step.')
         attr = attribute(
             name=f"ax{axis}_step",
             label=f"axis {axis} step",
@@ -233,7 +263,6 @@ class ESP301(Device):
         return attr
 
     def create_ax_status(self, axis):
-        self.logger.info(f'created axis{axis} status.')
         attr = attribute(
             name=f"ax{axis}_status",
             label=f"axis {axis} status",
@@ -252,7 +281,6 @@ class ESP301(Device):
             elif reply == '0':
                 setattr(self, f'_ax{axis}_status', False)
             return getattr(self, f'_ax{axis}_status')
-        self.logger.info(f'created read function for axis {axis} status')
         return read_status
 
     def create_write_status_function(self, axis):
@@ -263,7 +291,6 @@ class ESP301(Device):
                 self.dev_write(f"{axis}MO\r".encode())
             else:
                 self.dev_write(f"{axis}MF\r".encode())
-        self.logger.info(f'created write function for axis {axis} status')
         return write_status
 
     def initialize_dynamic_attributes(self):
@@ -284,14 +311,6 @@ class ESP301(Device):
         cmd_move_to_positive_limit = command(
             f=self.move_to_positive_limit, dtype_in=int,)
 
-        cmd_set_as_zero = command(
-            f=self.set_as_zero, dtype_in=int,)
-
-        @command()
-        @ESP301.clear_error_wrap
-        def ax2_positive_limit(self):
-            self.dev_write(f"2MT+\r".encode())
-
         cmd_reset_to_TA1 = command(
             f=self.reset_to_TA1)
 
@@ -302,6 +321,13 @@ class ESP301(Device):
                 setattr(self, f'write_ax{axis}_position',
                         self.create_write_position_function(axis))
                 self.add_attribute(self.create_position_attribute(axis))
+
+                setattr(self, f'read_set_ax{axis}_as',
+                        self.create_read_set_as_function(axis))
+                setattr(self, f'write_set_ax{axis}_as',
+                        self.create_write_set_as_function(axis))
+                self.add_attribute(self.create_set_as_attribute(axis))
+
                 self.add_attribute(self.create_ax_step_attribute(axis))
                 setattr(self, f'read_ax{axis}_status',
                         self.create_read_status_function(axis))
@@ -310,7 +336,6 @@ class ESP301(Device):
                 self.add_attribute(self.create_ax_status(axis))
                 self.add_command(cmd_move_to_negative_limit)
                 self.add_command(cmd_move_to_positive_limit)
-                self.add_command(cmd_set_as_zero)
         # only for a special case
         ax12_distance = attribute(
             name="ax12_distance",
@@ -597,11 +622,6 @@ class ESP301(Device):
     def move_to_positive_limit(self, axis):
         self.logger.info(f'positive limit of axis {axis}')
         self.dev_write(f"{axis}MT+\r".encode())
-
-    @clear_error_wrap
-    def set_as_zero(self, axis):
-        self.logger.info(f'setting axis {axis} as zero')
-        self.dev_write(f"{axis}DH0\r".encode())
 
     @clear_error_wrap
     def reset_to_TA1(self):

@@ -65,7 +65,6 @@ class OwisPS(Device):
             setattr(self, f'_ax{axis}_position', 0)
             setattr(self, f'_ax{axis}_step', 0.0)
         self._user_defined_locations = []
-        self.set_status("PS90 device is connected.")
         self.set_state(DevState.ON)
 
     user_defined_name = attribute(
