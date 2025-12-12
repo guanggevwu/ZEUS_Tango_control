@@ -21,7 +21,7 @@ Blue background colors of the Device Buttons indicate the device servers are sta
 
 ## 2.3 Generate GUI for images
 
-Click "Device GUI" after the selected device servers have been started and a Taurus window will pop up. This windows usually has multiple panels stacked together.
+Click "Device GUI" after the device servers have been started successfully and a Taurus window will pop up. This window usually has multiple panels stacked together.
 
 ## 2.4 Bandwidth
 
@@ -43,7 +43,7 @@ Check this to save scalar data. Click "Metadata" button next to the option. In t
 
 # 4 Acquisition
 
-Here is a screenshot of the data format of the saved data. The "Save path" is set as "Z:\user_data\2025\Burger_2\TA_data\20251208\run1". In this directory, there are one folder for each device, one folder for stitched image, one "scalars.csv" file to store the scalar in Metadata Window and one "settings.json" for Basler camera settings.  
+Here is a screenshot of the data format of the saved data. The "Save path" is set as "Z:\user_data\2025\Burger_2\TA_data\20251208\run1". In this directory, there are one folder for each device, one folder for stitched image, one "scalars.csv" file to store the scalars checked in Metadata Window and one "settings.json" for Basler camera settings.  
 ![saved data format](images/data_format.png)  
 This is the format of the saved scalars. The columns "shot number" and "time" are appended to each row automatically.  
 ![scalar file format](images/scalar_csv.png)
@@ -53,7 +53,7 @@ The image naming format is "Shot[shot number]\_Time[].tiff", for example, "Shot2
 
 ## 4.2 Start End
 
-The Start shot number is defined here. This need to be changed when resuming from a shooting break. For example, during a break, we often want to click "Stop" to stop acquisition in case of unwanted triggers. When we resume data acquisition, we sometimes prefer to pick up the previous shot number instead starting from shot number 1 again. This affects the naming of the saved images.
+The Start shot number is defined here. This needs to be changed when resuming from a shooting break. For example, during a break, we often want to click "Stop" to stop acquisition in case of unwanted triggers. When we resume data acquisition, we sometimes prefer to pick up the previous shot number instead starting from shot number 1 again. This affects the naming of the saved images.
 The End shot number is useful when we use continuous triggering and when the laser side can't control the number of triggers sent.
 
 ## 4.3 Scan
@@ -71,8 +71,9 @@ Make sure you have gone over all the procedures above and read the logging infor
 
 # 5 Logging
 
-This frame shows important messages during data acquisition. For example,
+This frame shows important messages during data acquisition. Please always read them before every shot. For example,
 (1) A message "shot xx is completed". This message indicates we have acquired data from all selected devices. An audio also plays when this message shows up.
+(2) If we notice an inconsistency of shot numbers from various devices, we need to figure out the problems before proceeding. Two common cases indicating the inconsistency. First, when "shot xx is completed" doesn't show up or the audio doesn't play. This means some of the devices haven't been able to output the data. Second, some devices output more images than they should. This is often due to extra false triggers.
 
 # 6 Common operations on the Taurus GUI.
 
@@ -82,7 +83,7 @@ Here is a screenshot of an example.
 ![Taurus_GUI](images/Taurus_GUI.png)
 Common operations include:  
 (1) Move a panel to front.  
-(2) Drag a panel and move. Sometimes you need to first unlock view before dragging.  
+(2) Drag a panel and move. Sometimes you need to unlock view before dragging.  
 (3) Lock View. This option is under "view" in the menu. Select the option to toggle between lock and unlock.  
 (4) Set up the layout of multiple panels. In most cases, we would like to "tile all the panels" so that we can see all the panels without switching between them. To do this, we firstly need to expand the main window so that it has enough space to dock all the panels. Panels usually have a minimum size which is determined by the contents in it. Secondly, we drag a panel to the edge of the main windows and a "split view" frame should appear (if not, expand the main windows more). Release the dragging and the panel should be docked to the requested location. During this operation, we may need to use (1) (2) (3) mentioned above.  
 (5) Save/load the perspective. The options are under "view" in the menu. If we are satisfied with the layout, we probably want to save the perspective so that we can later load it without manually dragging panels again. We suggest saving multiple perspectives for various purposes. For example, we hope we can see all the details of the devices and change the device parameters before starting to shoot. But we might not want to see the form panel during shoot due to limited space on the screen. Name them with "all" and "image", or just "1" and "2".  
