@@ -21,9 +21,17 @@ from queue import Queue
 from tango import AttributeProxy
 from pypylon import pylon
 
-logging.basicConfig(
-    format="%(asctime)s %(message)s",
-    level=logging.INFO)
+logger = logging.getLogger(__name__)
+formatter = logging.Formatter("%(asctime)s %(message)s")
+
+# Streamheandler is not neede because logging.basicConfig is set in some imported files.
+logger.setLevel(logging.DEBUG)
+log_file_path = os.path.join(os.path.dirname(__file__), 'DAQ_GUI_log.txt')
+fh = logging.FileHandler(log_file_path)
+fh.setLevel(logging.INFO)
+fh.setFormatter(formatter)
+
+logger.addHandler(fh)
 
 
 class DaqGUI:
@@ -348,7 +356,7 @@ class DaqGUI:
                 os.kill(value['server_pid'], signal.SIGTERM)
             if 'client_pid' in value:
                 os.kill(value['client_pid'], signal.SIGTERM)
-        logging.info(
+        logger.info(
             "Terminate. All processes are killed.")
 
     def update_selected_devices(self, device_name, checkbox_var):
@@ -444,7 +452,7 @@ class DaqGUI:
             self.toggle_acquisition()
 
     def insert_to_disabled(self, text, tag_config=None):
-        logging.info(text)
+        logger.info(text)
         time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
         self.logging_q.put([time, text, tag_config])
 
