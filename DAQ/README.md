@@ -108,18 +108,25 @@ Right clicking the image opens a list of commands. A few common commands are:
 
 ## How to add a new device server?
 
-Run
+### Add device by following the prompt.
+
+run the batch file at: "...\ZEUS_Tango_control\shortcut\Windows\add_new_device.bat". Or run the command in the terminal:
 
 ```
 python "...\ZEUS_Tango_control\register\register_device_server.py"
 ```
 
-Or edit the script file by appending the reg_dict dictionary and then run
+We will need to provide "server/instance", "class" and "device name". For Basler cameras, a convention is enter the "user defined name" in the Pylon as the "device name" in Tango. For example, if you select "Basler" and enter "TA1-SomeCamera" as the name, automatically "server/instance" will be set to "Balser/TA1-SomeCamera", class will be set to "Basler" and device name will be set to "TA3/basler/TA1-SomeCamera". All these parameters should be case insensitive.
+
+### Pre-enter all the information and then add the device.
+
+Another way to add a new device server is provide the needed information first by editing the script file and appending the reg_dict dictionary. Then run
 
 ```
 python "...\ZEUS_Tango_control\register\script.py" add [the newly added dict key]
-
 ```
+
+The advantage here is we have many examples in the reg_dict dictionary.
 
 ## Can I start another client during shooting?
 

@@ -69,12 +69,14 @@ Right clicking the image opens a list of commands. A few common commands are:
 (4) "Contrast adjustment" starts a "Contrast adjustment tool" to the button of the coordinate system. Be sure the image object is selected. Two ways to adjust the contrast. (a) Use the two buttons to the right of this tool. They are used to automatically adjust the contrast. Mouseover to read details. (b) Drag the lower limit and upper limit to manually change the limits. The coordinate system (e.g., the x axis range) of the tool can be adjust by right clicking on the system.</p>
 <h1>7 FAQ</h1>
 <h2>How to add a new device server?</h2>
-<p>Run</p>
+<h3>Add device by following the prompt.</h3>
+<p>run the batch file at: "...\ZEUS_Tango_control\shortcut\Windows\add_new_device.bat". Or run the command in the terminal:</p>
 <p><code>python "...\ZEUS_Tango_control\register\register_device_server.py"</code></p>
-<p>Or edit the script file by appending the reg_dict dictionary and then run</p>
-<p>```
-python "...\ZEUS_Tango_control\register\script.py" add [the newly added dict key]</p>
-<p>```</p>
+<p>We will need to provide "server/instance", "class" and "device name". For Basler cameras, a convention is enter the "user defined name" in the Pylon as the "device name" in Tango. For example, if you select "Basler" and enter "TA1-SomeCamera" as the name, automatically "server/instance" will be set to "Balser/TA1-SomeCamera", class will be set to "Basler" and device name will be set to "TA3/basler/TA1-SomeCamera". All these parameters should be case insensitive.</p>
+<h3>Pre-enter all the information and then add the device.</h3>
+<p>Another way to add a new device server is provide the needed information first by editing the script file and appending the reg_dict dictionary. Then run</p>
+<p><code>python "...\ZEUS_Tango_control\register\script.py" add [the newly added dict key]</code></p>
+<p>The advantage here is we have many examples in the reg_dict dictionary.</p>
 <h2>Can I start another client during shooting?</h2>
 <p>Yes. You can start multiple clients on multiple computers. This is useful<br />
 (1) when you are not the one who is operating the data acquisition computer but you still want to see the image closely in real time.
