@@ -2,7 +2,10 @@ Instructions on how to acquire data using the ZEUS DAQ app.
 
 # 1 Start the program
 
-To start the DAQ app, run the batch file at: "...\ZEUS_Tango_control\shortcut\Windows\DAQ.bat". A main "ZEUS DAQ GUI" window will pop up.
+To start the DAQ app, run the batch file at:  
+"...\ZEUS_Tango_control\shortcut\Windows\DAQ.bat".  
+A main "ZEUS DAQ GUI" window will pop up.  
+![main_GUI](images/main_GUI.png)
 
 # 2 Devices
 
@@ -25,7 +28,7 @@ Click "Device GUI" after the device servers have been started successfully and a
 
 ## 2.4 Bandwidth
 
-When we have multiple device servers selected, it is better to assign bandwidth for each device. Only the bandwidths of the Basler cameras need to be adjusted here. However, a small portion of the Basler cameras don't support the API called here and their bandwidth values are shown as -1. A common practice is to enter 80 in the "Allowed bandwidth" field and then click "Optimized". Sometimes we need to click "Optimized" twice to achieve the same "Resulting fps". Since the theoretical bandwidth is around 120 MB/s, we still leave 40 MB/s for other cameras (Andor, Allied Vision) and other applications (browsers, Remote Desktop, etc.). We probably should also use Pylon Viewer to assign bandwidth for the cameras that show "-1" bandwidth manually.
+When we have multiple device servers selected, it is better to assign the bandwidth for each device. Only the bandwidths of the Basler cameras need to be adjusted here. However, a small portion of the Basler cameras don't support the API called here and their bandwidth values are shown as -1. A common practice is to enter 80 in the "Allowed bandwidth" field and then click "Optimized". Sometimes we need to click "Optimized" twice to achieve the same "Resulting fps". Since the theoretical bandwidth is around 120 MB/s, we still leave 40 MB/s for other cameras (Andor, Allied Vision) and other applications (browsers, Remote Desktop, etc.). We probably should also use Pylon Viewer to assign bandwidth for the cameras that show "-1" bandwidth manually.
 
 # 3 Option
 
