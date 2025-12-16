@@ -52,7 +52,7 @@ class DaqGUI:
         self.client_GUI = dict()
         self.acquisition = {'status': False, 'is_completed': False}
 
-        root.title(f"ZEUS DAQ GUI")
+        root.title(f"ZEUS DAQ APP")
 
         s = ttk.Style()
         s.theme_use('alt')

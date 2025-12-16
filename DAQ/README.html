@@ -1,6 +1,9 @@
 <p>Instructions on how to acquire data using the ZEUS DAQ app.</p>
 <h1>1 Start the program</h1>
-<p>To start the DAQ app, run the batch file at: "...\ZEUS_Tango_control\shortcut\Windows\DAQ.bat". A main "ZEUS DAQ GUI" window will pop up.</p>
+<p>To start the DAQ app, run the batch file at:<br />
+"...\ZEUS_Tango_control\shortcut\Windows\DAQ.bat".<br />
+A main "ZEUS DAQ GUI" window will pop up.<br />
+<img alt="main_GUI" src="images/main_GUI.png" /></p>
 <h1>2 Devices</h1>
 <h2>2.1 Select the device servers</h2>
 <p>To select the device servers, click "Select" button. Only the devices that output image/array type data are shown in the pop-up windows, such as cameras, oscilloscope, spectrometers. If some of your devices don't show up here, you can add them to the database (See <a href="#7-faq">FAQ</a> section).<br />
@@ -14,14 +17,15 @@ Blue background colors of the Device Buttons indicate the device servers are sta
 <h2>2.3 Generate GUI for images</h2>
 <p>Click "Device GUI" after the device servers have been started successfully and a Taurus window will pop up. This window usually has multiple panels stacked together.</p>
 <h2>2.4 Bandwidth</h2>
-<p>When we have multiple device servers selected, it is better to assign bandwidth for each device. Only the bandwidths of the Basler cameras need to be adjusted here. However, a small portion of the Basler cameras don't support the API called here and their bandwidth values are shown as -1. A common practice is to enter 80 in the "Allowed bandwidth" field and then click "Optimized". Sometimes we need to click "Optimized" twice to achieve the same "Resulting fps". Since the theoretical bandwidth is around 120 MB/s, we still leave 40 MB/s for other cameras (Andor, Allied Vision) and other applications (browsers, Remote Desktop, etc.). We probably should also use Pylon Viewer to assign bandwidth for the cameras that show "-1" bandwidth manually.</p>
+<p>When we have multiple device servers selected, it is better to assign the bandwidth for each device. Only the bandwidths of the Basler cameras need to be adjusted here. However, a small portion of the Basler cameras don't support the API called here and their bandwidth values are shown as -1. A common practice is to enter 80 in the "Allowed bandwidth" field and then click "Optimized". Sometimes we need to click "Optimized" twice to achieve the same "Resulting fps". Since the theoretical bandwidth is around 120 MB/s, we still leave 40 MB/s for other cameras (Andor, Allied Vision) and other applications (browsers, Remote Desktop, etc.). We probably should also use Pylon Viewer to assign bandwidth for the cameras that show "-1" bandwidth manually.</p>
 <h1>3 Option</h1>
 <h2>3.1 Save background images</h2>
 <p>We usually don't check this. This sends a software trigger to the cameras. It has some limitations.</p>
 <h2>3.2 save an extra image by stitching</h2>
 <p>We usually check this. The DAQ will save an extra image by stitching the images from all devices. Each small image in this big image is stretched to fit into the tile. The pixel value is changed to enhance the contrast, which means we can't determine if an image is the saturated from the stitched image. The purpose of the stitched image is only for quick review.</p>
 <h2>3.3 Save Metadata</h2>
-<p>Check this to save scalar data. Click "Metadata" button next to the option. In the pop-up Metadata Window, select scalars you would like to save along with the images. Click "validate" to validate the scalars are accessible. The scalar data are saved in a ".csv" file and the file is in the same directory level with the camera folder level. Refer to screenshot in the <a href="#4-acquisition">Acquisition</a> section for details.</p>
+<p>Check this to save scalar data. Click "Metadata" button next to the option. In the pop-up Metadata Window, select scalars you would like to save along with the images. Click "validate" to validate the scalars are accessible. The scalar data are saved in a ".csv" file and the file is in the same directory level with the camera folder level. Refer to screenshot in the <a href="#4-acquisition">Acquisition</a> section for details.
+<img alt="metadata_window" src="images/metadata.png" /></p>
 <h1>4 Acquisition</h1>
 <p>Here is a screenshot of the data format of the saved data. The "Save path" is set as "Z:\user_data\2025\Burger_2\TA_data\20251208\run1". In this directory, there are one folder for each device, one folder for stitched image, one "scalars.csv" file to store the scalars checked in Metadata Window and one "settings.json" for Basler camera settings.<br />
 <img alt="saved data format" src="images/data_format.png" /><br />

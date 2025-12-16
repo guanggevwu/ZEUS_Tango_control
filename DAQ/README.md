@@ -43,6 +43,7 @@ We usually check this. The DAQ will save an extra image by stitching the images 
 ## 3.3 Save Metadata
 
 Check this to save scalar data. Click "Metadata" button next to the option. In the pop-up Metadata Window, select scalars you would like to save along with the images. Click "validate" to validate the scalars are accessible. The scalar data are saved in a ".csv" file and the file is in the same directory level with the camera folder level. Refer to screenshot in the [Acquisition](#4-acquisition) section for details.
+![metadata_window](images/metadata.png)
 
 # 4 Acquisition
 
