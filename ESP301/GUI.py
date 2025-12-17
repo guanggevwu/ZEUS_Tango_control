@@ -27,7 +27,7 @@ def create_app():
     for d in device_list:
         esp_app.add_device(d)
         location_file_path = os.path.join(os.path.dirname(
-            __file__), f'{d.replace("/", "_")}_locations.txt')
+            __file__), f'{d.replace("/", "_")}_client_locations.txt')
         if not os.path.isfile(location_file_path):
             with open(location_file_path, 'w', newline='') as f:
                 f.write(
@@ -36,17 +36,20 @@ def create_app():
             tmp = []
             next(f)
             for line in f:
-                name, positions = [e for e in line.replace(
-                    '\t', ' ').strip().replace('"', '').split(' ') if e]
-                tmp.append(f"{name}: ({positions})")
+                if line.strip():
+                    name, positions = [e for e in line.replace(
+                        '\t', ' ').strip().replace('"', '').split(' ') if e]
+                    tmp.append(f"{name}: ({positions})")
         # somehow Taurus.Device does not update the attribute
-        if tmp:
+        if tmp and tango.DeviceProxy(d).saved_location_source == 'client':
             tango.DeviceProxy(d).user_defined_locations = tmp
         else:
             tango.DeviceProxy(d).load_server_side_list()
         dropdown = {}
         dropdown['current_location'] = (
             (locations, locations.split(':')[0]) for locations in esp_app.attr_list[d]['dp'].user_defined_locations)
+        dropdown['saved_location_source'] = (
+            ('server', 'server'),  ('client', 'client'))
         form_panel, form_layout = esp_app.create_blank_panel('v')
         esp_app.gui.createPanel(form_panel, f'{d}_form')
         esp_app.create_form_panel(form_layout, d,  dropdown=dropdown, exclude=[

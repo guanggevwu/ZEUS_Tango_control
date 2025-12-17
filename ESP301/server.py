@@ -106,6 +106,8 @@ class ESP301(Device):
                     int(self.dev_read())])
                 self.dev_write(f"{axis}ZS00H\r".encode())
             self._error_message = None
+            self._saved_location_source = 'client'
+
             # print(
             #     f'ESP301 is connected. Model: {self._model}. Serial number: {self._serial_number}')
             self.set_status("ESP301 device is connected.")
@@ -134,6 +136,23 @@ class ESP301(Device):
         dtype="str",
         access=AttrWriteType.READ,
     )
+
+    saved_location_source = attribute(
+        label="saved location source",
+        dtype="str",
+        memorized=True,
+        hw_memorized=True,
+        access=AttrWriteType.READ_WRITE,
+        doc='Require restart client GUI to take effect in the GUI. If set to "server", use the "...server_locations.txt" on the server computer. If set to "client", use "...client_locations.txt" on the client computer. Only works when the txt files are not empty. For example, if the attribute is set to "client" but the "...client_locations.txt" is empty, the server side saved locations will still be used.'
+    )
+
+    def read_saved_location_source(self):
+        return self._saved_location_source
+
+    def write_saved_location_source(self, value):
+        if value == "server":
+            self.load_server_side_list()
+        self._saved_location_source = value
 
     def read_host_computer(self):
         return self._host_computer
@@ -643,15 +662,20 @@ class ESP301(Device):
                 tmp = []
                 next(f)
                 for line in f:
-                    name, positions = [e for e in line.replace(
-                        '\t', ' ').strip().replace('"', '').split(' ') if e]
-                    tmp.append(f"{name}: ({positions})")
-                self._user_defined_locations = tmp
-                self.logger.info(
-                    f'Loaded server side saved user defined locations: {tmp}')
+                    if line.strip():
+                        name, positions = [e for e in line.replace(
+                            '\t', ' ').strip().replace('"', '').split(' ') if e]
+                        tmp.append(f"{name}: ({positions})")
+                if tmp:
+                    self._user_defined_locations = tmp
+                    self.logger.info(
+                        f'Loaded server side saved user defined locations: {tmp}')
+                else:
+                    self.logger.info(
+                        "No server side saved user defined locations found.")
         except Exception as e:
             self.logger.info(
-                "Server side saved user defined locations file not found.")
+                "Server side saved user defined locations file is not loaded successfully. Reason: {e}")
 
     def wait_until_stop(self, axis=1):
         while True:

@@ -8,6 +8,7 @@ import time
 import platform
 from ctypes import windll, c_double
 import os
+import sys
 # -----------------------------
 
 
@@ -58,13 +59,13 @@ class OwisPS(Device):
                 self.logger.info(
                     f"Could NOT load axis parameter file: {pn}.owd for axis {axis}! Error code: {result}")
 
-        # self._read_time = "N/A"
         self._user_defined_name = 'ps90_23070207'
         self._host_computer = platform.node()
         for axis in self.axis.split(','):
-            setattr(self, f'_ax{axis}_position', 0)
+            setattr(self, f'_ax{axis}_position', -99999.0)
             setattr(self, f'_ax{axis}_step', 0.0)
         self._user_defined_locations = []
+        self._saved_location_source = 'client'
         self.set_state(DevState.ON)
 
     user_defined_name = attribute(
@@ -100,6 +101,23 @@ class OwisPS(Device):
     def read_read_time(self):
         self._read_time = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
         return self._read_time
+
+    saved_location_source = attribute(
+        label="saved location source",
+        dtype="str",
+        memorized=True,
+        hw_memorized=True,
+        access=AttrWriteType.READ_WRITE,
+        doc='Require restart client GUI to take effect in the GUI. If set to "server", use the "...server_locations.txt" on the server computer. If set to "client", use "...client_locations.txt" on the client computer. Only works when the txt files are not empty. For example, if the attribute is set to "client" but the "...client_locations.txt" is empty, the server side saved locations will still be used.'
+    )
+
+    def read_saved_location_source(self):
+        return self._saved_location_source
+
+    def write_saved_location_source(self, value):
+        if value == "server":
+            self.load_server_side_list()
+        self._saved_location_source = value
 
     user_defined_locations = attribute(
         label="user defined locations",
@@ -160,8 +178,13 @@ class OwisPS(Device):
                     self.create_read_ax_step_function(axis))
             setattr(self, f'write_ax{axis}_step',
                     self.create_write_ax_step_function(axis))
+            setattr(self, f'read_set_ax{axis}_as',
+                    self.create_read_set_as_function(axis))
+            setattr(self, f'write_set_ax{axis}_as',
+                    self.create_write_set_as_function(axis))
             self.add_attribute(self.create_position_attribute(axis))
             self.add_attribute(self.create_ax_step_attribute(axis))
+            self.add_attribute(self.create_set_as_attribute(axis))
 
             # self.add_command(self.create_command_member(axis))
             # self.add_command(self.create_init_axis_function(axis))
@@ -223,6 +246,38 @@ class OwisPS(Device):
             setattr(self, f'_ax{axis}_step', attr.get_write_value())
         return write_ax_step
 
+    def create_set_as_attribute(self, axis):
+        attr = attribute(
+            name=f"set_ax{axis}_as",
+            label=f"set axis {axis} as",
+            dtype=str,
+            memorized=True,
+            access=AttrWriteType.READ_WRITE,
+        )
+        return attr
+
+    def create_read_set_as_function(self, axis):
+        def read_set_as(self, attr):
+            if hasattr(self, f'_ax{axis}_old'):
+                setattr(self, f'_set_ax{axis}_as',
+                        f"set {getattr(self, f'_ax{axis}_old'):.3f} to {getattr(self, f'_ax{axis}_position'):.3f}")
+            else:
+                setattr(self, f'_set_ax{axis}_as',
+                        "------------N/A-----------")
+            return getattr(self, f'_set_ax{axis}_as')
+        return read_set_as
+
+    def create_write_set_as_function(self, axis):
+        def write_set_as(self, attr):
+            if hasattr(attr, 'get_write_value'):
+                attr = attr.get_write_value()
+            self.logger.info(f"{attr}")
+            setattr(self, f'_ax{axis}_old', getattr(
+                self, f'_ax{axis}_position'))
+            error = self.dev.PS90_SetPositionEx(1, axis, c_double(float(attr)))
+            setattr(self, f'_ax{axis}_position', float(attr))
+        return write_set_as
+
     @command
     def stop_all_axis(self):
         self.logger.info(f"stop all axis")
@@ -258,6 +313,37 @@ class OwisPS(Device):
             self.dev.PS90_MoveEx(
                 1, int(input[0]), c_double(-getattr(self, f'_ax{input[0]}_step')), 1)
         self.logger.info(f'relative moving, [direction, axis], {input}')
+
+    @command
+    def load_server_side_list(self):
+        '''
+        Load the server side saved list of user defined locations.
+        '''
+        try:
+            server_list_path = os.path.join(os.path.dirname(
+                __file__), f'{sys.argv[1]}_server_locations.txt')
+            if not os.path.isfile(server_list_path):
+                with open(server_list_path, 'w', newline='') as f:
+                    f.write(
+                        "name positions\n")
+            with open(server_list_path, 'r',) as f:
+                tmp = []
+                next(f)
+                for line in f:
+                    if line.strip():
+                        name, positions = [e for e in line.replace(
+                            '\t', ' ').strip().replace('"', '').split(' ') if e]
+                        tmp.append(f"{name}: ({positions})")
+                if tmp:
+                    self._user_defined_locations = tmp
+                    self.logger.info(
+                        f'Loaded server side saved user defined locations: {tmp}')
+                else:
+                    self.logger.info(
+                        "No server side saved user defined locations found.")
+        except Exception as e:
+            self.logger.info(
+                "Server side saved user defined locations file is not loaded successfully. Reason: {e}")
 
 
 if __name__ == "__main__":
