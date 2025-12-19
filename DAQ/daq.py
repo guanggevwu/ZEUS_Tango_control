@@ -360,6 +360,13 @@ class Daq:
                     f"Shot {self.current_shot_for_all_cam-1} is completed.", 'green_text')
                 playsound(os.path.join(os.path.dirname(__file__), 'media',
                           'sound', 'shot_completion_1.mp3'), block=False)
+                # send plasma mirror ready signal
+                if not self.GUI.options['use_plasma_mirror']:
+                    self.GUI.send_message_to_laser_side('TA2_ready')
+                # remove highlight in scan module window
+                if self.GUI.scan_window.winfo_exists() and self.GUI.scan_window.tree.tag_has(f'#{self.current_shot_for_all_cam-1}'):
+                    self.GUI.scan_window.tree.tag_configure(
+                        f'#{self.current_shot_for_all_cam-1}', background='white')
                 # save scala data
                 if self.GUI.options["save_metadata"]:
                     self.csv_header = ['shot_number', 'time']
@@ -416,9 +423,6 @@ class Daq:
         if self.GUI.scan_window.winfo_exists():
             self.GUI.scan_window.tree.tag_configure(
                 f'#{shot_number}', background='yellow')
-            if self.GUI.scan_window.tree.tag_has(f'#{shot_number-1}'):
-                self.GUI.scan_window.tree.tag_configure(
-                    f'#{shot_number-1}', background='white')
 
     def save_scalars(self, shot_number,):
         self.csv_header.extend(self.scalars.keys())

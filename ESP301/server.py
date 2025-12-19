@@ -40,7 +40,7 @@ class ESP301(Device):
         '''
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
-            self._error_message = None
+            self._error_message = ''
             self.should_stop = False
             func(self, *args, **kwargs)
         return wrapper
@@ -105,11 +105,11 @@ class ESP301(Device):
                 setattr(self, f"_axis{axis}_unit", self.unit_code[
                     int(self.dev_read())])
                 self.dev_write(f"{axis}ZS00H\r".encode())
-            self._error_message = None
+            self._error_message = ''
             self._saved_location_source = 'client'
-
-            # print(
-            #     f'ESP301 is connected. Model: {self._model}. Serial number: {self._serial_number}')
+            if self.extra_script == "plasma_mirror":
+                self.laser_socket = socket.socket(
+                    socket.AF_INET, socket.SOCK_DGRAM)
             self.set_status("ESP301 device is connected.")
         except:
             print("Could NOT connect to  ESP device.")
@@ -231,8 +231,13 @@ class ESP301(Device):
         def write_position(self, attr):
             if hasattr(attr, 'get_write_value'):
                 attr = attr.get_write_value()
-            setattr(self, f'_ax{axis}_position', attr)
             self.dev_write(f"{axis}PA{attr:.3f}\r".encode())
+            if self.extra_script == "plasma_mirror" and attr != getattr(self, f'_ax{axis}_position'):
+                # The query for message starts before the move is finished so that the NO ERROR message might not be updated yet. Adding a small delay here. With the added delay, the error message may still not be updated but it allows 0.1 second for the stage to move a little bit, which might be good for plasma mirror.
+                time.sleep(0.1)
+                if "NO ERROR" in self.read_message():
+                    self.send_message_to_laser_side()
+            setattr(self, f'_ax{axis}_position', attr)
         return write_position
 
     def create_set_as_attribute(self, axis):
@@ -542,7 +547,7 @@ class ESP301(Device):
         label="error message",
         dtype="str",
         access=AttrWriteType.READ,
-        doc="refer to error appendix: https://www.newport.com/medias/sys_master/images/images/hda/h3e/9117547069470/ESP301-User-s-Manual.pdf"
+        doc="refer to error appendix: https://www.newport.com/medias/sys_master/images/images/hda/h3e/9117547069470/ESP301-User-s-Manual.pdf. "
     )
 
     def read_error_message(self):
@@ -611,6 +616,7 @@ class ESP301(Device):
             self.dev_write(f"{a}ST\r".encode())
         self.should_stop = True
 
+    @clear_error_wrap
     @command()
     def move_relative_axis(self, input: list[int]):
         if input[1]:
@@ -620,6 +626,10 @@ class ESP301(Device):
             self.dev_write(
                 f"{input[0]}PR{-getattr(self, f'_ax{input[0]}_step'):.3f}\r".encode())
         self.logger.info(f'relative moving, [axis, direction], {input}')
+        if self.extra_script == "plasma_mirror":
+            time.sleep(0.1)
+            if "NO ERROR" in self.read_message():
+                self.send_message_to_laser_side()
 
     @clear_error_wrap
     def move_relative_axis12(self, plus: bool = True):
@@ -703,6 +713,13 @@ class ESP301(Device):
         self.dev_write(f"2DH211.05\r".encode())
         self.dev_write(f"1PA{self.TA1[0]:.3f}\r".encode())
         self.dev_write(f"2PA{self.TA1[1]:.3f}\r".encode())
+
+    def send_message_to_laser_side(self):
+        message = f'{datetime.datetime.now()}: TA2_ready'
+        self.laser_socket.sendto(
+            message.encode(), ("192.168.131.71", 5005))
+        self.logger.info(
+            f"{datetime.datetime.now()}: send TA2_ready to laser side")
 
 
 if __name__ == "__main__":

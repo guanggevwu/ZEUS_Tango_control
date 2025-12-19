@@ -1,3 +1,4 @@
+import socket
 from tkinter import *
 from tkinter import messagebox
 from tkinter import ttk
@@ -120,13 +121,13 @@ class DaqGUI:
             root, text='Options', padding=pad_widget, style='Sty1.TLabelframe')
         self.frame2.grid(column=0, row=1, sticky=(N, W, E, S))
 
-        self.frame2_checkbutton_content = {'background_image': {
-            'text': 'Save background images', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'save_metadata': {'text': 'Save metadata', 'init_status': False}}
+        self.frame2_checkbutton_content = {'use_plasma_mirror': {
+            'text': 'Use plasma mirror (only for TA2)', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'save_metadata': {'text': 'Save metadata', 'init_status': False}}
         item_per_column = 2
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
             checkbox_var = BooleanVar(value=value['init_status'])
             checkbox = ttk.Checkbutton(self.frame2, text=value['text'],
-                                       variable=checkbox_var, style='Sty1.TCheckbutton')
+                                       variable=checkbox_var, style='highlight.TCheckbutton')
             if idx == len(self.frame2_checkbutton_content) - 1:
                 checkbox.grid(
                     column=0, row=int((idx-1)/item_per_column)+1, sticky=W)
@@ -193,31 +194,42 @@ class DaqGUI:
         self.pad_space(self.frame3)
         self.pad_space(self.frame4)
 
-        self.init_settings()
         Thread(target=self.logger_thread, daemon=True).start()
+        self.init_settings()
+        self.laser_socket = socket.socket(
+            socket.AF_INET, socket.SOCK_DGRAM)
 
     def init_settings(self):
         # self.selected_devices structure. self.selected_devices = {'[device name]': {'checkbutton': ttk.Button, 'server_pid': [int/string?], 'connection_try_times': [int], 'tango_dp': tango.DeviceProxy}, }
         self.init_file_path = os.path.join(
             os.path.dirname(__file__), 'init.json')
-        if os.path.isfile(self.init_file_path) and os.stat(self.init_file_path).st_size:
-            with open(self.init_file_path) as jsonfile:
-                self.init_dict = json.load(jsonfile)
-                self.selected_devices = self.init_dict['selected_devices'] if 'selected_devices' in self.init_dict else dict(
-                )
-                self.checked_savable_attributes = self.init_dict[
-                    'checked_savable_attributes'] if 'checked_savable_attributes' in self.init_dict else []
-                self.options = self.init_dict['options'] if 'options' in self.init_dict and self.init_dict['options'] is not None else dict(
-                )
-                self.path_var.set(
-                    self.init_dict['save_path']) if "save_path" in self.init_dict else ''
-
-                for key, value in self.options.items():
-                    if key in self.frame2_checkbutton_content:
-                        self.frame2_checkbutton_content[key]['var'].set(value)
+        if not os.path.isfile(self.init_file_path):
+            with open(self.init_file_path, 'w') as jsonfile:
+                json.dump({}, jsonfile)
         else:
-            self.selected_devices = dict()
-            self.options = None
+            try:
+                with open(self.init_file_path) as jsonfile:
+                    self.init_dict = json.load(jsonfile)
+                    self.selected_devices = self.init_dict['selected_devices'] if 'selected_devices' in self.init_dict else dict(
+                    )
+                    self.checked_savable_attributes = self.init_dict[
+                        'checked_savable_attributes'] if 'checked_savable_attributes' in self.init_dict else []
+                    self.options = self.init_dict['options'] if 'options' in self.init_dict and self.init_dict['options'] is not None else dict(
+                    )
+                    self.options['use_plasma_mirror'] = True
+                    self.path_var.set(
+                        self.init_dict['save_path']) if "save_path" in self.init_dict else ''
+
+                    for key, value in self.options.items():
+                        if key in self.frame2_checkbutton_content:
+                            self.frame2_checkbutton_content[key]['var'].set(
+                                value)
+            except Exception as e:
+                logger.error(
+                    f"Error in loading init.json file. Exception: {type(e)}, {e}")
+                self.selected_devices = dict()
+                self.checked_savable_attributes = []
+                self.options = dict()
         # only applied to basler cameras
         self.serial_number_vs_friendly_name = dict()
         for device in pylon.TlFactory.GetInstance().EnumerateDevices():
@@ -225,6 +237,16 @@ class DaqGUI:
             )] = f'{device.GetUserDefinedName()}({device.GetSerialNumber()})'
         for key in self.selected_devices:
             self.update_selected_devices(key, BooleanVar(value=True))
+
+    def send_message_to_laser_side(self, message: str):
+        '''
+        Send a message to the laser side via UDP socket. This function is called when the acquisition is started. If use plasma mirror is not checked, it will send 'TA2_ready' message. If use plasma mirror is checked, it will send 'TA2_not_ready' message.
+        The plasma mirror stage device server will send 'TA2_ready' message when the stage moves, too.
+        '''
+        message = f'{datetime.now()}: {message}'
+        self.laser_socket.sendto(
+            message.encode(), ("192.168.131.71", 5005))
+        self.insert_to_disabled(f'send "{message}" to laser side')
 
     def pad_space(self, frame):
         for child in frame.winfo_children():
@@ -356,6 +378,7 @@ class DaqGUI:
                 os.kill(value['server_pid'], signal.SIGTERM)
             if 'client_pid' in value:
                 os.kill(value['client_pid'], signal.SIGTERM)
+        self.laser_socket.close()
         logger.info(
             "Terminate. All processes are killed.")
 
@@ -414,36 +437,24 @@ class DaqGUI:
 
     def start_acquisition(self):
         '''Start the acquisition in a new thread. It will create a Daq object and call its acquisition method. It will also save the options and selected devices to a json file. It is called by the toggle_acquisition function.'''
-        self.options = dict()
         for opt in self.frame2_checkbutton_content.keys():
             self.options[opt] = self.frame2_checkbutton_content[opt]['var'].get()
         with open(self.init_file_path, 'w') as jsonfile:
             json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get(), "checked_savable_attributes": self.checked_savable_attributes},
                       jsonfile)
+        # remove highlight in scan module before starting acquisition
+        if hasattr(self, "scan_window") and self.scan_window.winfo_exists():
+            if self.scan_window.tree.tag_has(f'#{self.current_shot_number}'):
+                self.scan_window.tree.tag_configure(
+                    f'#{self.current_shot_number}', background='white')
         # if the checkbox is checked, then we use the config saved in config.py file and we pass None here. If it is unchecked, then we pass the basic configuration and ignore the configuration in the file.
         self.daq = Daq(self.selected_devices,
                        dir=self.path_var.get(), thread_event=self.my_event, check_exist=False, GUI=self)
-        '''
-        # dont confirm at the moment. Maybe add it back after adding the file format setting.
-        self.Yes_for_all = False
-        for c in self.selected_devices:
-            cam_dir = os.path.join(
-                self.path_var.get(), c.split('/')[-1])
-            if not self.Yes_for_all and cam_dir:
-                files_num = sum([len(files)
-                                for r, d, files in os.walk(cam_dir)])
-                if files_num:
-                    answer = messagebox.askyesno(
-                        message=f'{cam_dir} has {files_num} files in it. Are you sure you want to overwrite?', icon='question', title='Install')
-                    if not answer:
-                        self.acquisition['status'] = False
-                        self.acquisition['button']['style'] = 'Sty3_start.TButton'
-                        self.acquisition['button']['text'] = 'Start'
-                        return
-        '''
         self.daq.set_camera_configuration()
-        if self.options['background_image']:
-            self.daq.take_background(stitch=self.options['stitch'])
+        if not self.options['use_plasma_mirror']:
+            self.send_message_to_laser_side('TA2_ready')
+        else:
+            self.send_message_to_laser_side('TA2_not_ready')
         scan_table = self.scan_window.scan_table if hasattr(
             self, 'scan_window') else None
         self.daq.acquisition(
@@ -741,7 +752,7 @@ class ScanWindow(Toplevel):
         self.save_scan_table_to_file()
 
     def save_scan_table_to_file(self):
-        with open(self.scan_table_file, 'w') as csvfile:
+        with open(self.scan_table_file, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(list(self.scan_table.keys()))
             writer.writerows([[value[idx] for value in self.scan_table.values()]
