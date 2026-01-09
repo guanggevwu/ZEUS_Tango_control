@@ -39,6 +39,15 @@ class GentecEO(Device):
         elif self.friendly_name == "QE195":
             filtered_ports = [
                 p for p in filtered_ports if p.serial_number == '27869B461E002000']
+        elif self.friendly_name == "MA2_QE95LP-H-MB-QED-INT":
+            filtered_ports = [
+                p for p in filtered_ports if p.serial_number == 'ECB51B5127002800']  # com 9
+        elif self.friendly_name == "MA2_north":
+            filtered_ports = [
+                p for p in filtered_ports if p.serial_number == 'E932816E22001400']  # com 11
+        elif self.friendly_name == "MA2_south":
+            filtered_ports = [
+                p for p in filtered_ports if p.serial_number == 'E932816E21001500']  # com 10
         return filtered_ports[0]
 
     host_computer = attribute(
@@ -552,6 +561,16 @@ class GentecEO(Device):
         self.device.write(b'*CVU')
         self._main_value = self.device.readline().strip().decode()
         self._main_value = float(self._main_value)
+        # If the read back value is infinity (use 1e6 as threshold)
+        if self._main_value > 10e6:
+            digits = ''.join([i for i in self._display_range if i.isdigit()])
+            non_digits = ''.join(
+                [i for i in self._display_range if not i.isdigit()])
+            non_digits_prefix = non_digits.replace('J', '')
+            unit_prefix = ['', '', 'p', 'n', 'u', 'm', '']
+            scale_list = [1, 1, 1e12, 1e9, 1e6, 1e3, 1]
+            idx = unit_prefix.index(non_digits_prefix)
+            self._main_value = float(digits) / scale_list[idx]
         self._main_value_adjust, self._main_value_adjust_unit = self.format_unit(
             self._main_value, self._base_unit)
         self.push_change_event(
@@ -569,7 +588,7 @@ class GentecEO(Device):
         unit_prefix = ['', '', 'p', 'n', 'u', 'm', '']
         scale_list = [1, 1, 1e12, 1e9, 1e6, 1e3, 1]
         for idx, m in enumerate(magnitude_ranges):
-            if value >= m[0] and value <= m[1]:
+            if value >= m[0] and value < m[1]:
                 unit = unit_prefix[idx] + _base_unit
                 value = scale_list[idx] * value
                 break
@@ -659,6 +678,7 @@ class GentecEO(Device):
     def init_device(self):
         '''
         save_data is initialized before save_path during the initialization caused by hw_memorized. self.write_save_data(True) will not set self._save to True because self._save_path is an empty string at that moment. Introducing self._try_save_data will save the intended status and can be used later in write_save_path function.
+        readlines() blocks the timeout time 
         '''
         self._host_computer = platform.node()
         self._debug = 0
@@ -683,20 +703,24 @@ class GentecEO(Device):
             com_number = com_obj.device
         try:
             self.device = serial.Serial(
-                port=com_number, baudrate=9600, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
+                port=com_number, baudrate=115200, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
+            self.device.reset_input_buffer()
             self.set_state(DevState.ON)
             self._read_time = "N/A"
-            self.device.write(b'*STS')
-            res = self.device.readlines()
-            res_decode = [e.strip().decode() for e in res]
+            self.device.write(b"*STS")
+            res = []
+            new_line = "aaa"
+            while new_line[0:2] != ":1":
+                new_line = self.device.readline().rstrip().decode()
+                res.append(new_line)
             decoded = ''
-            for i in res_decode:
+            for i in res:
                 decoded = decoded+chr(int(i[-2:], 16))
                 decoded = decoded+chr(int(i[-4:-2], 16))
             self._serial_number = decoded[42*2:45*2]
             self._model = decoded[26*2:42*2]
             self.display_range_steps = range(
-                int(res_decode[10][-2:], 16), int(res_decode[8][-2:], 16)+1)
+                int(res[10][-2:], 16), int(res[8][-2:], 16)+1)
             self._model = self._model.replace(
                 '\x00', '').replace(chr(int('CC', 16)), '')
             if self._model == "PH100-Si-HA-OD1":
@@ -715,8 +739,8 @@ class GentecEO(Device):
                 f'Genotec-eo device is connected. Model: {self._model}. Serial number: {self._serial_number}')
             self.set_state(DevState.ON)
             self.set_status("Gentec device is connected.")
-        except:
-            print("Could NOT connect to  Genotec-eo")
+        except Exception as e:
+            print(f"Could NOT connect to  Genotec-eo.\n Reason: {e}")
             self.set_state(DevState.OFF)
 
 

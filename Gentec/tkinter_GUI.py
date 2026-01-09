@@ -2,22 +2,27 @@ from tkinter import *
 from tkinter import ttk
 import tango
 import sys
-
+import os
+if True:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from common.config import device_name_table, image_panel_config
 
 class Gentec:
     def __init__(self, root):
         self.fontsize = 50
         if len(sys.argv) > 1:
-            if sys.argv[1] == 'all':
-                device_name = ['laser/gentec/MA1',
-                               'laser/gentec/MA2', 'laser/gentec/MA3', 'laser/gentec/Onshot']
+            if 'combination' in sys.argv[1]:
+                device_name = device_name_table[sys.argv[1]]
             else:
                 device_name = [sys.argv[1]]
             if len(sys.argv) > 2:
                 self.fontsize = sys.argv[2]
         self.dp = []
-        for dn in device_name:
-            self.dp.append(tango.DeviceProxy(dn))
+        try:
+            for dn in device_name:
+                self.dp.append(tango.DeviceProxy(dn))
+        except Exception as e:
+            print("Some device servers are not available!")
         # attrs = self.dp.get_attribute_list()
         # self.required_list. keys are the attributes of tango device and values are the label names.
         self.required_list = {

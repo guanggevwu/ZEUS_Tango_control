@@ -2,7 +2,8 @@
 device_name_table = {
     'TA1_gxregulator_combination': ['TA1/gx_regulator/TA1_regulator_1', 'TA1/gx_regulator/TA1_regulator_2'],
     '3PW_basler_combination': ['laser/basler/3PW_Screen', 'laser/basler/3PW_Grating-4_NF',  'laser/basler/3PW_Grating-4_FF'],
-    'testcam_basler_combination': ['test/basler/testcam', 'facility/file_reader/file_reader_1']
+    'testcam_basler_combination': ['test/basler/testcam', 'facility/file_reader/file_reader_1'],
+    'MA2_genteceo_combination': ['laser/gentec/MA2', 'laser/gentec/MA2_north', 'laser/gentec/MA2_south']
 }
 # For most of the combination cases , the instance name is same as the last part of the device name. For non-combination cases, the instance name is searched by class name  and thus no problem here.
 instance_exception = {"testcam_basler_combination": ["testsr"]}

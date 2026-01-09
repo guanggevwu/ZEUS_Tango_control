@@ -34,7 +34,7 @@ class GentecEOMenu(Menu):
                     font=('Helvetica', self.fontsize))
 
         self.menu_dict = {'start server': ['server.py', self.instances, []],
-                          'start Taurus GUI': ['Taurus_GUI.py', self.device_names, []], 'start Tkinter GUI': ['tkinter_GUI.py', ('all', *self.device_names), []]}
+                          'start Taurus GUI': ['Taurus_GUI.py', self.device_names, []], 'start Tkinter GUI': ['tkinter_GUI.py', self.device_names, []]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             # value[0][:-3], i.e., 'gentec_server' is the attribute name
             setattr(self, value[0][:-3], StringVar())
