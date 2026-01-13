@@ -9,7 +9,7 @@ import json
 from collections import defaultdict
 from PIL import ImageDraw
 import sys
-import atexit
+import platform
 from config import default_config_dict
 import shutil
 import matplotlib.pyplot as plt
@@ -34,6 +34,15 @@ class Daq:
         # images_to_stitch_dict has key-value pairs of format [shot_number:string, image_to_stitch]. shot_number:string is "background", "shot1"... image_to_stitch is the adjust numpy image array.
         self.cam_info = defaultdict(dict)
         self.dir = dir
+        if self.GUI.options['save_copy']:
+            date = datetime.now().strftime("%Y%m%d")
+            if platform.system() == 'Linux':
+                self.hidden_dir = f"~/DAQ_hidden/{date}"
+            elif platform.system() == 'Windows':
+                self.hidden_dir = f"C:\\DAQ_hidden\\{date}"
+            self.path_list = [self.dir, self.hidden_dir]
+        else:
+            self.path_list = [self.dir]
         self.select_cam_list = select_cam_list
         self.thread_event = thread_event
         Yes_for_all = False
@@ -61,12 +70,13 @@ class Daq:
                             exception = Exception(
                                 "Raise because of refusing to overwrite!")
                             raise
-                if dir:
-                    os.makedirs(os.path.join(
-                        self.dir, self.cam_info[c]['user_defined_name']), exist_ok=True)
-                    os.makedirs(os.path.join(
-                        self.dir, 'stitching'), exist_ok=True)
-
+                for p in self.path_list:
+                    if p:
+                        os.makedirs(os.path.join(
+                            p, self.cam_info[c]['user_defined_name']), exist_ok=True)
+                        if self.GUI.options['stitch']:
+                            os.makedirs(os.path.join(
+                                p, 'stitching'), exist_ok=True)
                 logging.info(f'Connected: {c}')
             except:
                 if 'exception' in locals():
@@ -140,9 +150,10 @@ class Daq:
                     full_configuration[c] = {key: getattr(
                         info['device_proxy'], key, None) for key in Key_list}
             json_object = json.dumps(full_configuration)
-            os.makedirs(self.dir, exist_ok=True)
-            with open(os.path.join(self.dir, "settings.json"), "w+") as settings_File:
-                settings_File.write(json_object)
+            for p in self.path_list:
+                os.makedirs(p, exist_ok=True)
+                with open(os.path.join(p, "settings.json"), "w+") as settings_File:
+                    settings_File.write(json_object)
 
     def get_image(self, bs):
         bits = ''.join([i for i in bs.format_pixel if i.isdigit()])
@@ -167,7 +178,9 @@ class Daq:
         return adjusted_image
 
     def take_background(self, stitch=True):
-        '''take a background image'''
+        '''take a background image
+        haven't updated it for a while. For example, hidden save folder.
+        '''
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
             if bs.info().dev_class.lower() in ['basler', 'vimba']:
@@ -239,7 +252,9 @@ class Daq:
                 if not hasattr(self, "scan_shot_range"):
                     self.scan_shot_range = range(
                         self.GUI.row_shotnum, self.GUI.row_shotnum + len(value))
-                os.makedirs(os.path.join(self.dir, 'scan_list'), exist_ok=True)
+                for p in self.path_list:
+                    os.makedirs(os.path.join(
+                        p, 'scan_list'), exist_ok=True)
                 self.scan_attr_proxies[device_attr_name] = tango.AttributeProxy(
                     device_attr_name)
                 if shot_start in self.scan_shot_range:
@@ -282,105 +297,114 @@ class Daq:
         # acquisition
 
     def thread_acquire_data(self, info, stitch, shot_end,):
-        xy_reader_count = 0
-        while True:
-            if self.thread_event is not None and self.thread_event.is_set():
-                # self.logger(
-                #     f"{info['user_defined_name']} acquisition thread stopped.")
-                break
-            bs = info['device_proxy']
-            # self.logger(f'{bs.dev_name()}, {info["shot_num"]}, start')
-            t0 = datetime.now()
-            if info['shot_num'] > shot_end:
-                info['is_completed'] = True
-            elif bs.is_new_image:
-                if (bs.info().dev_class.lower() in ['basler', 'vimba']) or (bs.info().dev_class.lower() == 'filereader' and bs.data_type == "image"):
-                    data, data_array = self.get_image(bs)
-                    file_name = self.generate_file_name(info, bs)
-                    file_name = file_name.replace('%f', 'tiff')
+        try:
+            xy_reader_count = 0
+            while True:
+                if self.thread_event is not None and self.thread_event.is_set():
                     # self.logger(
-                    #     f"It takes {datetime.now()-t0} to acquire {info['user_defined_name']} {info['shot_num']}.")
-                    save_path = os.path.join(info['cam_dir'], file_name)
-                    message = f"Shot {info['shot_num']} for {info['user_defined_name']} {data.size} is saved."
-                    Thread(target=self.thread_saving,
-                           args=(data, save_path, message)).start()
-                    add_number = 1
-                    # For scope, it saves multiple files per shot. stitch_local set to True only every bs.files_per_shot.
-                    stitch_local = True
-                elif bs.info().dev_class.lower() == 'filereader' and bs.data_type == "xy":
-                    file_name = self.generate_file_name(info, bs)
-                    file_name = file_name.replace('%f', 'csv')
-                    source_path = os.path.join(bs.folder_path, bs.current_file)
-                    destination_path = os.path.join(
-                        info['cam_dir'], file_name)
-                    message = f"Shot {info['shot_num']} for {info['user_defined_name']} is saved."
-                    Thread(target=self.thread_copy, args=(
-                        source_path, destination_path, message)).start()
-                    xy_reader_count += 1
-                    if xy_reader_count == bs.files_per_shot:
-                        data_array = self.save_plot_data(bs.x, bs.y)
+                    #     f"{info['user_defined_name']} acquisition thread stopped.")
+                    break
+                bs = info['device_proxy']
+                # self.logger(f'{bs.dev_name()}, {info["shot_num"]}, start')
+                t0 = datetime.now()
+                if info['shot_num'] > shot_end:
+                    info['is_completed'] = True
+                elif bs.is_new_image:
+                    if (bs.info().dev_class.lower() in ['basler', 'vimba']) or (bs.info().dev_class.lower() == 'filereader' and bs.data_type == "image"):
+                        data, data_array = self.get_image(bs)
+                        file_name = self.generate_file_name(info, bs)
+                        file_name = file_name.replace('%f', 'tiff')
+                        # self.logger(
+                        #     f"It takes {datetime.now()-t0} to acquire {info['user_defined_name']} {info['shot_num']}.")
+                        save_path = os.path.join(info['cam_dir'], file_name)
+                        message = f"Shot {info['shot_num']} for {info['user_defined_name']} {data.size} is saved."
+                        Thread(target=self.thread_saving,
+                               args=(data, save_path, message)).start()
                         add_number = 1
-                        xy_reader_count = 0
+                        # For scope, it saves multiple files per shot. stitch_local set to True only every bs.files_per_shot.
                         stitch_local = True
-                    else:
-                        add_number = 0
-                        stitch_local = False
-                if stitch and stitch_local:
-                    if getattr(bs, 'format_pixel', '').lower() == "rgb8":
-                        data_array = 0.299 * \
-                            data_array[:, :, 0] + 0.587 * data_array[:,
-                                                                     :, 1] + 0.114 * data_array[:, :, 2]
-                    adjusted_image = self.stretch_image(data_array)
-                    info['images_to_stitch'][f'shot{info["shot_num"]}'] = adjusted_image
-                info['shot_num'] += add_number
-                # self.logger(
-                #     f"It takes {datetime.now()-t0} to save {info['user_defined_name']} {info['shot_num']-1} out of thread.")
+                    elif bs.info().dev_class.lower() == 'filereader' and bs.data_type == "xy":
+                        file_name = self.generate_file_name(info, bs)
+                        file_name = file_name.replace('%f', 'csv')
+                        source_path = os.path.join(
+                            bs.folder_path, bs.current_file)
+                        destination_path = os.path.join(
+                            info['cam_dir'], file_name)
+                        message = f"Shot {info['shot_num']} for {info['user_defined_name']} is saved."
+                        Thread(target=self.thread_copy, args=(
+                            source_path, destination_path, message)).start()
+                        xy_reader_count += 1
+                        if xy_reader_count == bs.files_per_shot:
+                            data_array = self.save_plot_data(bs.x, bs.y)
+                            add_number = 1
+                            xy_reader_count = 0
+                            stitch_local = True
+                        else:
+                            add_number = 0
+                            stitch_local = False
+                    if stitch and stitch_local:
+                        if getattr(bs, 'format_pixel', '').lower() == "rgb8":
+                            data_array = 0.299 * \
+                                data_array[:, :, 0] + 0.587 * data_array[:,
+                                                                         :, 1] + 0.114 * data_array[:, :, 2]
+                        adjusted_image = self.stretch_image(data_array)
+                        info['images_to_stitch'][f'shot{info["shot_num"]}'] = adjusted_image
+                    info['shot_num'] += add_number
+                    # self.logger(
+                    #     f"It takes {datetime.now()-t0} to save {info['user_defined_name']} {info['shot_num']-1} out of thread.")
+        except Exception as e:
+            self.logger(
+                f'Error in {info["user_defined_name"]} "thread_acquire_data" thread: {e}', 'red_text')
 
     def thread_stitch_and_go_to_next_scan_point(self, stitch, scan_table):
-        while True:
-            if self.thread_event is not None and self.thread_event.is_set():
-                # self.logger(f'stitching and scan thread stopped.')
-                break
-            # t0 = datetime.now()
-            # check if all cameras have a new shot
-            if all([i['shot_num'] > self.current_shot_for_all_cam for i in self.cam_info.values()]):
-                if stitch:
-                    stitch_save_path = os.path.join(
-                        self.dir, 'stitching', f'shot{self.current_shot_for_all_cam}_{datetime.now().strftime("%H%M%S.%f")}.tiff')
-                    large_image_p = self.stitch_images(
-                        f'shot{self.current_shot_for_all_cam}')
-                    message = f"Shot {self.current_shot_for_all_cam} for stitching is saved."
-                    Thread(target=self.thread_saving, args=(
-                        large_image_p, stitch_save_path, message)).start()
-                    # self.logger(
-                    #     f"Shot {self.current_shot_for_all_cam} for stitching {large_image_p.size} is queued.")
-                    # self.logger(f"It takes {datetime.now() - t0} to save out of thread.")
-                self.current_shot_for_all_cam += 1
-                self.logger(
-                    f"Shot {self.current_shot_for_all_cam-1} is completed.", 'green_text')
-                playsound(os.path.join(os.path.dirname(__file__), 'media',
-                          'sound', 'shot_completion_1.mp3'), block=False)
-                # send plasma mirror ready signal
-                if not self.GUI.options['use_plasma_mirror']:
-                    self.GUI.send_message_to_laser_side('TA2_ready')
-                # remove highlight in scan module window
-                if self.GUI.scan_window.winfo_exists() and self.GUI.scan_window.tree.tag_has(f'#{self.current_shot_for_all_cam-1}'):
-                    self.GUI.scan_window.tree.tag_configure(
-                        f'#{self.current_shot_for_all_cam-1}', background='white')
-                # save scala data
-                if self.GUI.options["save_metadata"]:
-                    self.csv_header = ['shot_number', 'time']
-                    self.save_scalars(self.current_shot_for_all_cam)
-                if scan_table is not None and hasattr(self, "scan_shot_range") and self.current_shot_for_all_cam in self.scan_shot_range:
-                    for device_attr_name, ap in self.scan_attr_proxies.items():
-                        self.set_scan_value(
-                            ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
+        try:
+            while True:
+                if self.thread_event is not None and self.thread_event.is_set():
+                    # self.logger(f'stitching and scan thread stopped.')
+                    break
+                # t0 = datetime.now()
+                # check if all cameras have a new shot
+                if all([i['shot_num'] > self.current_shot_for_all_cam for i in self.cam_info.values()]):
+                    if stitch:
+                        stitch_save_path = os.path.join(
+                            self.dir, 'stitching', f'shot{self.current_shot_for_all_cam}_{datetime.now().strftime("%H%M%S.%f")}.tiff')
+                        large_image_p = self.stitch_images(
+                            f'shot{self.current_shot_for_all_cam}')
+                        message = f"Shot {self.current_shot_for_all_cam} for stitching is saved."
+                        Thread(target=self.thread_saving, args=(
+                            large_image_p, stitch_save_path, message)).start()
+                        # self.logger(
+                        #     f"Shot {self.current_shot_for_all_cam} for stitching {large_image_p.size} is queued.")
+                        # self.logger(f"It takes {datetime.now() - t0} to save out of thread.")
+                    self.current_shot_for_all_cam += 1
+                    self.logger(
+                        f"Shot {self.current_shot_for_all_cam-1} is completed.", 'green_text')
+                    playsound(os.path.join(os.path.dirname(__file__), 'media',
+                                           'sound', 'shot_completion_1.mp3'), block=False)
+                    # send plasma mirror ready signal
+                    if not self.GUI.options['use_plasma_mirror']:
+                        self.GUI.send_message_to_laser_side('TA2_ready')
+                    # remove highlight in scan module window
+                    if hasattr(self.GUI, 'scan_window') and self.GUI.scan_window.winfo_exists() and self.GUI.scan_window.tree.tag_has(f'#{self.current_shot_for_all_cam-1}'):
+                        self.GUI.scan_window.tree.tag_configure(
+                            f'#{self.current_shot_for_all_cam-1}', background='white')
+                    # save scala data
+                    if self.GUI.options["save_metadata"]:
+                        self.csv_header = ['shot_number', 'time']
+                        self.save_scalars(self.current_shot_for_all_cam)
+                    if scan_table is not None and hasattr(self, "scan_shot_range") and self.current_shot_for_all_cam in self.scan_shot_range:
+                        for device_attr_name, ap in self.scan_attr_proxies.items():
+                            self.set_scan_value(
+                                ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
 
-            if not False in [value['is_completed'] for value in self.cam_info.values()]:
-                self.logger("All shots completed!")
-                self.thread_event.set()
-                return
-            time.sleep(0.3)
+                if not False in [value['is_completed'] for value in self.cam_info.values()]:
+                    self.logger("All shots completed!")
+                    self.thread_event.set()
+                    return
+                time.sleep(0.3)
+        except Exception as e:
+            self.logger(
+                f'Error in "thread_stitch_and_go_to_next_scan_point" thread: {e}', 'red_text')
 
     def generate_file_name(self, info, bs, shoot=True):
         rep = info['file_name']
@@ -426,27 +450,40 @@ class Daq:
 
     def save_scalars(self, shot_number,):
         self.csv_header.extend(self.scalars.keys())
-        with open(os.path.join(self.dir, 'scalars.csv'), 'a+', newline='') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=self.csv_header)
-            csvfile.seek(0)
-            current_header = csvfile.readline()
-            if (not current_header) or (current_header.strip() != ','.join(self.csv_header)):
-                writer.writeheader()
-                csvfile.seek(0, os.SEEK_END)
-            data_to_write = {'shot_number': shot_number-1,
-                             'time': datetime.now().strftime("%Y-%m-%d_%H:%M:%S.%f")}
-            data_to_write.update({key: str(value.read(
-            ).value)+value.get_config().unit for key, value in self.scalars.items()})
-            writer.writerow(data_to_write)
-            self.logger(f'Wrote scalars: {data_to_write}')
+        for p in self.path_list:
+            with open(os.path.join(p, 'scalars.csv'), 'a+', newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=self.csv_header)
+                csvfile.seek(0)
+                current_header = csvfile.readline()
+                if (not current_header) or (current_header.strip() != ','.join(self.csv_header)):
+                    writer.writeheader()
+                    csvfile.seek(0, os.SEEK_END)
+                data_to_write = {'shot_number': shot_number-1,
+                                 'time': datetime.now().strftime("%Y-%m-%d_%H:%M:%S.%f")}
+                other_data = {
+                    key: f'{value.read().value: .6g}{value.get_config().unit}' for key, value in self.scalars.items()}
+                data_to_write.update(other_data)
+                writer.writerow(data_to_write)
+        self.logger(f'Write scalars: {other_data}')
 
     def thread_saving(self, data, save_path, message):
-        data.save(save_path)
-        self.logger(message)
+        try:
+            data.save(save_path)
+            self.logger(message)
+            if self.GUI.options['save_copy']:
+                data.save(save_path.replace(self.dir, self.hidden_dir, 1))
+        except Exception as e:
+            self.logger(f"Error saving file: {e}", 'red_text')
 
     def thread_copy(self, source_path, destination_path, message):
-        shutil.copy(source_path, destination_path)
-        self.logger(message)
+        try:
+            shutil.copy(source_path, destination_path)
+            self.logger(message)
+            if self.GUI.options['save_copy']:
+                shutil.copy(source_path, destination_path.replace(
+                    self.dir, self.hidden_dir, 1))
+        except Exception as e:
+            self.logger(f"Error copying file: {e}", 'red_text')
 
     def imadjust(self, input, tol=0.01):
         """

@@ -481,7 +481,7 @@ class Basler(Device):
             access=AttrWriteType.READ,
         )
 
-        if self._model not in  ['a2A1920-51gcBAS', 'acA2500-20gc']:
+        if self._model not in ['a2A1920-51gcBAS', 'acA2500-20gc']:
             self.add_attribute(binning_horizontal)
             self.add_attribute(binning_vertical)
         if self.friendly_name == "3PW_Grating-4_NF" or self.friendly_name == "3PW_Screen" or self.friendly_name == "test":
@@ -718,7 +718,7 @@ class Basler(Device):
             if device.GetSerialNumber() == self.serial_number:
                 self.friendly_name = device.GetUserDefinedName()
                 return device
-            if self.friendly_name and device.GetUserDefinedName() == self.friendly_name :
+            if self.friendly_name and device.GetUserDefinedName() == self.friendly_name:
                 self.serial_number = device.GetUserDefinedName()
                 return device
         # factory = pylon.TlFactory.GetInstance()
@@ -1163,7 +1163,7 @@ class Basler(Device):
             self.i = 0
             # Previous we use a very large number for _grab_number, but it caused some memory problem when we have many camera.
             self._grab_number = max(
-                [self._repetition*self._frames_per_trigger, 500])
+                [self._repetition*self._frames_per_trigger, 1000])
             self.camera.StartGrabbingMax(
                 self._grab_number, pylon.GrabStrategy_OneByOne)
             self.logger.info(

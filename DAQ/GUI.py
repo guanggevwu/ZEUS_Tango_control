@@ -122,7 +122,8 @@ class DaqGUI:
         self.frame2.grid(column=0, row=1, sticky=(N, W, E, S))
 
         self.frame2_checkbutton_content = {'use_plasma_mirror': {
-            'text': 'Use plasma mirror (only for TA2)', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'save_metadata': {'text': 'Save metadata', 'init_status': False}}
+            'text': 'Use plasma mirror (only for TA2)', 'init_status': True}, 'save_copy': {
+            'text': 'Save an extra copy of data', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'save_metadata': {'text': 'Save metadata', 'init_status': False}}
         item_per_column = 2
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
             checkbox_var = BooleanVar(value=value['init_status'])
