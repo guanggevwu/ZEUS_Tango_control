@@ -500,8 +500,14 @@ class DeviceListWindow(Toplevel):
         devices_seperated_by_location = defaultdict(list)
         locations = ['laser', 'TA1', 'TA2', 'TA3', 'Others']
         for device_name in self.device_names_in_db:
+            device_area = device_name.split('/')[0]
+            if device_name in Basler_class_device:
+                sn = device_name.split('/')[-1].split('_')[-1]
+                if sn in self.parent.serial_number_vs_friendly_name and '-' in self.parent.serial_number_vs_friendly_name[sn]:
+                    device_area = self.parent.serial_number_vs_friendly_name[sn].split(
+                        '-')[0]
             for location in locations[:-1]:
-                if location == device_name.split('/')[0]:
+                if location == device_area:
                     devices_seperated_by_location[location].append(
                         device_name)
                     break

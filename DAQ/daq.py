@@ -51,6 +51,7 @@ class Daq:
         for c in select_cam_list:
             try:
                 bs = tango.DeviceProxy(c)
+                bs.ping()
                 self.cam_info[c] = {}
                 self.cam_info[c]['device_proxy'] = bs
                 self.cam_info[c]['user_defined_name'] = bs.user_defined_name
