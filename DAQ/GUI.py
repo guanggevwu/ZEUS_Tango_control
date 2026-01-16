@@ -69,6 +69,8 @@ class DaqGUI:
         for w in style_widgets:
             s.configure(f'Sty1.{w}',
                         font=('Helvetica', self.font_mid))
+        s.configure('small_button.TButton', font=(
+            'Helvetica', self.font_small))
         s.configure('Sty1.TCheckbutton', font=(
             'Helvetica', self.font_small))
         s.configure('highlight.TCheckbutton', font=(
@@ -113,7 +115,7 @@ class DaqGUI:
             self.frame1, text='Device GUI', command=self.start_device_GUI, style='Sty2_client_offline.TButton')
         self.client_GUI['button'].grid(column=1, row=0, sticky='WE')
         self.device_row, self.selected_device_per_row = 1, 4
-        ttk.Button(self.frame1, text='Bandwidth', command=self.open_bandwidth_table, style='Sty1.TButton').grid(
+        ttk.Button(self.frame1, text='Bandwidth', command=self.open_bandwidth_window, style='Sty1.TButton').grid(
             column=3, row=0, sticky='WE')
 
         # ---------------------frame 2
@@ -121,24 +123,29 @@ class DaqGUI:
             root, text='Options', padding=pad_widget, style='Sty1.TLabelframe')
         self.frame2.grid(column=0, row=1, sticky=(N, W, E, S))
 
+        # half column options first and then full column options with buttons
         self.frame2_checkbutton_content = {'use_plasma_mirror': {
-            'text': 'Use plasma mirror (only for TA2)', 'init_status': True}, 'save_copy': {
-            'text': 'Save an extra copy of data', 'init_status': True}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True}, 'save_metadata': {'text': 'Save metadata', 'init_status': False}}
+            'text': 'Use plasma mirror (only for TA2)', 'init_status': True, 'button': None}, 'save_copy': {
+            'text': 'Save an extra copy of data', 'init_status': True, 'button': None}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True, 'button': None}, 'save_metadata': {'text': 'Save metadata', 'init_status': False, 'button': 'Metadata'}, 'scan': {'text': 'Scan over parameters', 'init_status': False, 'button': 'Parameters'}}
         item_per_column = 2
+        current_row = 0
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
             checkbox_var = BooleanVar(value=value['init_status'])
             checkbox = ttk.Checkbutton(self.frame2, text=value['text'],
                                        variable=checkbox_var, style='highlight.TCheckbutton')
-            if idx == len(self.frame2_checkbutton_content) - 1:
+            if value['button'] is not None:
+                # If current_row is x.0, use x as the row number. If current_row is x.5, use x+1 as the row number. int(current_row+0.5) fits both cases. Add 1 for the start of next row.
                 checkbox.grid(
-                    column=0, row=int((idx-1)/item_per_column)+1, sticky=W)
+                    column=0, row=int(current_row+0.5), sticky=W)
+                ttk.Button(self.frame2, text=value['button'], command=getattr(self, f"open_{value['button'].lower()}_window"), style='small_button.TButton').grid(
+                    column=1, row=int(current_row+0.5), sticky='W')
+                current_row = int(current_row+0.5) + 1
             else:
+                # If current_row is x.0 or x.5, use x as the row number. Add 0.5 for the start of next row. For example, if current_row is x.0, then next row is x.5. If the next option is an half column option, then it will be placed at int(x.5) = x row, i.e., the same row.
                 checkbox.grid(
-                    column=idx % item_per_column, row=int(idx/item_per_column), sticky=W)
+                    column=idx % item_per_column, row=int(current_row), sticky=W)
+                current_row += 0.5
             value['var'] = checkbox_var
-
-        ttk.Button(self.frame2, text='Metadata', command=self.open_metadata_window, style='Sty1.TButton').grid(
-            column=1, row=int((idx-1)/item_per_column)+1, sticky='W')
 
         # ---------------------frame 3
 
@@ -168,8 +175,6 @@ class DaqGUI:
         ttk.Entry(self.frame3, textvariable=self.shot_end_var, font=(
             'Helvetica', int(self.font_mid*0.75)), width=10).grid(
             column=3, row=1, sticky='W')
-        ttk.Button(self.frame3, text='Scan', command=self.open_scan_list, style='Sty1.TButton').grid(
-            column=4, row=1, sticky='W')
         self.acquisition['button'] = ttk.Button(
             self.frame3, text='Start', command=self.toggle_acquisition, style='Sty3_start.TButton')
         self.acquisition['button'].grid(
@@ -218,6 +223,7 @@ class DaqGUI:
                     self.options = self.init_dict['options'] if 'options' in self.init_dict and self.init_dict['options'] is not None else dict(
                     )
                     self.options['use_plasma_mirror'] = True
+                    self.options['scan'] = False
                     self.path_var.set(
                         self.init_dict['save_path']) if "save_path" in self.init_dict else ''
 
@@ -269,7 +275,7 @@ class DaqGUI:
         self.metadata_window.attributes('-topmost', True)
         self.metadata_window.attributes('-topmost', False)
 
-    def open_scan_list(self):
+    def open_parameters_window(self):
         '''Command for the scan button in frame3. It opens a new window with a scan list.'''
         if not (hasattr(self, "scan_window") and self.scan_window.winfo_exists()):
             self.scan_window = ScanWindow(self)
@@ -277,9 +283,9 @@ class DaqGUI:
         self.scan_window.attributes('-topmost', True)
         self.scan_window.attributes('-topmost', False)
 
-    def open_bandwidth_table(self):
-        '''Command for the scan button in frame1. It opens a new window with the bandwidth table.'''
-        if not (hasattr(self, "bandwidth") and self.scan_window.winfo_exists()):
+    def open_bandwidth_window(self):
+        '''Command for the Bandwidth button in frame1. It opens a new window with the bandwidth table.'''
+        if not (hasattr(self, "bandwidth_window") and self.bandwidth_window.winfo_exists()):
             self.bandwidth_window = BandwidthWindow(self)
         self.bandwidth_window.deiconify()
         self.bandwidth_window.attributes('-topmost', True)
@@ -681,7 +687,7 @@ class ScanWindow(Toplevel):
                 idx/self.item_each_row), idx % self.item_each_row
             checkbox_var = BooleanVar(
                 value=True) if device_attr_name in self.scan_table else BooleanVar(value=False)
-            checkbox = ttk.Checkbutton(self.scan_frame1, text='/'.join(device_attr_name.split('/')[2:]), command=lambda device_attr_name=device_attr_name, checkbox_var=checkbox_var: self.add_device_to_scan(device_attr_name, checkbox_var),
+            checkbox = ttk.Checkbutton(self.scan_frame1, text=device_attr_name, command=lambda device_attr_name=device_attr_name, checkbox_var=checkbox_var: self.add_device_to_scan(device_attr_name, checkbox_var),
                                        variable=checkbox_var, style='highlight.TCheckbutton')
             checkbox.grid(
                 column=col, row=self.scannable_list_row, sticky=W)
@@ -756,8 +762,9 @@ class ScanWindow(Toplevel):
         with open(self.scan_table_file, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(list(self.scan_table.keys()))
-            writer.writerows([[value[idx] for value in self.scan_table.values()]
-                             for idx in range(len(list(self.scan_table.values())[0]))])
+            if list(self.scan_table.values()):
+                writer.writerows([[value[idx] for value in self.scan_table.values()]
+                                  for idx in range(len(list(self.scan_table.values())[0]))])
 
     def update_tree(self):
         '''Render the tree widget'''

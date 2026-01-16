@@ -138,7 +138,7 @@ class OwisPS(Device):
         dtype=str,
         memorized=True,
         access=AttrWriteType.READ_WRITE,
-        doc='Use dev.current_location = "location_name" to move to the predefined location'
+        doc='Use dev.current_location = "location_name" to move to the predefined location. Do NOT include the coordinates part.'
     )
 
     def is_position_close(self, a: list[float], b: list[float], tol=1e-3):

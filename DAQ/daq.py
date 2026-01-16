@@ -245,16 +245,13 @@ class Daq:
         # set scan value
         # self.scan_attr_proxies is a dictionary. Its key is a string device/attr and its value is the attribute proxy
         self.scan_attr_proxies = {}
-        if scan_table and any(scan_table.values()):
+        if self.GUI.options['scan'] and scan_table and any(scan_table.values()):
             self.scan_table = scan_table
 
             for device_attr_name, value in self.scan_table.items():
                 if not hasattr(self, "scan_shot_range"):
                     self.scan_shot_range = range(
                         self.GUI.row_shotnum, self.GUI.row_shotnum + len(value))
-                for p in self.path_list:
-                    os.makedirs(os.path.join(
-                        p, 'scan_list'), exist_ok=True)
                 self.scan_attr_proxies[device_attr_name] = tango.AttributeProxy(
                     device_attr_name)
                 if shot_start in self.scan_shot_range:
@@ -392,7 +389,7 @@ class Daq:
                     if self.GUI.options["save_metadata"]:
                         self.csv_header = ['shot_number', 'time']
                         self.save_scalars(self.current_shot_for_all_cam)
-                    if scan_table is not None and hasattr(self, "scan_shot_range") and self.current_shot_for_all_cam in self.scan_shot_range:
+                    if self.GUI.options["scan"] and scan_table is not None and hasattr(self, "scan_shot_range") and self.current_shot_for_all_cam in self.scan_shot_range:
                         for device_attr_name, ap in self.scan_attr_proxies.items():
                             self.set_scan_value(
                                 ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
@@ -437,7 +434,36 @@ class Daq:
 
         if value_list[self.scan_shot_range.index(shot_number)]:
             value = value_list[self.scan_shot_range.index(shot_number)]
-            attr_proxy.write(float(value))
+            '''
+            AttributeProxy.get_config().date_type returns an int representing the data type. It looks like the mapping is:
+            0: tango.CmdArgType.DEV_VOID (No data)
+            1: tango.CmdArgType.DEV_BOOLEAN
+            2: tango.CmdArgType.DEV_SHORT
+            3: tango.CmdArgType.DEV_LONG
+            4: tango.CmdArgType.DEV_FLOAT
+            5: tango.CmdArgType.DEV_DOUBLE
+            6: tango.CmdArgType.DEV_USHORT
+            7: tango.CmdArgType.DEV_ULONG
+            8: tango.CmdArgType.DEV_STRING
+            9: tango.CmdArgType.DEV_VAR_SHORT_ARRAY (1D Array)
+            10: tango.CmdArgType.DEV_VAR_LONG_ARRAY (1D Array)
+            11: tango.CmdArgType.DEV_VAR_FLOAT_ARRAY (1D Array)
+            12: tango.CmdArgType.DEV_VAR_DOUBLE_ARRAY (1D Array)
+            13: tango.CmdArgType.DEV_VAR_USHORT_ARRAY (1D Array)
+            14: tango.CmdArgType.DEV_VAR_ULONG_ARRAY (1D Array)
+            15: tango.CmdArgType.DEV_VAR_STRING_ARRAY (1D Array)
+            16: tango.CmdArgType.DEV_VAR_LONG64_ARRAY (1D Array)
+            17: tango.CmdArgType.DEV_VAR_ULONG64_ARRAY (1D Array)
+            18: tango.CmdArgType.DEV_LONG64
+            19: tango.CmdArgType.DEV_ULONG64
+            20: tango.CmdArgType.DEV_ENCODED (e.g., JPEG, PNG, or custom) 
+            '''
+            data_type_map = {1: bool, 8: str}
+            if attr_proxy.get_config().data_type in data_type_map:
+                convert_func = data_type_map[attr_proxy.get_config().data_type]
+            else:
+                convert_func = float
+            attr_proxy.write(convert_func(value))
             self.logger(
                 f'Shot {shot_number}. {attr_proxy.get_device_proxy().dev_name().split("/")[-1]}/{attr_proxy.name()}: {value}')
         else:

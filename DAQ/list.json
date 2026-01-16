@@ -76,6 +76,14 @@
     "laser/esp300/esp300_turning_box3/ax1_position",
     "laser/esp300/esp300_turning_box3/ax2_position",
     "laser/esp300/esp300_turning_box3/ax3_position",
-    "laser/gentec/MA2_QE95LP-H-MB-QED-INT/main_value"
+    "laser/gentec/MA2_QE95LP-H-MB-QED-INT/main_value",
+    "other/dg645/DG645_control_room/A_relative_delay",
+    "other/dg645/DG645_control_room/B_relative_delay",
+    "other/dg645/DG645_control_room/C_relative_delay",
+    "other/dg645/DG645_control_room/D_relative_delay",
+    "other/dg645/DG645_control_room/E_relative_delay",
+    "other/dg645/DG645_control_room/F_relative_delay",
+    "other/dg645/DG645_control_room/G_relative_delay",
+    "other/dg645/DG645_control_room/H_relative_delay"
   ]
 }
