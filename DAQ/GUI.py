@@ -431,7 +431,7 @@ class DaqGUI:
             self.acquisition['button']['style'] = 'Sty3_start.TButton'
             self.acquisition['button']['text'] = 'Start'
             del self.daq
-            self.insert_to_disabled("Stopped acquisition.", 'red_text')
+            self.insert_to_disabled("Stopped acquisition.", 'green_text')
         else:
             self.acquisition['status'] = True
             self.acquisition['is_completed'] = False
@@ -473,6 +473,8 @@ class DaqGUI:
         logger.info(text)
         time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
         self.logging_q.put([time, text, tag_config])
+        if tag_config == "red_text":
+            messagebox.showerror(message=text)
 
     def logger_thread(self):
         while 1:

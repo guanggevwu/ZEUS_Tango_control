@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 from threading import Thread
 import csv
 from playsound3 import playsound
+from tkinter import messagebox
+
 logging.basicConfig(
     format="%(asctime)s %(message)s",
     level=logging.INFO)
@@ -457,7 +459,7 @@ class Daq:
             17: tango.CmdArgType.DEV_VAR_ULONG64_ARRAY (1D Array)
             18: tango.CmdArgType.DEV_LONG64
             19: tango.CmdArgType.DEV_ULONG64
-            20: tango.CmdArgType.DEV_ENCODED (e.g., JPEG, PNG, or custom) 
+            20: tango.CmdArgType.DEV_ENCODED (e.g., JPEG, PNG, or custom)
             '''
             data_type_map = {1: bool, 8: str}
             if attr_proxy.get_config().data_type in data_type_map:
