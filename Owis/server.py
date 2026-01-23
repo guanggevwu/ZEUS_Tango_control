@@ -6,7 +6,7 @@ import datetime
 import logging
 import time
 import platform
-from ctypes import windll, c_double
+import ctypes
 import os
 import sys
 # -----------------------------
@@ -35,13 +35,13 @@ class OwisPS(Device):
         handlers = [logging.StreamHandler()]
         logging.basicConfig(handlers=handlers,
                             format="%(asctime)s %(message)s", level=logging.INFO)
-        self.dev = windll.LoadLibrary(os.path.join(
+        self.dev = ctypes.windll.LoadLibrary(os.path.join(
             os.path.dirname(__file__), "ps90.dll"))
         p90_connected = self.dev.PS90_SimpleConnect(1, b"")  # ANSI/Unicode !!
         if p90_connected != 0:
             print("Could NOT connect to PS90!")
             self.set_state(DevState.OFF)
-            return
+            raise
         # load axis parameter file according to the part number
         if self.part_number:
             self.part_number_list = self.part_number.split(',')
@@ -204,7 +204,7 @@ class OwisPS(Device):
 
     def create_read_position_function(self, axis):
         def read_position(self, attr):
-            self.dev.PS90_GetPositionEx.restype = c_double
+            self.dev.PS90_GetPositionEx.restype = ctypes.c_double
             setattr(self, f'_ax{axis}_position',
                     self.dev.PS90_GetPositionEx(1, axis))
             return getattr(self, f'_ax{axis}_position')
@@ -218,7 +218,7 @@ class OwisPS(Device):
             else:
                 value = attr
             self.dev.PS90_SetTargetMode(1, axis, 1)
-            self.dev.PS90_MoveEx(1, axis, c_double(value), 1)
+            self.dev.PS90_MoveEx(1, axis, ctypes.c_double(value), 1)
         self.logger.info(f'created write function for axis {axis}')
         return write_position
 
@@ -274,7 +274,8 @@ class OwisPS(Device):
             self.logger.info(f"{attr}")
             setattr(self, f'_ax{axis}_old', getattr(
                 self, f'_ax{axis}_position'))
-            error = self.dev.PS90_SetPositionEx(1, axis, c_double(float(attr)))
+            error = self.dev.PS90_SetPositionEx(
+                1, axis, ctypes.c_double(float(attr)))
             setattr(self, f'_ax{axis}_position', float(attr))
         return write_set_as
 
@@ -307,11 +308,11 @@ class OwisPS(Device):
     def move_relative_axis(self, input: list[int]):
         self.dev.PS90_SetTargetMode(1, int(input[0]), 0)
         if input[1]:
-            self.dev.PS90_MoveEx(1, int(input[0]), c_double(
+            self.dev.PS90_MoveEx(1, int(input[0]), ctypes.c_double(
                 getattr(self, f'_ax{input[0]}_step')), 1)
         else:
             self.dev.PS90_MoveEx(
-                1, int(input[0]), c_double(-getattr(self, f'_ax{input[0]}_step')), 1)
+                1, int(input[0]), ctypes.c_double(-getattr(self, f'_ax{input[0]}_step')), 1)
         self.logger.info(f'relative moving, [direction, axis], {input}')
 
     @command

@@ -84,7 +84,9 @@ def create_app():
                     [ax], [ax], [ax]], modified_cmd_name=[f'init_ax{ax}', f'go_ref_ax{ax}', f'free_switch_ax{ax}'])
         owis_app.add_command(
             command_layout, d, command_list=['stop_all_axis'])
-    owis_app.gui.removePanel('Manual')
+    owis_app.gui.helpManualURI = os.path.join(os.path.dirname(
+        __file__), 'README.html')
+    owis_app.gui.onShowManual()
     owis_app.gui.show()
     owis_app.app.exec_()
 
