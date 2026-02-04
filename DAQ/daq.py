@@ -24,7 +24,7 @@ logging.basicConfig(
 
 
 class Daq:
-    def __init__(self, select_cam_list, dir='', debug=False, check_exist=True, thread_event=None, GUI=None):
+    def __init__(self, select_cam_list, dir='', debug=False, thread_event=None, GUI=None):
         if GUI is None:
             self.logger = logging.getLogger(__name__).info
         else:
@@ -60,19 +60,6 @@ class Daq:
                 self.cam_info[c]['cam_dir'] = os.path.join(
                     self.dir, self.cam_info[c]['user_defined_name'])
                 self.cam_info[c]['images_to_stitch'] = {}
-                if dir and check_exist and not Yes_for_all and os.path.exists(self.cam_info[c]['cam_dir']):
-                    files_num = sum(
-                        [len(files) for r, d, files in os.walk(self.cam_info[c]['cam_dir'])])
-                    if files_num:
-                        is_overwrite = input(
-                            f'{self.cam_info[c]["cam_dir"]} already exists and has {files_num} files in it. Overwrite? yes(y)/all(a)/no(n)')
-                        if is_overwrite.lower() == 'a':
-                            Yes_for_all = True
-                        elif is_overwrite.lower() != 'y':
-                            # will not be terminated because this is in a try closure
-                            exception = Exception(
-                                "Raise because of refusing to overwrite!")
-                            raise
                 for p in self.path_list:
                     if p:
                         os.makedirs(os.path.join(
@@ -138,7 +125,7 @@ class Daq:
                                     f"{info['user_defined_name']}/{key} is changed from {old_value} to {value}")
                     except:
                         self.logger(
-                            f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}")
+                            f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}, 'red_text'")
             # if the saving_format is not set in the configuration
             if ('saving_format' not in info['config_dict']):
                 info['file_name'] = '%s'
@@ -258,8 +245,12 @@ class Daq:
                 self.scan_attr_proxies[device_attr_name] = tango.AttributeProxy(
                     device_attr_name)
                 if shot_start in self.scan_shot_range:
-                    self.set_scan_value(
-                        self.scan_attr_proxies[device_attr_name], value, shot_start)
+                    try:
+                        self.set_scan_value(
+                            self.scan_attr_proxies[device_attr_name], value, shot_start)
+                    except Exception as e:
+                        self.logger(
+                            f"Error setting scan value for {device_attr_name} at shot {shot_start}: {e}", 'red_text')
         self.scalars = {attr: tango.AttributeProxy(
             attr) for attr in self.GUI.checked_savable_attributes}
         resulting_fps_dict = {}
@@ -310,6 +301,18 @@ class Daq:
                 if info['shot_num'] > shot_end:
                     info['is_completed'] = True
                 elif bs.is_new_image:
+                    if self.GUI.options["use_plasma_mirror"]:
+                        try:
+                            self.plasma_mirror_stages = tango.DeviceProxy(
+                                'TA2/esp301/esp302_ta2_2')
+                            self.GUI.damaged_zones[f'{self.plasma_mirror_stages.ax1_position:>10} {self.plasma_mirror_stages.ax2_position:>10}'] = False
+                            self.GUI.write_to_init_file()
+                            self.GUI.is_plasma_mirror_ready = None
+                            if hasattr(self.GUI, 'damagedzones_window') and self.GUI.damagedzones_window.winfo_exists():
+                                self.GUI.damagedzones_window.setup_checkboxes()
+                        except Exception as e:
+                            self.logger(
+                                f'Error in accessing plasma mirror stage: {e}', 'red_text')
                     if (bs.info().dev_class.lower() in ['basler', 'vimba']) or (bs.info().dev_class.lower() == 'filereader' and bs.data_type == "image"):
                         data, data_array = self.get_image(bs)
                         file_name = self.generate_file_name(info, bs)

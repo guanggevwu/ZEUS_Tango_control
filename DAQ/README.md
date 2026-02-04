@@ -30,11 +30,13 @@ Click "Device GUI" after the device servers have been started successfully and a
 
 When we have multiple device servers selected, it is better to assign the bandwidth for each device. Only the bandwidths of the Basler cameras need to be adjusted here. However, a small portion of the Basler cameras don't support the API called here and their bandwidth values are shown as -1. A common practice is to enter 80 in the "Allowed bandwidth" field and then click "Optimized". Sometimes we need to click "Optimized" twice to achieve the same "Resulting fps". Since the theoretical bandwidth is around 120 MB/s, we still leave 40 MB/s for other cameras (Andor, Allied Vision) and other applications (browsers, Remote Desktop, etc.). We probably should also use Pylon Viewer to assign bandwidth for the cameras that show "-1" bandwidth manually.
 
-# 3 Option
+# 3 Options
 
-## 3.1 Save background images
+<mark>Before we change the Options, make sure to stop data acquisition first.</mark>
 
-We usually don't check this. This sends a software trigger to the cameras. It has some limitations.
+## 3.1 Use plasma mirror
+
+If we use plasma mirror in the experiment, we check this option. The plasma mirror is for single-shot usage. Without moving the plasma mirror to an unused location, it could cause huge damages to the optics. The button "DamagedZones" saves a list of shot locations. If current location is within 4 mm (value is set in "constant.py") of one of the damaged zones, the button becomes red and a message is sent to the laser side to disable the hardware trigger button on the table. This function only works for TA2 experiment.
 
 ## 3.2 save an extra image by stitching
 
@@ -44,6 +46,16 @@ We usually check this. The DAQ will save an extra image by stitching the images 
 
 Check this to save scalar data. Click "Metadata" button next to the option. In the pop-up Metadata Window, select scalars you would like to save along with the images. Click "validate" to validate the scalars are accessible. The scalar data are saved in a ".csv" file and the file is in the same directory level with the camera folder level. Refer to screenshot in the [Acquisition](#4-acquisition) section for details.
 ![metadata_window](images/metadata.png)
+
+## 3.4 Scan
+
+We check this option to scan over some parameters, i.e., stages, timings or injection pressures. The button "Parameters" takes us to a new window "Scan Module".
+Section "Scannable Device". Check the attributes that need to be scanned over. The selected attributes appear on the header of Scan Table.
+Section "Scan Table". The scan list appears here. We can select rows and "Remove Selected" to modify the list.
+Section "Scan begins". The default number is 1. Sometimes if we would like to start a scan from a certain shot number, we can enter the shot number here.
+Section "Input". Enter value for each attribute and "Add to list".
+After each shot, the attributes will be set to the desired values automatically.
+Here I will give an complex example. we have taken 100 shots without using scan. Then we plan to do some scans for shot 101-150. We need to (1) stop data acquisition. (2) set "Start" (in Acquisition on the main page) to 101. (3) Check "Scan over parameters" and click "Parameters" button. (4) In the popup windows, select attributes you would like to scan over. Enter 101 for the "First Row in Scan Table as shot number #" and click "Change". Enter values for the attributes in "Input" and "Add to list" for all 50 shots. You may also edit the "scan_table.csv" as a faster way to input the scan parameters.
 
 # 4 Acquisition
 
@@ -59,15 +71,6 @@ The image naming format is "Shot[shot number]\_Time[].tiff", for example, "Shot2
 
 The Start shot number is defined here. This needs to be changed when resuming from a shooting break. For example, during a break, we often want to click "Stop" to stop acquisition in case of unwanted triggers. When we resume data acquisition, we sometimes prefer to pick up the previous shot number instead starting from shot number 1 again. This affects the naming of the saved images.
 The End shot number is useful when we use continuous triggering and when the laser side can't control the number of triggers sent.
-
-## 4.3 Scan
-
-This module probably should be moved to Option frame in the future. Open "Scan Module" window and we see 4 sections here.
-Section "Scannable Device". Check the attributes that need to be scanned over. The selected attributes appear on the header of Scan Table.
-Section "Scan Table". The scan list appears here. We can select rows and "Remove Selected" to modify the list.
-Section "Starting shot number". The default number is 1. Sometimes if we would like to start a scan from a certain shot number, we can enter the shot number here.
-Section "Input". Enter value for each attribute and "Add to list".
-After each shot, the attributes will be set to the desired values automatically.
 
 ## Start/Stop
 

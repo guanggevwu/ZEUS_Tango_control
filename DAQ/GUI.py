@@ -21,6 +21,8 @@ from collections import defaultdict
 from queue import Queue
 from tango import AttributeProxy
 from pypylon import pylon
+import time
+from constants import *
 
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s %(message)s")
@@ -76,7 +78,7 @@ class DaqGUI:
         s.configure('highlight.TCheckbutton', font=(
             'Helvetica', self.font_small))
         s.map("highlight.TCheckbutton",
-              background=[('selected', 'lightgreen'), ('!selected', 'lightgrey')])
+              background=[('selected', '#5dade2'), ('!selected', 'lightgrey')])
         s.configure('Sty2_offline.TButton', font=(
             'Helvetica', self.font_mid), background='#85929e')
         s.configure('Sty2_offline_text_small.TButton', font=(
@@ -92,7 +94,11 @@ class DaqGUI:
         s.configure('Sty3_start.TButton', font=(
             'Helvetica', self.font_mid), background='green')
         s.configure('Sty3_stop.TButton', font=(
-            'Helvetica', self.font_mid), background='red')
+            'Helvetica', self.font_mid), background='#5dade2')
+        s.configure('Sty3_start_small.TButton', font=(
+            'Helvetica', self.font_small), background='green')
+        s.configure('Sty3_stop_small.TButton', font=(
+            'Helvetica', self.font_small), background='red')
         s.configure("Treeview", font=('Helvetica', self.font_mid))
         s.configure('Treeview.Heading', font=(
             'Helvetica', self.font_small), background="PowderBlue")
@@ -125,10 +131,11 @@ class DaqGUI:
 
         # half column options first and then full column options with buttons
         self.frame2_checkbutton_content = {'use_plasma_mirror': {
-            'text': 'Use plasma mirror (only for TA2)', 'init_status': True, 'button': None}, 'save_copy': {
+            'text': 'Use plasma mirror', 'init_status': True, 'button': 'DamagedZones'}, 'save_copy': {
             'text': 'Save an extra copy of data', 'init_status': True, 'button': None}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True, 'button': None}, 'save_metadata': {'text': 'Save metadata', 'init_status': False, 'button': 'Metadata'}, 'scan': {'text': 'Scan over parameters', 'init_status': False, 'button': 'Parameters'}}
         item_per_column = 2
         current_row = 0
+        self.frame2_buttons = dict()
         for idx, (key, value) in enumerate(self.frame2_checkbutton_content.items()):
             checkbox_var = BooleanVar(value=value['init_status'])
             checkbox = ttk.Checkbutton(self.frame2, text=value['text'],
@@ -137,7 +144,9 @@ class DaqGUI:
                 # If current_row is x.0, use x as the row number. If current_row is x.5, use x+1 as the row number. int(current_row+0.5) fits both cases. Add 1 for the start of next row.
                 checkbox.grid(
                     column=0, row=int(current_row+0.5), sticky=W)
-                ttk.Button(self.frame2, text=value['button'], command=getattr(self, f"open_{value['button'].lower()}_window"), style='small_button.TButton').grid(
+                self.frame2_buttons[value['button']] = ttk.Button(self.frame2, text=value['button'], command=getattr(
+                    self, f"open_{value['button'].lower()}_window"), style='small_button.TButton')
+                self.frame2_buttons[value['button']].grid(
                     column=1, row=int(current_row+0.5), sticky='W')
                 current_row = int(current_row+0.5) + 1
             else:
@@ -218,11 +227,14 @@ class DaqGUI:
                     self.init_dict = json.load(jsonfile)
                     self.selected_devices = self.init_dict['selected_devices'] if 'selected_devices' in self.init_dict else dict(
                     )
+                    self.damaged_zones = self.init_dict['damaged_zones'] if 'damaged_zones' in self.init_dict else [
+                    ]
+                    self.damaged_zones = {i: None for i in self.damaged_zones}
                     self.checked_savable_attributes = self.init_dict[
                         'checked_savable_attributes'] if 'checked_savable_attributes' in self.init_dict else []
                     self.options = self.init_dict['options'] if 'options' in self.init_dict and self.init_dict['options'] is not None else dict(
                     )
-                    self.options['use_plasma_mirror'] = True
+                    # self.options['use_plasma_mirror'] = True
                     self.options['scan'] = False
                     self.path_var.set(
                         self.init_dict['save_path']) if "save_path" in self.init_dict else ''
@@ -235,6 +247,7 @@ class DaqGUI:
                 logger.error(
                     f"Error in loading init.json file. Exception: {type(e)}, {e}")
                 self.selected_devices = dict()
+                self.damaged_zones = dict()
                 self.checked_savable_attributes = []
                 self.options = dict()
         # only applied to basler cameras
@@ -245,6 +258,42 @@ class DaqGUI:
         for key in self.selected_devices:
             self.update_selected_devices(key, BooleanVar(value=True))
 
+    def threading_check_damaged_zones(self):
+        '''Threading function to check the damaged zones from plasma mirror stage. It will send TA2_ready or TA2_not_ready message to laser side via UDP socket.'''
+        try:
+            self.plasma_mirror_tango_dp = tango.DeviceProxy(
+                'TA2/esp301/esp302_ta2_2')
+            while True:
+                if self.my_event.is_set():
+                    break
+                current_location = np.array(
+                    [self.plasma_mirror_tango_dp.ax1_position, self.plasma_mirror_tango_dp.ax2_position])
+                for p in self.damaged_zones:
+                    p_float = np.array([float(i)
+                                       for i in p.strip().split()])
+                    if np.linalg.norm(current_location - p_float) < PLASMA_MIRROR_DAMAGE_RADIUS:
+                        my_message = 'TA2_not_ready'
+                        self.send_message_to_laser_side(my_message)
+                        if self.is_plasma_mirror_ready is None or self.is_plasma_mirror_ready:
+                            self.is_plasma_mirror_ready = False
+                            self.frame2_buttons['DamagedZones']['style'] = 'Sty3_stop_small.TButton'
+                            self.insert_to_disabled(
+                                f'In plasma mirror damaged zones.', 'red_text', with_alarm=False)
+                        break
+                else:
+                    my_message = 'TA2_ready'
+                    self.send_message_to_laser_side(my_message)
+                    if self.is_plasma_mirror_ready is None or not self.is_plasma_mirror_ready:
+                        self.is_plasma_mirror_ready = True
+                        self.frame2_buttons['DamagedZones']['style'] = 'Sty3_start_small.TButton'
+                        self.insert_to_disabled(
+                            f'Plasma mirror is safe.', 'green_text')
+                time.sleep(CHECKING_PLASMA_MIRROR_INTERVAL)
+        except Exception as e:
+            self.send_message_to_laser_side('TA2_not_ready')
+            self.insert_to_disabled(
+                f'Error in accessing plasma mirror stage. If you are not using plasma mirror, please uncheck "Use plasma mirror".', 'red_text')
+
     def send_message_to_laser_side(self, message: str):
         '''
         Send a message to the laser side via UDP socket. This function is called when the acquisition is started. If use plasma mirror is not checked, it will send 'TA2_ready' message. If use plasma mirror is checked, it will send 'TA2_not_ready' message.
@@ -252,8 +301,7 @@ class DaqGUI:
         '''
         message = f'{datetime.now()}: {message}'
         self.laser_socket.sendto(
-            message.encode(), ("192.168.131.71", 5005))
-        self.insert_to_disabled(f'send "{message}" to laser side')
+            message.encode(), (LASER_SIDE_IP, LASER_SIDE_PORT))
 
     def pad_space(self, frame):
         for child in frame.winfo_children():
@@ -266,6 +314,14 @@ class DaqGUI:
         self.device_list_window.deiconify()
         self.device_list_window.attributes('-topmost', True)
         self.device_list_window.attributes('-topmost', False)
+
+    def open_damagedzones_window(self):
+        '''Command for the damaged button in frame2. It opens a new window with the save attributes list.'''
+        if not (hasattr(self, "damagedzones_window") and self.damagedzones_window.winfo_exists()):
+            self.damagedzones_window = DamagedZonesWindow(self)
+        self.damagedzones_window.deiconify()
+        self.damagedzones_window.attributes('-topmost', True)
+        self.damagedzones_window.attributes('-topmost', False)
 
     def open_metadata_window(self):
         '''Command for the metadata button in frame2. It opens a new window with the save attributes list.'''
@@ -431,7 +487,7 @@ class DaqGUI:
             self.acquisition['button']['style'] = 'Sty3_start.TButton'
             self.acquisition['button']['text'] = 'Start'
             del self.daq
-            self.insert_to_disabled("Stopped acquisition.", 'green_text')
+            self.insert_to_disabled("Stopped acquisition.")
         else:
             self.acquisition['status'] = True
             self.acquisition['is_completed'] = False
@@ -439,16 +495,21 @@ class DaqGUI:
             Thread(target=self.start_acquisition).start()
             self.acquisition['button']['style'] = 'Sty3_stop.TButton'
             self.acquisition['button']['text'] = 'Stop'
+            self.insert_to_disabled("", with_timestamp=False)
             self.insert_to_disabled(
                 "Started acquisition in a new thread.", 'green_text')
+
+    def write_to_init_file(self):
+        '''Write the selected devices and options to the init.json file.'''
+        with open(self.init_file_path, 'w') as jsonfile:
+            json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get(
+            ), "checked_savable_attributes": self.checked_savable_attributes, "damaged_zones": list(self.damaged_zones.keys())}, jsonfile)
 
     def start_acquisition(self):
         '''Start the acquisition in a new thread. It will create a Daq object and call its acquisition method. It will also save the options and selected devices to a json file. It is called by the toggle_acquisition function.'''
         for opt in self.frame2_checkbutton_content.keys():
             self.options[opt] = self.frame2_checkbutton_content[opt]['var'].get()
-        with open(self.init_file_path, 'w') as jsonfile:
-            json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get(), "checked_savable_attributes": self.checked_savable_attributes},
-                      jsonfile)
+        self.write_to_init_file()
         # remove highlight in scan module before starting acquisition
         if hasattr(self, "scan_window") and self.scan_window.winfo_exists():
             if self.scan_window.tree.tag_has(f'#{self.current_shot_number}'):
@@ -456,12 +517,13 @@ class DaqGUI:
                     f'#{self.current_shot_number}', background='white')
         # if the checkbox is checked, then we use the config saved in config.py file and we pass None here. If it is unchecked, then we pass the basic configuration and ignore the configuration in the file.
         self.daq = Daq(self.selected_devices,
-                       dir=self.path_var.get(), thread_event=self.my_event, check_exist=False, GUI=self)
+                       dir=self.path_var.get(), thread_event=self.my_event, GUI=self)
         self.daq.set_camera_configuration()
-        if not self.options['use_plasma_mirror']:
-            self.send_message_to_laser_side('TA2_ready')
+        if self.options['use_plasma_mirror']:
+            self.is_plasma_mirror_ready = None
+            Thread(target=self.threading_check_damaged_zones, daemon=True).start()
         else:
-            self.send_message_to_laser_side('TA2_not_ready')
+            self.frame2_buttons['DamagedZones']['style'] = 'small_button.TButton'
         scan_table = self.scan_window.scan_table if hasattr(
             self, 'scan_window') else None
         self.daq.acquisition(
@@ -469,18 +531,21 @@ class DaqGUI:
         if not self.my_event.is_set():
             self.toggle_acquisition()
 
-    def insert_to_disabled(self, text, tag_config=None):
+    def insert_to_disabled(self, text, tag_config=None, with_timestamp=True, with_alarm=True):
         logger.info(text)
-        time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-        self.logging_q.put([time, text, tag_config])
-        if tag_config == "red_text":
+        if with_timestamp:
+            time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+            self.logging_q.put([f'{time}, {text}', tag_config])
+        else:
+            self.logging_q.put([text, tag_config])
+        if tag_config == "red_text" and with_alarm:
             messagebox.showerror(message=text)
 
     def logger_thread(self):
         while 1:
-            time, text, tag_config = self.logging_q.get()
+            text, tag_config = self.logging_q.get()
             self.t['state'] = 'normal'
-            self.t.insert(END, f'{time}, {text}\n', tag_config)
+            self.t.insert(END, f'{text}\n', tag_config)
             self.t.see("end")
             self.t['state'] = 'disabled'
 
@@ -602,6 +667,65 @@ class BandwidthWindow(Toplevel):
         self.update_bandwidth_tree()
 
 
+class DamagedZonesWindow(Toplevel):
+    def __init__(self, parent):
+        super().__init__(master=root)
+        self.title("Damaged zones in plasma mirror")
+        self.parent = parent
+
+        self.damaged_zones = self.parent.damaged_zones
+        self.main_frame = ttk.Frame(self)
+        self.main_frame.grid(column=0, row=0)
+        self.button_frame = ttk.Frame(
+            self.main_frame, padding="0 0 10 0")
+        self.button_frame.grid(column=0, row=0, sticky="NW")
+        ttk.Button(self.button_frame, text='Select All', command=self.select_all,
+                   style='Sty1.TButton').grid(column=0, row=0)
+        ttk.Button(self.button_frame, text='Clear Selected', command=self.clear_selected_damaged_zones,
+                   style='Sty1.TButton').grid(column=1, row=0)
+        self.setup_checkboxes()
+
+    def setup_checkboxes(self):
+        items_per_column = 20
+        if hasattr(self, 'checkbox_frame'):
+            self.checkbox_frame.destroy()
+        self.checkbox_frame = ttk.Frame(
+            self.main_frame, padding="0 0 10 0")
+        self.checkbox_frame.grid(column=0, row=1, sticky="NW")
+        for frame_idx in range(len(self.damaged_zones)//items_per_column+1):
+            sub_frame = ttk.Labelframe(
+                self.checkbox_frame, padding="0 0 10 0", style='Sty1.TLabelframe')
+            sub_frame.grid(column=frame_idx, row=1, sticky="NW")
+            sub_frame.columnconfigure(0, weight=1)
+            sub_frame.columnconfigure(1, weight=1)
+            start = frame_idx*items_per_column
+            end = min((frame_idx+1)*items_per_column,
+                      len(self.damaged_zones))
+            for idx, attr in enumerate(list(self.damaged_zones.keys())[start:end]):
+                checkbox_var = BooleanVar(value=False)
+                checkbox = ttk.Checkbutton(
+                    sub_frame, text='    '.join(attr.split()), variable=checkbox_var, style='highlight.TCheckbutton')
+                checkbox.grid(
+                    column=0, row=idx % items_per_column, sticky=W)
+                self.damaged_zones[attr] = checkbox_var
+
+    def clear_selected_damaged_zones(self, target=None):
+        '''Button command: clear the selected damaged zones'''
+        tmp = []
+        for attr, is_checked in self.damaged_zones.items():
+            if is_checked.get():
+                tmp.append(attr)
+        for attr in tmp:
+            self.damaged_zones.pop(attr)
+        self.setup_checkboxes()
+        self.parent.write_to_init_file()
+
+    def select_all(self):
+        '''Button command: select all damaged zones'''
+        for attr, is_checked in self.damaged_zones.items():
+            is_checked.set(True)
+
+
 class MetadataWindow(Toplevel):
     def __init__(self, parent):
         super().__init__(master=root)
@@ -667,7 +791,7 @@ class ScanWindow(Toplevel):
             self, text='Scan Table', padding=pad_widget, style='Sty1.TLabelframe')
         self.scan_frame2.grid(column=0, row=1, rowspan=2, sticky="WE")
         self.scan_frame3 = ttk.Labelframe(
-            self, text='Starting shot number', padding=pad_widget, style='Sty1.TLabelframe')
+            self, text='Scan begins', padding=pad_widget, style='Sty1.TLabelframe')
         self.scan_frame3.grid(column=1, row=1, sticky="WENS")
         self.scan_frame4 = ttk.Labelframe(
             self, text='Input', padding=pad_widget, style='Sty1.TLabelframe')
@@ -701,7 +825,7 @@ class ScanWindow(Toplevel):
                 column=col, row=self.scannable_list_row, sticky=W)
 
         ttk.Label(
-            self.scan_frame3, text='Starting from shot ', font=('Helvetica', 12)).grid(row=0, column=0)
+            self.scan_frame3, text='First row in Scan Table as shot number # ', font=('Helvetica', 12)).grid(row=0, column=0)
 
         self.firstrow_var = IntVar(value=1)
         ttk.Entry(self.scan_frame3, textvariable=self.firstrow_var).grid(
