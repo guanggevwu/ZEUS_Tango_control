@@ -196,6 +196,7 @@ class DaqGUI:
             'Helvetica', int(self.font_mid*0.75)), wrap=WORD)
         self.t.tag_config("red_text", foreground="red")
         self.t.tag_config("green_text", foreground="green")
+        self.t.tag_config("blue_text", foreground="blue")
         self.t.grid(column=0, row=0, sticky=W)
         self.insert_to_disabled("DAQ GUI is started.")
         sb = ttk.Scrollbar(self.frame4,
@@ -292,7 +293,7 @@ class DaqGUI:
         except Exception as e:
             self.send_message_to_laser_side('TA2_not_ready')
             self.insert_to_disabled(
-                f'Error in accessing plasma mirror stage. If you are not using plasma mirror, please uncheck "Use plasma mirror".', 'red_text')
+                f'Error in accessing plasma mirror stage. If you are not using plasma mirrors, please uncheck "Use plasma mirror".', 'red_text')
 
     def send_message_to_laser_side(self, message: str):
         '''
@@ -497,7 +498,7 @@ class DaqGUI:
             self.acquisition['button']['text'] = 'Stop'
             self.insert_to_disabled("", with_timestamp=False)
             self.insert_to_disabled(
-                "Started acquisition in a new thread.", 'green_text')
+                "Started acquisition in a new thread.", 'blue_text')
 
     def write_to_init_file(self):
         '''Write the selected devices and options to the init.json file.'''
@@ -611,18 +612,28 @@ class BandwidthWindow(Toplevel):
     def __init__(self, parent):
         self.parent = parent
         super().__init__(master=root)
-        ttk.Label(self, text='Allowed bandwidth:', font=(
+        self.frame = ttk.Frame(self, padding="10 10 10 10")
+        self.frame.grid(column=0, row=0)
+        ttk.Label(self.frame, text='Allowed bandwidth:', font=(
             'Helvetica', int(self.parent.font_mid*0.75))).grid(
             column=0, row=0, sticky='W')
         self.total_bandwidth_var = DoubleVar(value=80.0)
-        ttk.Entry(self, textvariable=self.total_bandwidth_var, font=(
+        ttk.Entry(self.frame, textvariable=self.total_bandwidth_var, font=(
             'Helvetica', int(self.parent.font_mid*0.75)), width=20).grid(
             column=1, row=0, sticky='W')
-        ttk.Button(self, text='Optimize', command=self.optimize_bandwidth, style='Sty1.TButton').grid(
+        ttk.Button(self.frame, text='Optimize', command=self.optimize_bandwidth, style='Sty1.TButton').grid(
             column=2, row=0, sticky='W')
-        ttk.Button(self, text='Refresh', command=self.update_bandwidth_tree, style='Sty1.TButton').grid(
+        ttk.Button(self.frame, text='Refresh', command=self.update_bandwidth_tree, style='Sty1.TButton').grid(
             column=3, row=0, sticky='W')
-        self.tree = ttk.Treeview(self, style="normal.Treeview")
+        note1 = "1. Cameras with bandwidth shown as -1 are bandwidth-not-available. Change bandwidth for them in Pylon Viewer if their result fps is much greater than other cameras."
+        note2 = "2. Suggested allowed bandwidth for all bandwidth-available cameras is 80MB/s. Decrease it if there are bandwidth-not-available cameras."
+        ttk.Label(self.frame, text=note1, font=(
+            'Helvetica', int(self.parent.font_mid*0.75)), wraplength=550).grid(
+            column=0, row=1, columnspan=4, pady=(5, 5), sticky='W')
+        ttk.Label(self.frame, text=note2, font=(
+            'Helvetica', int(self.parent.font_mid*0.75)), wraplength=550).grid(
+            column=0, row=2, columnspan=4, pady=(0, 5), sticky='W')
+        self.tree = ttk.Treeview(self.frame, style="normal.Treeview")
         self.tree.column("#0", width=150, anchor='center')
         self.tree.heading('#0', text='Name')
         column_heading = ['Bandwidth', 'Resulting fps']
@@ -630,40 +641,39 @@ class BandwidthWindow(Toplevel):
         self.update_bandwidth_tree()
 
     def update_bandwidth_tree(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-        for i in self.tree['columns']:
-            self.tree.column(i, width=150, anchor='center')
-            self.tree.heading(i, text=i)
-        self.bandwidth_list = []
-        self.resulting_fps_list = []
-        self.frame_size_list = []
-        self.name_list = []
-        for key, value in self.parent.selected_devices.items():
-            if not 'basler' in key.lower():
-                continue
-            bandwidth = value['tango_dp'].bandwidth
-            resulting_fps = value['tango_dp'].resulting_fps
-            self.tree.insert('', 'end', text=key.split(
-                '/')[-1], values=(bandwidth, resulting_fps))
-            if bandwidth < 0:
-                continue
-            self.name_list.append(key)
-            self.bandwidth_list.append(bandwidth)
-            self.resulting_fps_list.append(resulting_fps)
-            self.frame_size_list.append(bandwidth/resulting_fps)
-        self.tree.grid(column=0, columnspan=4, row=1)
+        try:
+            for item in self.tree.get_children():
+                self.tree.delete(item)
+            for i in self.tree['columns']:
+                self.tree.column(i, width=150, anchor='center')
+                self.tree.heading(i, text=i)
+            self.frame_size = dict()
+            for key, value in self.parent.selected_devices.items():
+                if not 'basler' in key.lower():
+                    continue
+                bandwidth = value['tango_dp'].bandwidth
+                resulting_fps = value['tango_dp'].resulting_fps
+                friendly_name = value['tango_dp'].user_defined_name
+                self.tree.insert('', 'end', text=friendly_name,
+                                 values=(bandwidth, resulting_fps))
+                if bandwidth < 0:
+                    continue
+                self.frame_size[key] = bandwidth/resulting_fps
+            self.tree.grid(column=0, columnspan=4, row=3)
+        except Exception as e:
+            messagebox.showerror(
+                message=f'Error in updating bandwidth table. Please make sure all devices are connected properly. Exception: {type(e)}, {e}')
 
     def optimize_bandwidth(self):
         total_bandwidth = self.total_bandwidth_var.get()
         if not total_bandwidth:
             messagebox.showinfo(message='Please input the total bandwidth!')
             return
-        for key, value in self.parent.selected_devices.items():
-            if key in self.name_list:
-                value['tango_dp'].bandwidth = total_bandwidth / \
-                    np.sum(self.frame_size_list) * \
-                    self.frame_size_list[self.name_list.index(key)]
+        size_of_total_frames = np.sum([v for v in self.frame_size.values()])
+        for key, value in self.frame_size.items():
+            self.parent.selected_devices[key]['tango_dp'].bandwidth = total_bandwidth / \
+                size_of_total_frames * \
+                self.frame_size[key]
         self.update_bandwidth_tree()
 
 
@@ -674,7 +684,7 @@ class DamagedZonesWindow(Toplevel):
         self.parent = parent
 
         self.damaged_zones = self.parent.damaged_zones
-        self.main_frame = ttk.Frame(self)
+        self.main_frame = ttk.Frame(self, padding="10 10 10 10")
         self.main_frame.grid(column=0, row=0)
         self.button_frame = ttk.Frame(
             self.main_frame, padding="0 0 10 0")
@@ -704,7 +714,7 @@ class DamagedZonesWindow(Toplevel):
             for idx, attr in enumerate(list(self.damaged_zones.keys())[start:end]):
                 checkbox_var = BooleanVar(value=False)
                 checkbox = ttk.Checkbutton(
-                    sub_frame, text='    '.join(attr.split()), variable=checkbox_var, style='highlight.TCheckbutton')
+                    sub_frame, text=f'{attr.split()[0]:>10} {attr.split()[1]:>10}', variable=checkbox_var, style='highlight.TCheckbutton')
                 checkbox.grid(
                     column=0, row=idx % items_per_column, sticky=W)
                 self.damaged_zones[attr] = checkbox_var

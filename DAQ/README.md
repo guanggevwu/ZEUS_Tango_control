@@ -123,7 +123,7 @@ run the batch file at: "...\ZEUS_Tango_control\shortcut\Windows\add_new_device.b
 python "...\ZEUS_Tango_control\register\register_device_server.py"
 ```
 
-We will need to provide "server/instance", "class" and "device name". For Basler cameras, a convention is enter the "user defined name" in the Pylon as the "device name" in Tango. For example, if you select "Basler" and enter "TA1-SomeCamera" as the name, automatically "server/instance" will be set to "Balser/TA1-SomeCamera", class will be set to "Basler" and device name will be set to "TA3/basler/TA1-SomeCamera". All these parameters should be case insensitive.
+For Basler cameras, all we need to provide is the serial number. Follow prompts to finish the registration.
 
 ### Pre-enter all the information and then add the device.
 

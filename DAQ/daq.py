@@ -305,7 +305,7 @@ class Daq:
                         try:
                             self.plasma_mirror_stages = tango.DeviceProxy(
                                 'TA2/esp301/esp302_ta2_2')
-                            self.GUI.damaged_zones[f'{self.plasma_mirror_stages.ax1_position:>10} {self.plasma_mirror_stages.ax2_position:>10}'] = False
+                            self.GUI.damaged_zones[f'{self.plasma_mirror_stages.ax1_position} {self.plasma_mirror_stages.ax2_position}'] = False
                             self.GUI.write_to_init_file()
                             self.GUI.is_plasma_mirror_ready = None
                             if hasattr(self.GUI, 'damagedzones_window') and self.GUI.damagedzones_window.winfo_exists():
@@ -381,7 +381,7 @@ class Daq:
                         # self.logger(f"It takes {datetime.now() - t0} to save out of thread.")
                     self.current_shot_for_all_cam += 1
                     self.logger(
-                        f"Shot {self.current_shot_for_all_cam-1} is completed.", 'green_text')
+                        f"Shot {self.current_shot_for_all_cam-1} is completed.", 'blue_text')
                     playsound(os.path.join(os.path.dirname(__file__), 'media',
                                            'sound', 'shot_completion_1.mp3'), block=False)
                     # send plasma mirror ready signal
