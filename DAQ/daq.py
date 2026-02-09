@@ -68,11 +68,8 @@ class Daq:
                             os.makedirs(os.path.join(
                                 p, 'stitching'), exist_ok=True)
                 logging.info(f'Connected: {c}')
-            except:
-                if 'exception' in locals():
-                    raise exception
-                else:
-                    raise Exception(f"{c} is not found!")
+            except Exception as e:
+                raise Exception(f"Error. {e}")
         self.debug = debug
         # atexit.register(self.termination)
 
@@ -123,9 +120,9 @@ class Daq:
                             if key != "is_polling_periodically":
                                 self.logger(
                                     f"{info['user_defined_name']}/{key} is changed from {old_value} to {value}")
-                    except:
+                    except Exception as e:
                         self.logger(
-                            f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}, 'red_text'")
+                            f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}. Details: {e}", 'red_text')
             # if the saving_format is not set in the configuration
             if ('saving_format' not in info['config_dict']):
                 info['file_name'] = '%s'
@@ -232,33 +229,30 @@ class Daq:
         '''
         Main acquisition function. Use external trigger and save data.
         '''
+        self.current_shot_for_all_cam = shot_start
         # set scan value
         # self.scan_attr_proxies is a dictionary. Its key is a string device/attr and its value is the attribute proxy
         self.scan_attr_proxies = {}
         if self.GUI.options['scan'] and scan_table and any(scan_table.values()):
             self.scan_table = scan_table
-
+            self.scan_shot_range = range(
+                self.GUI.scan_window.row_shotnum, self.GUI.scan_window.row_shotnum + len(list(self.scan_table.values())[0]))
             for device_attr_name, value in self.scan_table.items():
-                if not hasattr(self, "scan_shot_range"):
-                    self.scan_shot_range = range(
-                        self.GUI.row_shotnum, self.GUI.row_shotnum + len(value))
                 self.scan_attr_proxies[device_attr_name] = tango.AttributeProxy(
                     device_attr_name)
-                if shot_start in self.scan_shot_range:
-                    try:
-                        self.set_scan_value(
-                            self.scan_attr_proxies[device_attr_name], value, shot_start)
-                    except Exception as e:
-                        self.logger(
-                            f"Error setting scan value for {device_attr_name} at shot {shot_start}: {e}", 'red_text')
+                try:
+                    self.set_scan_value(
+                        self.scan_attr_proxies[device_attr_name], value, shot_start)
+                    self.GUI.root.event_generate("<<RefreshScanTable>>")
+                except Exception as e:
+                    self.logger(
+                        f"Error setting scan value for {device_attr_name} at shot {shot_start}: {e}", 'red_text')
         self.scalars = {attr: tango.AttributeProxy(
             attr) for attr in self.GUI.checked_savable_attributes}
         resulting_fps_dict = {}
         if len(self.cam_info) < 2:
             stitch = False
-        # compare shot number of each camera with self.current_shot_for_all_cam to determine if it is time to stitch and inform "shot xx is compeleted"
         # reset shot number and set the start shot number
-        self.current_shot_for_all_cam = shot_start
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
             if hasattr(bs, 'reset_number'):
@@ -282,7 +276,7 @@ class Daq:
                                    stitch, scan_table], daemon=True)
         threads.append(t_shot_completion)
         t_shot_completion.start()
-        self.logger('Waiting for a trigger...')
+        self.logger('Waiting for a trigger...', 'blue_text')
         for t in threads:
             t.join()
         # acquisition
@@ -309,7 +303,8 @@ class Daq:
                             self.GUI.write_to_init_file()
                             self.GUI.is_plasma_mirror_ready = None
                             if hasattr(self.GUI, 'damagedzones_window') and self.GUI.damagedzones_window.winfo_exists():
-                                self.GUI.damagedzones_window.setup_checkboxes()
+                                self.GUI.root.event_generate(
+                                    "<<RefreshDamagedZonesData>>")
                         except Exception as e:
                             self.logger(
                                 f'Error in accessing plasma mirror stage: {e}', 'red_text')
@@ -387,18 +382,18 @@ class Daq:
                     # send plasma mirror ready signal
                     if not self.GUI.options['use_plasma_mirror']:
                         self.GUI.send_message_to_laser_side('TA2_ready')
-                    # remove highlight in scan module window
-                    if hasattr(self.GUI, 'scan_window') and self.GUI.scan_window.winfo_exists() and self.GUI.scan_window.tree.tag_has(f'#{self.current_shot_for_all_cam-1}'):
-                        self.GUI.scan_window.tree.tag_configure(
-                            f'#{self.current_shot_for_all_cam-1}', background='white')
                     # save scala data
                     if self.GUI.options["save_metadata"]:
                         self.csv_header = ['shot_number', 'time']
                         self.save_scalars(self.current_shot_for_all_cam)
-                    if self.GUI.options["scan"] and scan_table is not None and hasattr(self, "scan_shot_range") and self.current_shot_for_all_cam in self.scan_shot_range:
-                        for device_attr_name, ap in self.scan_attr_proxies.items():
-                            self.set_scan_value(
-                                ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
+                    if self.GUI.options["scan"]:
+                        if hasattr(self.GUI, "scan_window") and self.GUI.scan_window.winfo_exists():
+                            self.GUI.root.event_generate(
+                                "<<RefreshScanTable>>")
+                        if scan_table is not None and hasattr(self, "scan_shot_range"):
+                            for device_attr_name, ap in self.scan_attr_proxies.items():
+                                self.set_scan_value(
+                                    ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
 
                 if not False in [value['is_completed'] for value in self.cam_info.values()]:
                     self.logger("All shots completed!")
@@ -437,7 +432,8 @@ class Daq:
         :param shot_number: the shot number to be set
         :returns: None
         """
-
+        if shot_number not in self.scan_shot_range:
+            return
         if value_list[self.scan_shot_range.index(shot_number)]:
             value = value_list[self.scan_shot_range.index(shot_number)]
             '''
@@ -471,14 +467,10 @@ class Daq:
                 convert_func = float
             attr_proxy.write(convert_func(value))
             self.logger(
-                f'Shot {shot_number}. {attr_proxy.get_device_proxy().dev_name().split("/")[-1]}/{attr_proxy.name()}: {value}')
+                f'Shot {shot_number}. {attr_proxy.get_device_proxy().dev_name().split("/")[-1]}/{attr_proxy.name()}: {value}.')
         else:
             self.logger(
                 f'Shot {shot_number}. {attr_proxy.get_device_proxy().dev_name().split("/")[-1]}/{attr_proxy.name()}: empty scan value. It was {attr_proxy.read().value} {attr_proxy.get_config().unit}.')
-        self.GUI.current_shot_number = shot_number
-        if self.GUI.scan_window.winfo_exists():
-            self.GUI.scan_window.tree.tag_configure(
-                f'#{shot_number}', background='yellow')
 
     def save_scalars(self, shot_number,):
         self.csv_header.extend(self.scalars.keys())

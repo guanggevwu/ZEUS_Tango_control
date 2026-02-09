@@ -39,13 +39,10 @@ logger.addHandler(fh)
 
 class DaqGUI:
     def __init__(self, root):
+        self.root = root
         self.db = tango.Database()
         self.root_path = os.path.dirname(os.path.dirname(__file__))
         self.logging_q = Queue()
-        # self.current_shot_numbern is for highlight function. O indicate no highlight before start acquisition.
-        self.current_shot_number = 0
-        # self.row_shotnum is for define start shot on scan list.
-        self.row_shotnum = 1
         if platform.system() == 'Linux':
             self.python_path = os.path.join(
                 self.root_path, 'venv', 'bin', 'python')
@@ -210,10 +207,10 @@ class DaqGUI:
         self.pad_space(self.frame3)
         self.pad_space(self.frame4)
 
-        Thread(target=self.logger_thread, daemon=True).start()
         self.init_settings()
         self.laser_socket = socket.socket(
             socket.AF_INET, socket.SOCK_DGRAM)
+        self.schedule_logging_message()
 
     def init_settings(self):
         # self.selected_devices structure. self.selected_devices = {'[device name]': {'checkbutton': ttk.Button, 'server_pid': [int/string?], 'connection_try_times': [int], 'tango_dp': tango.DeviceProxy}, }
@@ -259,19 +256,20 @@ class DaqGUI:
         for key in self.selected_devices:
             self.update_selected_devices(key, BooleanVar(value=True))
 
-    def threading_check_damaged_zones(self):
+    def schedule_checking_damaged_zones(self):
         '''Threading function to check the damaged zones from plasma mirror stage. It will send TA2_ready or TA2_not_ready message to laser side via UDP socket.'''
         try:
             self.plasma_mirror_tango_dp = tango.DeviceProxy(
                 'TA2/esp301/esp302_ta2_2')
-            while True:
-                if self.my_event.is_set():
-                    break
+            if self.my_event.is_set():
+                self.frame2_buttons['DamagedZones']['style'] = 'small_button.TButton'
+                return
+            else:
                 current_location = np.array(
                     [self.plasma_mirror_tango_dp.ax1_position, self.plasma_mirror_tango_dp.ax2_position])
                 for p in self.damaged_zones:
                     p_float = np.array([float(i)
-                                       for i in p.strip().split()])
+                                        for i in p.strip().split()])
                     if np.linalg.norm(current_location - p_float) < PLASMA_MIRROR_DAMAGE_RADIUS:
                         my_message = 'TA2_not_ready'
                         self.send_message_to_laser_side(my_message)
@@ -289,7 +287,8 @@ class DaqGUI:
                         self.frame2_buttons['DamagedZones']['style'] = 'Sty3_start_small.TButton'
                         self.insert_to_disabled(
                             f'Plasma mirror is safe.', 'green_text')
-                time.sleep(CHECKING_PLASMA_MIRROR_INTERVAL)
+                self.root.after(CHECKING_PLASMA_MIRROR_INTERVAL *
+                                1000, self.schedule_checking_damaged_zones)
         except Exception as e:
             self.send_message_to_laser_side('TA2_not_ready')
             self.insert_to_disabled(
@@ -368,7 +367,7 @@ class DaqGUI:
             #        args=(device_name,)).start()
             # self.check_device_server_status(device_name)
             self.selected_devices[device_name]['connection_try_times'] = 0
-            root.after(
+            self.root.after(
                 3000, lambda: self.check_device_server_status(device_name))
         else:
             self.kill_device_server(device_name)
@@ -387,7 +386,7 @@ class DaqGUI:
         self.insert_to_disabled(f'{device_name} server is killed.')
 
     def check_device_server_status(self, device_name):
-        '''Check if the device server is running. If it is running, it will change the button style to online. If it is not running, it will try to connect again. It is called by the connect_to_device function.'''
+        '''Check if the device server is running. If it is running, it will change the button style to online. If it is not running, it will try to check again. It is called by the connect_to_device function.'''
         if 'connection_try_times' not in self.selected_devices[device_name]:
             return
         self.selected_devices[device_name]['connection_try_times'] += 1
@@ -408,7 +407,7 @@ class DaqGUI:
                         f'Exception: {type(e)}. "{device_name}" server is not running. Check if the device is occupied by other process.', 'red_text')
                 self.kill_device_server(device_name)
             else:
-                root.after(
+                self.root.after(
                     3000, lambda: self.check_device_server_status(device_name))
 
     def start_device_GUI(self):
@@ -511,18 +510,14 @@ class DaqGUI:
         for opt in self.frame2_checkbutton_content.keys():
             self.options[opt] = self.frame2_checkbutton_content[opt]['var'].get()
         self.write_to_init_file()
-        # remove highlight in scan module before starting acquisition
-        if hasattr(self, "scan_window") and self.scan_window.winfo_exists():
-            if self.scan_window.tree.tag_has(f'#{self.current_shot_number}'):
-                self.scan_window.tree.tag_configure(
-                    f'#{self.current_shot_number}', background='white')
         # if the checkbox is checked, then we use the config saved in config.py file and we pass None here. If it is unchecked, then we pass the basic configuration and ignore the configuration in the file.
         self.daq = Daq(self.selected_devices,
                        dir=self.path_var.get(), thread_event=self.my_event, GUI=self)
         self.daq.set_camera_configuration()
         if self.options['use_plasma_mirror']:
             self.is_plasma_mirror_ready = None
-            Thread(target=self.threading_check_damaged_zones, daemon=True).start()
+            Thread(target=self.schedule_checking_damaged_zones,
+                   daemon=True).start()
         else:
             self.frame2_buttons['DamagedZones']['style'] = 'small_button.TButton'
         scan_table = self.scan_window.scan_table if hasattr(
@@ -532,23 +527,32 @@ class DaqGUI:
         if not self.my_event.is_set():
             self.toggle_acquisition()
 
-    def insert_to_disabled(self, text, tag_config=None, with_timestamp=True, with_alarm=True):
+    def insert_to_disabled(self, text, tag_config=None, with_timestamp=True, with_alarm=None):
+        if with_alarm is None:
+            if tag_config == 'red_text':
+                with_alarm = True
+            else:
+                with_alarm = False
         logger.info(text)
         if with_timestamp:
             time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-            self.logging_q.put([f'{time}, {text}', tag_config])
+            self.logging_q.put([f'{time}, {text}', tag_config, with_alarm])
         else:
-            self.logging_q.put([text, tag_config])
-        if tag_config == "red_text" and with_alarm:
-            messagebox.showerror(message=text)
+            self.logging_q.put([text, tag_config, with_alarm])
 
-    def logger_thread(self):
-        while 1:
-            text, tag_config = self.logging_q.get()
+    def schedule_logging_message(self):
+        try:
+            text, tag_config, with_alarm = self.logging_q.get(block=False)
             self.t['state'] = 'normal'
             self.t.insert(END, f'{text}\n', tag_config)
             self.t.see("end")
             self.t['state'] = 'disabled'
+            if with_alarm:
+                messagebox.showerror(message=text)
+        except Exception as e:
+            pass
+        finally:
+            self.root.after(200, self.schedule_logging_message)
 
 
 class DeviceListWindow(Toplevel):
@@ -561,7 +565,7 @@ class DeviceListWindow(Toplevel):
                 Basler_class_device = self.parent.db.get_device_name('*', c)
             self.device_names_in_db.extend(
                 self.parent.db.get_device_name('*', c))
-        super().__init__(master=root)
+        super().__init__(master=parent.root)
         self.title("Device List")
         newframe1 = ttk.Frame(self)
         newframe1.grid(column=0, row=0, columnspan=1, sticky=(N, W, E, S))
@@ -611,7 +615,7 @@ class DeviceListWindow(Toplevel):
 class BandwidthWindow(Toplevel):
     def __init__(self, parent):
         self.parent = parent
-        super().__init__(master=root)
+        super().__init__(master=parent.root)
         self.frame = ttk.Frame(self, padding="10 10 10 10")
         self.frame.grid(column=0, row=0)
         ttk.Label(self.frame, text='Allowed bandwidth:', font=(
@@ -672,14 +676,13 @@ class BandwidthWindow(Toplevel):
         size_of_total_frames = np.sum([v for v in self.frame_size.values()])
         for key, value in self.frame_size.items():
             self.parent.selected_devices[key]['tango_dp'].bandwidth = total_bandwidth / \
-                size_of_total_frames * \
-                self.frame_size[key]
+                size_of_total_frames * self.frame_size[key]
         self.update_bandwidth_tree()
 
 
 class DamagedZonesWindow(Toplevel):
     def __init__(self, parent):
-        super().__init__(master=root)
+        super().__init__(master=parent.root)
         self.title("Damaged zones in plasma mirror")
         self.parent = parent
 
@@ -694,8 +697,10 @@ class DamagedZonesWindow(Toplevel):
         ttk.Button(self.button_frame, text='Clear Selected', command=self.clear_selected_damaged_zones,
                    style='Sty1.TButton').grid(column=1, row=0)
         self.setup_checkboxes()
+        parent.root.bind("<<RefreshDamagedZonesData>>",
+                         self.setup_checkboxes)
 
-    def setup_checkboxes(self):
+    def setup_checkboxes(self, event=None):
         items_per_column = 20
         if hasattr(self, 'checkbox_frame'):
             self.checkbox_frame.destroy()
@@ -738,7 +743,7 @@ class DamagedZonesWindow(Toplevel):
 
 class MetadataWindow(Toplevel):
     def __init__(self, parent):
-        super().__init__(master=root)
+        super().__init__(master=parent.root)
         self.title("Metadata Module")
         self.parent = parent
         items_per_column = 20
@@ -790,10 +795,12 @@ class MetadataWindow(Toplevel):
 
 class ScanWindow(Toplevel):
     def __init__(self, parent):
-        super().__init__(master=root)
+        super().__init__(master=parent.root)
         self.title("Scan Module")
         self.parent = parent
         pad_widget = "10 0 0 10"
+        # self.row_shotnum is for define start shot on scan list.
+        self.row_shotnum = 1
         self.scan_frame1 = ttk.Labelframe(
             self, text='Scannable Device', padding=pad_widget, style='Sty1.TLabelframe')
         self.scan_frame1.grid(column=0, row=0, columnspan=2, sticky=W)
@@ -855,7 +862,7 @@ class ScanWindow(Toplevel):
             self.scan_frame2, text='Clear all', command=self.clear_list, style='Sty2_offline.TButton')
         clear_button.grid(row=21, column=int(
             self.item_each_row/2), columnspan=int(self.item_each_row/2))
-
+        parent.root.bind("<<RefreshScanTable>>", self.update_tree)
         for child in self.winfo_children():
             child.grid_configure(padx=[0, 5], pady=5)
 
@@ -873,7 +880,7 @@ class ScanWindow(Toplevel):
 
     def change_row_shotnum(self):
         '''Button command: apply the row to shotnum value'''
-        self.parent.row_shotnum = self.firstrow_var.get()
+        self.row_shotnum = self.firstrow_var.get()
         self.update_tree()
 
     def add_data_to_list(self):
@@ -908,7 +915,7 @@ class ScanWindow(Toplevel):
                 writer.writerows([[value[idx] for value in self.scan_table.values()]
                                   for idx in range(len(list(self.scan_table.values())[0]))])
 
-    def update_tree(self):
+    def update_tree(self, event=None):
         '''Render the tree widget'''
         if hasattr(self, 'tree'):
             self.tree.destroy()
@@ -923,11 +930,11 @@ class ScanWindow(Toplevel):
                 if not self.tree.exists(str(idx+1)):
                     # assign a tag for each row so that we can change the tag configuration (for example change background color) in the future.
                     self.tree.insert('', 'end', str(idx+1),
-                                     text=f'#{idx+self.parent.row_shotnum}', tags=(f'#{idx+self.parent.row_shotnum}'))
+                                     text=f'#{idx+self.row_shotnum}', tags=(f'#{idx+self.row_shotnum}'))
                 self.tree.set(str(idx+1), key, v)
-        if self.tree.tag_has(f'#{self.parent.current_shot_number}'):
+        if hasattr(self.parent, 'daq') and hasattr(self.parent.daq, 'current_shot_for_all_cam') and self.tree.tag_has(f'#{self.parent.daq.current_shot_for_all_cam}'):
             self.tree.tag_configure(
-                f'#{self.parent.current_shot_number}', background='yellow')
+                f'#{self.parent.daq.current_shot_for_all_cam}', background='yellow')
         self.tree.grid(column=0, columnspan=self.item_each_row,
                        row=self.scannable_list_row+1, rowspan=len(self.scan_table)+1)
 
