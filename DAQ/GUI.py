@@ -1,6 +1,5 @@
 import socket
-from tkinter import *
-from tkinter import messagebox
+from tkinter import Tk, messagebox, Toplevel, Text, StringVar, IntVar, DoubleVar, BooleanVar, PhotoImage
 from tkinter import ttk
 import tango
 import numpy as np
@@ -50,7 +49,6 @@ class DaqGUI:
             self.python_path = os.path.join(
                 self.root_path, 'venv', 'Scripts', 'python.exe')
         self.client_GUI = dict()
-        self.acquisition = {'status': False, 'is_completed': False}
 
         root.title(f"ZEUS DAQ APP")
 
@@ -100,7 +98,7 @@ class DaqGUI:
         s.configure('Treeview.Heading', font=(
             'Helvetica', self.font_small), background="PowderBlue")
         # frame1 = ttk.Frame(root, padding="3 3 12 12")
-        # frame1.grid(column=0, row=0, sticky=(N, W, E, S))
+        # frame1.grid(column=0, row=0, sticky='nsew')
         # root.columnconfigure(0, weight=1)
         # root.rowconfigure(0, weight=1)
 
@@ -111,7 +109,7 @@ class DaqGUI:
             root, text='Devices', padding=pad_widget, style='Sty1.TLabelframe')
         for i in range(4):  # 4 columns
             self.frame1.columnconfigure(i, weight=1, uniform='g1')
-        self.frame1.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.frame1.grid(column=0, row=0, sticky='nsew')
         ttk.Button(self.frame1, text='Select', command=self.open_device_list, style='Sty1.TButton').grid(
             column=0, row=0, sticky='WE')
         self.client_GUI['button'] = ttk.Button(
@@ -124,7 +122,7 @@ class DaqGUI:
         # ---------------------frame 2
         self.frame2 = ttk.Labelframe(
             root, text='Options', padding=pad_widget, style='Sty1.TLabelframe')
-        self.frame2.grid(column=0, row=1, sticky=(N, W, E, S))
+        self.frame2.grid(column=0, row=1, sticky='nsew')
 
         # half column options first and then full column options with buttons
         self.frame2_checkbutton_content = {'use_plasma_mirror': {
@@ -140,7 +138,7 @@ class DaqGUI:
             if value['button'] is not None:
                 # If current_row is x.0, use x as the row number. If current_row is x.5, use x+1 as the row number. int(current_row+0.5) fits both cases. Add 1 for the start of next row.
                 checkbox.grid(
-                    column=0, row=int(current_row+0.5), sticky=W)
+                    column=0, row=int(current_row+0.5), sticky='W')
                 self.frame2_buttons[value['button']] = ttk.Button(self.frame2, text=value['button'], command=getattr(
                     self, f"open_{value['button'].lower()}_window"), style='small_button.TButton')
                 self.frame2_buttons[value['button']].grid(
@@ -149,7 +147,7 @@ class DaqGUI:
             else:
                 # If current_row is x.0 or x.5, use x as the row number. Add 0.5 for the start of next row. For example, if current_row is x.0, then next row is x.5. If the next option is an half column option, then it will be placed at int(x.5) = x row, i.e., the same row.
                 checkbox.grid(
-                    column=idx % item_per_column, row=int(current_row), sticky=W)
+                    column=idx % item_per_column, row=int(current_row), sticky='W')
                 current_row += 0.5
             value['var'] = checkbox_var
 
@@ -157,7 +155,7 @@ class DaqGUI:
 
         self.frame3 = ttk.Labelframe(
             root, text='Acquisition', padding=pad_widget, style='Sty1.TLabelframe')
-        self.frame3.grid(column=0, row=2, sticky=(N, W, E, S))
+        self.frame3.grid(column=0, row=2, sticky='nsew')
         ttk.Label(self.frame3, text='Save path:', font=(
             'Helvetica', int(self.font_mid*0.75))).grid(
             column=0, row=0, sticky='W')
@@ -181,26 +179,26 @@ class DaqGUI:
         ttk.Entry(self.frame3, textvariable=self.shot_end_var, font=(
             'Helvetica', int(self.font_mid*0.75)), width=10).grid(
             column=3, row=1, sticky='W')
-        self.acquisition['button'] = ttk.Button(
+        self.acquisition_button = ttk.Button(
             self.frame3, text='Start', command=self.toggle_acquisition, style='Sty3_start.TButton')
-        self.acquisition['button'].grid(
+        self.acquisition_button.grid(
             column=0, row=2, columnspan=5, sticky='WE')
 
         self.frame4 = ttk.Labelframe(
             root, text='Logging', padding=pad_widget, style='Sty1.TLabelframe')
-        self.frame4.grid(column=0, row=3, sticky=(N, W, E, S))
+        self.frame4.grid(column=0, row=3, sticky='nsew')
         self.t = Text(self.frame4, width=70, height=20, font=(
-            'Helvetica', int(self.font_mid*0.75)), wrap=WORD)
+            'Helvetica', int(self.font_mid*0.75)), wrap='word')
         self.t.tag_config("red_text", foreground="red")
         self.t.tag_config("green_text", foreground="green")
         self.t.tag_config("blue_text", foreground="blue")
-        self.t.grid(column=0, row=0, sticky=W)
+        self.t.grid(column=0, row=0, sticky='W')
         self.insert_to_disabled("DAQ GUI is started.")
         sb = ttk.Scrollbar(self.frame4,
                            orient='vertical',
                            command=self.t.yview)
 
-        sb.grid(column=1, row=0, sticky=NS)
+        sb.grid(column=1, row=0, sticky='NS')
         self.t['yscrollcommand'] = sb.set
         self.pad_space(self.frame1)
         self.pad_space(self.frame2)
@@ -225,9 +223,10 @@ class DaqGUI:
                     self.init_dict = json.load(jsonfile)
                     self.selected_devices = self.init_dict['selected_devices'] if 'selected_devices' in self.init_dict else dict(
                     )
-                    self.damaged_zones = self.init_dict['damaged_zones'] if 'damaged_zones' in self.init_dict else [
+                    damaged_zones_list = self.init_dict['damaged_zones'] if 'damaged_zones' in self.init_dict else [
                     ]
-                    self.damaged_zones = {i: None for i in self.damaged_zones}
+                    self.damaged_zones = dict.fromkeys(
+                        damaged_zones_list, BooleanVar(value=False))
                     self.checked_savable_attributes = self.init_dict[
                         'checked_savable_attributes'] if 'checked_savable_attributes' in self.init_dict else []
                     self.options = self.init_dict['options'] if 'options' in self.init_dict and self.init_dict['options'] is not None else dict(
@@ -257,7 +256,12 @@ class DaqGUI:
             self.update_selected_devices(key, BooleanVar(value=True))
 
     def schedule_checking_damaged_zones(self):
-        '''Threading function to check the damaged zones from plasma mirror stage. It will send TA2_ready or TA2_not_ready message to laser side via UDP socket.'''
+        '''Threading function to check the damaged zones from plasma mirror stage. It will send TA2_ready or TA2_not_ready message to laser side via UDP socket.
+
+        There are two plans. One is that the message is sent in a fixed interval regardless of previous status. One problem of this plan is that the data acquisition is a bit slower than shot. When a shot fires, the laser side would probably reset "allow shoot" to False. On the user side, the DAQ program could still be sending "TA2_ready" signals to the laser side because the delay between data acquisition (although I use the acquisition of first image from the cameras to indicate a shot is fired) and the shot. The laser side will "allow shot" after receiving this message. The DAQ will send a "TA2_not_ready" shortly and the laser side will set "allow-shoot" to False. I can provide a concrete example. Asumme the user side send "ready" or "not ready" every 2 s. Asumme data acquisition has 0.5 delay after the shot is fired. Asumme the laser side doesn't have any mechanism to refuse "ready" message after a shot. If the shot is fired at t=2s, the user side send message at t = 0.1s, 2.1s... The laser side will receive "ready" at t=2.1s (since 2.1 < 2.5 and the DAQ assume the shot has not been fired yet.) and set "allow shoot" to True. The user side will send "not ready" at t=2.5s. If the second shot occurs at t=3s at the damaged zones, it will be allowed and cause problem. However, this plan is more robust when dealing with UDP message lost. 
+        The other plan is the message is only sent when the status is changed. In the previous example, the "ready" message is sent at t=0.1s and it will not send a "ready" message again at 2.1s. It starts to send new message after the acquisition occurs and reset is_plasma_mirror_ready to None. In this plan, the notification in the logging section is the same as the message sending. This plan is less robust when dealing with UDP message lost. 
+        Currently I would prefer to go with second plan.
+        '''
         try:
             self.plasma_mirror_tango_dp = tango.DeviceProxy(
                 'TA2/esp301/esp302_ta2_2')
@@ -271,22 +275,22 @@ class DaqGUI:
                     p_float = np.array([float(i)
                                         for i in p.strip().split()])
                     if np.linalg.norm(current_location - p_float) < PLASMA_MIRROR_DAMAGE_RADIUS:
-                        my_message = 'TA2_not_ready'
-                        self.send_message_to_laser_side(my_message)
                         if self.is_plasma_mirror_ready is None or self.is_plasma_mirror_ready:
                             self.is_plasma_mirror_ready = False
                             self.frame2_buttons['DamagedZones']['style'] = 'Sty3_stop_small.TButton'
                             self.insert_to_disabled(
                                 f'In plasma mirror damaged zones.', 'red_text', with_alarm=False)
+                            my_message = 'TA2_not_ready'
+                            self.send_message_to_laser_side(my_message)
                         break
                 else:
-                    my_message = 'TA2_ready'
-                    self.send_message_to_laser_side(my_message)
                     if self.is_plasma_mirror_ready is None or not self.is_plasma_mirror_ready:
                         self.is_plasma_mirror_ready = True
                         self.frame2_buttons['DamagedZones']['style'] = 'Sty3_start_small.TButton'
                         self.insert_to_disabled(
                             f'Plasma mirror is safe.', 'green_text')
+                        my_message = 'TA2_ready'
+                        self.send_message_to_laser_side(my_message)
                 self.root.after(CHECKING_PLASMA_MIRROR_INTERVAL *
                                 1000, self.schedule_checking_damaged_zones)
         except Exception as e:
@@ -392,7 +396,7 @@ class DaqGUI:
         self.selected_devices[device_name]['connection_try_times'] += 1
         try:
             dp = tango.DeviceProxy(device_name)
-            dp.ping()
+            dp.ping()  # type: ignore
             self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_online_text_small.TButton'
             self.selected_devices[device_name]['tango_dp'] = dp
             self.insert_to_disabled(f'{device_name} is connected.')
@@ -481,20 +485,17 @@ class DaqGUI:
 
     def toggle_acquisition(self):
         '''Command for the start/stop button in frame3. It toggles the acquisition status. If the acquisition is running, it will stop it. If it is not running, it will start it in a new thread.'''
-        if self.acquisition['status']:
+        if self.acquisition_button['text'] == 'Stop':
             self.my_event.set()
-            self.acquisition['status'] = False
-            self.acquisition['button']['style'] = 'Sty3_start.TButton'
-            self.acquisition['button']['text'] = 'Start'
+            self.acquisition_button['style'] = 'Sty3_start.TButton'
+            self.acquisition_button['text'] = 'Start'
             del self.daq
             self.insert_to_disabled("Stopped acquisition.")
         else:
-            self.acquisition['status'] = True
-            self.acquisition['is_completed'] = False
             self.my_event = Event()
             Thread(target=self.start_acquisition).start()
-            self.acquisition['button']['style'] = 'Sty3_stop.TButton'
-            self.acquisition['button']['text'] = 'Stop'
+            self.acquisition_button['style'] = 'Sty3_stop.TButton'
+            self.acquisition_button['text'] = 'Stop'
             self.insert_to_disabled("", with_timestamp=False)
             self.insert_to_disabled(
                 "Started acquisition in a new thread.", 'blue_text')
@@ -544,7 +545,7 @@ class DaqGUI:
         try:
             text, tag_config, with_alarm = self.logging_q.get(block=False)
             self.t['state'] = 'normal'
-            self.t.insert(END, f'{text}\n', tag_config)
+            self.t.insert('end', f'{text}\n', tag_config)
             self.t.see("end")
             self.t['state'] = 'disabled'
             if with_alarm:
@@ -560,6 +561,7 @@ class DeviceListWindow(Toplevel):
         self.parent = parent
         self.device_names_in_db = []
         self.class_name = ['Basler', 'FileReader', 'Vimba']
+        Basler_class_device = []
         for c in self.class_name:
             if c == 'Basler':
                 Basler_class_device = self.parent.db.get_device_name('*', c)
@@ -568,7 +570,7 @@ class DeviceListWindow(Toplevel):
         super().__init__(master=parent.root)
         self.title("Device List")
         newframe1 = ttk.Frame(self)
-        newframe1.grid(column=0, row=0, columnspan=1, sticky=(N, W, E, S))
+        newframe1.grid(column=0, row=0, columnspan=1, sticky='nsew')
         devices_seperated_by_location = defaultdict(list)
         locations = ['laser', 'TA1', 'TA2', 'TA3', 'Others']
         for device_name in self.device_names_in_db:
@@ -592,7 +594,7 @@ class DeviceListWindow(Toplevel):
         for col, (location, device_sub_list) in enumerate(devices_seperated_by_location.items()):
             sub_frame = ttk.Labelframe(
                 newframe1, text=location, padding="0 0 10 0", style='Sty1.TLabelframe')
-            sub_frame.grid(column=col, row=0, sticky=N)
+            sub_frame.grid(column=col, row=0, sticky='N')
             for row, device_name in enumerate(device_sub_list):
                 checkbox_var = BooleanVar(
                     value=True) if device_name in self.parent.selected_devices else BooleanVar(value=False)
@@ -605,11 +607,8 @@ class DeviceListWindow(Toplevel):
                 checkbox = ttk.Checkbutton(sub_frame, text=checkbox_text, command=lambda device_name=device_name, checkbox_var=checkbox_var: self.parent.update_selected_devices(device_name, checkbox_var),
                                            variable=checkbox_var, style='highlight.TCheckbutton')
                 checkbox.grid(
-                    column=0, row=row, sticky=W)
+                    column=0, row=row, sticky='W')
                 checkboxes[device_name] = checkbox_var
-
-        for child in newframe1.winfo_children():
-            child.grid_configure(padx=[0, 0], pady=5)
 
 
 class BandwidthWindow(Toplevel):
@@ -681,7 +680,7 @@ class BandwidthWindow(Toplevel):
 
 
 class DamagedZonesWindow(Toplevel):
-    def __init__(self, parent):
+    def __init__(self, parent: DaqGUI):
         super().__init__(master=parent.root)
         self.title("Damaged zones in plasma mirror")
         self.parent = parent
@@ -696,6 +695,8 @@ class DamagedZonesWindow(Toplevel):
                    style='Sty1.TButton').grid(column=0, row=0)
         ttk.Button(self.button_frame, text='Clear Selected', command=self.clear_selected_damaged_zones,
                    style='Sty1.TButton').grid(column=1, row=0)
+        ttk.Button(self.button_frame, text='Reload from file', command=self.reload_from_file,
+                   style='Sty2_offline.TButton').grid(column=2, row=0)
         self.setup_checkboxes()
         parent.root.bind("<<RefreshDamagedZonesData>>",
                          self.setup_checkboxes)
@@ -721,7 +722,7 @@ class DamagedZonesWindow(Toplevel):
                 checkbox = ttk.Checkbutton(
                     sub_frame, text=f'{attr.split()[0]:>10} {attr.split()[1]:>10}', variable=checkbox_var, style='highlight.TCheckbutton')
                 checkbox.grid(
-                    column=0, row=idx % items_per_column, sticky=W)
+                    column=0, row=idx % items_per_column, sticky='W')
                 self.damaged_zones[attr] = checkbox_var
 
     def clear_selected_damaged_zones(self, target=None):
@@ -739,6 +740,14 @@ class DamagedZonesWindow(Toplevel):
         '''Button command: select all damaged zones'''
         for attr, is_checked in self.damaged_zones.items():
             is_checked.set(True)
+
+    def reload_from_file(self):
+        '''Reload the damaged zones from the init file. It is called when the init file is updated.'''
+        with open(self.parent.init_file_path) as jsonfile:
+            init_dict = json.load(jsonfile)
+            self.damaged_zones = {i: BooleanVar(
+                value=False) for i in init_dict['damaged_zones']}
+        self.setup_checkboxes()
 
 
 class MetadataWindow(Toplevel):
@@ -770,18 +779,19 @@ class MetadataWindow(Toplevel):
                 checkbox = ttk.Checkbutton(sub_frame, text=attr, command=lambda to_be_saved_attr=attr, checkbox_var=checkbox_var: self.parent.update_checked_savable_attributes(
                     to_be_saved_attr, checkbox_var), variable=checkbox_var, style='highlight.TCheckbutton')
                 checkbox.grid(
-                    column=0, row=idx % items_per_column, sticky=W)
+                    column=0, row=idx % items_per_column, sticky='W')
                 self.savable_attributes[attr]['label'] = ttk.Label(
                     sub_frame, text='', foreground="black")
                 self.savable_attributes[attr]['label'].grid(
-                    column=1, row=idx % items_per_column, sticky=E)
+                    column=1, row=idx % items_per_column, sticky='E')
 
     def show_attr_value(self):
         '''Button command: show the current value of the attributes'''
         for attr in self.parent.checked_savable_attributes:
             try:
-                tango_attr_value = str(AttributeProxy(attr).read(
-                ).value) + AttributeProxy(attr).get_config().unit
+                attr_proxy = AttributeProxy(attr)
+                tango_attr_value = str(
+                    attr_proxy.read().value) + attr_proxy.get_config().unit  # type: ignore
                 color = "green"
             except Exception as e:
                 tango_attr_value = f'{type(e)}'
@@ -803,7 +813,7 @@ class ScanWindow(Toplevel):
         self.row_shotnum = 1
         self.scan_frame1 = ttk.Labelframe(
             self, text='Scannable Device', padding=pad_widget, style='Sty1.TLabelframe')
-        self.scan_frame1.grid(column=0, row=0, columnspan=2, sticky=W)
+        self.scan_frame1.grid(column=0, row=0, columnspan=2, sticky='W')
         self.scan_frame2 = ttk.Labelframe(
             self, text='Scan Table', padding=pad_widget, style='Sty1.TLabelframe')
         self.scan_frame2.grid(column=0, row=1, rowspan=2, sticky="WE")
@@ -826,10 +836,11 @@ class ScanWindow(Toplevel):
             reader = csv.DictReader(csvfile)
             header = reader.fieldnames
             self.scan_number = 0
-            for row in reader:
-                self.scan_number += 1
-                for h in header:
-                    self.scan_table[h].append(row[h])
+            if header is not None:
+                for row in reader:
+                    self.scan_number += 1
+                    for h in header:
+                        self.scan_table[h].append(row[h])
 
         for idx, device_attr_name in enumerate(self.scannable_list):
             self.scannable_list_row, col = int(
@@ -839,7 +850,7 @@ class ScanWindow(Toplevel):
             checkbox = ttk.Checkbutton(self.scan_frame1, text=device_attr_name, command=lambda device_attr_name=device_attr_name, checkbox_var=checkbox_var: self.add_device_to_scan(device_attr_name, checkbox_var),
                                        variable=checkbox_var, style='highlight.TCheckbutton')
             checkbox.grid(
-                column=col, row=self.scannable_list_row, sticky=W)
+                column=col, row=self.scannable_list_row, sticky='W')
 
         ttk.Label(
             self.scan_frame3, text='First row in Scan Table as shot number # ', font=('Helvetica', 12)).grid(row=0, column=0)
@@ -863,8 +874,6 @@ class ScanWindow(Toplevel):
         clear_button.grid(row=21, column=int(
             self.item_each_row/2), columnspan=int(self.item_each_row/2))
         parent.root.bind("<<RefreshScanTable>>", self.update_tree)
-        for child in self.winfo_children():
-            child.grid_configure(padx=[0, 5], pady=5)
 
     def add_device_to_scan(self, device_attr_name, checkbox_var):
         '''Button command: check or uncheck the devices'''
