@@ -22,7 +22,9 @@
     "other/dg645/DG645_control_room/E_relative_delay",
     "other/dg645/DG645_control_room/F_relative_delay",
     "other/dg645/DG645_control_room/G_relative_delay",
-    "other/dg645/DG645_control_room/H_relative_delay"
+    "other/dg645/DG645_control_room/H_relative_delay",
+    "laser/esp301/esp301_1/ax1_position",
+    "laser/esp301/esp301_1/ax2_position"
   ],
   "savable_attributes_list": [
     "test/owisps/test/ax1_position",

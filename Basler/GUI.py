@@ -224,7 +224,8 @@ def create_app():
         for device in pylon.TlFactory.GetInstance().EnumerateDevices():
             serial_number_vs_friendly_name[device.GetSerialNumber(
             )] = device.GetUserDefinedName()
-
+    else:
+        serial_number_vs_friendly_name = None
     # get the configuration
     for d in device_list:
         pass_config1 = {}
@@ -239,7 +240,7 @@ def create_app():
 
         # image panel.
         image_panel, image_layout = basler_app.create_blank_panel('v')
-        if d.split('/')[-1].split('_')[-1] in serial_number_vs_friendly_name:
+        if serial_number_vs_friendly_name and d.split('/')[-1].split('_')[-1] in serial_number_vs_friendly_name:
             friendly_name = serial_number_vs_friendly_name[d.split(
                 '/')[-1].split('_')[-1]]
         else:
