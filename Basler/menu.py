@@ -24,6 +24,22 @@ class BaslerMenu(Menu):
         self.friendly_instances = self.generate_friendly_name(self.instances)
         self.friendly_device_names = self.generate_friendly_name(
             self.device_names)
+        # sort by friendly_instances and keep the indices of the sorting.
+        indexed_sorted_friendly_instances = sorted(
+            enumerate(self.friendly_instances), key=lambda x: x[1])
+        indices1, self.friendly_instances = zip(
+            *indexed_sorted_friendly_instances)
+        # Apply the indices1 to friendly_device_names, instances and device_names to keep the consistency after sorting.
+        self.instances = [self.instances[i] for i in indices1]
+
+        # sort by friendly_device_names and keep the indices of the sorting.
+        indexed_sorted_friendly_device_names = sorted(
+            enumerate([name.split('/')[-1] for name in self.friendly_device_names]), key=lambda x: x[1])
+        indices2, _ = zip(
+            *indexed_sorted_friendly_device_names)
+        self.friendly_device_names = [
+            self.friendly_device_names[i] for i in indices2]
+        self.device_names = [self.device_names[i] for i in indices2]
 
         self.menu_dict = {'start server': ['server.py', self.instances, [], self.friendly_instances],
                           'start Taurus GUI': ['GUI.py', self.device_names, [], self.friendly_device_names]}

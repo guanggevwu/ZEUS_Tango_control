@@ -25,7 +25,7 @@ Blue background colors of the Device Buttons indicate the device servers are sta
 <h2>3.2 save an extra image by stitching</h2>
 <p>We usually check this. The DAQ will save an extra image by stitching the images from all devices. Each small image in this big image is stretched to fit into the tile. The pixel value is changed to enhance the contrast, which means we can't determine if an image is the saturated from the stitched image. The purpose of the stitched image is only for quick review.</p>
 <h2>3.3 Save Metadata</h2>
-<p>Check this to save scalar data. Click "Metadata" button next to the option. In the pop-up Metadata Window, select scalars you would like to save along with the images. Click "validate" to validate the scalars are accessible. The scalar data are saved in a ".csv" file and the file is in the same directory level with the camera folder level. Refer to screenshot in the <a href="#4-acquisition">Acquisition</a> section for details.
+<p>Check this to save scalar data. Click "Metadata" button next to the option. In the pop-up Metadata Window, select scalars you would like to save along with the images. Click "validate" to validate the scalars are accessible. The scalar data are saved in a ".csv" file and the file is in the same directory level with the camera folder level. Refer to screenshot in the <a href="#4-acquisition">Acquisition</a> section for details.<br />
 <img alt="metadata_window" src="images/metadata.png" /></p>
 <h2>3.4 Scan</h2>
 <p>We check this option to scan over some parameters, i.e., stages, timings or injection pressures. The button "Parameters" takes us to a new window "Scan Module".
@@ -39,7 +39,7 @@ Here I will give an complex example. we have taken 100 shots without using scan.
 <p>Here is a screenshot of the data format of the saved data. The "Save path" is set as "Z:\user_data\2025\Burger_2\TA_data\20251208\run1". In this directory, there are one folder for each device, one folder for stitched image, one "scalars.csv" file to store the scalars checked in Metadata Window and one "settings.json" for Basler camera settings.<br />
 <img alt="saved data format" src="images/data_format.png" /><br />
 This is the format of the saved scalars. The columns "shot number" and "time" are appended to each row automatically.<br />
-<img alt="scalar file format" src="images/scalar_csv.png" />
+<img alt="scalar file format" src="images/scalar_csv.png" /><br />
 The image naming format is "Shot[shot number]_Time[].tiff", for example, "Shot2_Time16-36-28.138403.tiff".</p>
 <h2>4.1 Save path</h2>
 <h2>4.2 Start End</h2>
@@ -54,7 +54,7 @@ The End shot number is useful when we use continuous triggering and when the las
 <h1>6 Common operations on the Taurus GUI.</h1>
 <h2>6.1 Taurus GUI</h2>
 <p>Here is a screenshot of an example.<br />
-<img alt="Taurus_GUI" src="images/Taurus_GUI.png" />
+<img alt="Taurus_GUI" src="images/Taurus_GUI.png" /><br />
 Common operations include:<br />
 (1) Move a panel to front.<br />
 (2) Drag a panel and move. Sometimes you need to unlock view before dragging.<br />
@@ -66,7 +66,7 @@ A saved perspective is only valid for the specific set of devices.</p>
 <p>A form panel is a panel that contains attributes reading/writing values in a form format. The green highlighted values are the reading values we are concerned of. Press "ENTER" to confirm input. The "Apply" button in the bottom right is usually not needed. Press "CTRL" + "ENTER" to force applying the current value.</p>
 <h2>6.3 Image panel</h2>
 <p>A few commonly used functionalities are mentioned here. Remember any modifications to the image (i.e., the visualization of the collected data) from the image panel will not affect the data collected.<br />
-<img alt="alt text" src="images/image_panel.png" />
+<img alt="alt text" src="images/image_panel.png" /><br />
 With "Mouse"/"Selection" icon selected,<br />
 (1) Left button click selects an object which can be the image, a ROI, a cross section, etc.<br />
 (2) Wheel button click resets the image size and position. Wheel button drag moves the image.<br />

@@ -700,19 +700,34 @@ class ESP301(Device):
             time.sleep(1)
 
     def threaded_reset_to_TA1(self):
+        print("Trying to reset to TA1 positon...")
         self.stop_whole_function_due_to_error = False
+        print("Moving to ax1 negative limit...")
         self.move_to_negative_limit(axis=1)
         self.wait_until_stop(axis=1)
+        print("At the ax1 negative limit.")
         if self.stop_whole_function_due_to_error:
+            print(
+                "Error occurs during moving to ax1 negative limit. Stop the reset process.")
             return
+        print("Moving to ax2 positive limit...")
         self.move_to_positive_limit(axis=2)
         self.wait_until_stop(axis=2)
+        print("At the ax2 positive limit.")
         if self.stop_whole_function_due_to_error:
+            print(
+                "Error occurs during moving to ax2 positive limit. Stop the reset process.")
             return
+        print(
+            f'Set ax1 negative limit. Original: {self.read_ax1_position()}. Now: -1.')
         self.dev_write(f"1DH-1\r".encode())
+        print(
+            f'Set ax2 positive limit. Original: {self.read_ax2_position()}. Now: 211.05.')
         self.dev_write(f"2DH211.05\r".encode())
         self.dev_write(f"1PA{self.TA1[0]:.3f}\r".encode())
+        print(f'Moving to TA1, axis 1 position: {self.TA1[0]:.3f}')
         self.dev_write(f"2PA{self.TA1[1]:.3f}\r".encode())
+        print(f'Moving to TA1, axis 2 position: {self.TA1[1]:.3f}')
 
     # def send_message_to_laser_side(self):
     #     message = f'{datetime.datetime.now()}: TA2_ready'

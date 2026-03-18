@@ -44,7 +44,7 @@ We usually check this. The DAQ will save an extra image by stitching the images 
 
 ## 3.3 Save Metadata
 
-Check this to save scalar data. Click "Metadata" button next to the option. In the pop-up Metadata Window, select scalars you would like to save along with the images. Click "validate" to validate the scalars are accessible. The scalar data are saved in a ".csv" file and the file is in the same directory level with the camera folder level. Refer to screenshot in the [Acquisition](#4-acquisition) section for details.
+Check this to save scalar data. Click "Metadata" button next to the option. In the pop-up Metadata Window, select scalars you would like to save along with the images. Click "validate" to validate the scalars are accessible. The scalar data are saved in a ".csv" file and the file is in the same directory level with the camera folder level. Refer to screenshot in the [Acquisition](#4-acquisition) section for details.  
 ![metadata_window](images/metadata.png)
 
 ## 3.4 Scan
@@ -62,7 +62,7 @@ Here I will give an complex example. we have taken 100 shots without using scan.
 Here is a screenshot of the data format of the saved data. The "Save path" is set as "Z:\user_data\2025\Burger_2\TA_data\20251208\run1". In this directory, there are one folder for each device, one folder for stitched image, one "scalars.csv" file to store the scalars checked in Metadata Window and one "settings.json" for Basler camera settings.  
 ![saved data format](images/data_format.png)  
 This is the format of the saved scalars. The columns "shot number" and "time" are appended to each row automatically.  
-![scalar file format](images/scalar_csv.png)
+![scalar file format](images/scalar_csv.png)  
 The image naming format is "Shot[shot number]\_Time[].tiff", for example, "Shot2_Time16-36-28.138403.tiff".
 
 ## 4.1 Save path
@@ -87,7 +87,7 @@ This frame shows important messages during data acquisition. Please always read 
 ## 6.1 Taurus GUI
 
 Here is a screenshot of an example.  
-![Taurus_GUI](images/Taurus_GUI.png)
+![Taurus_GUI](images/Taurus_GUI.png)  
 Common operations include:  
 (1) Move a panel to front.  
 (2) Drag a panel and move. Sometimes you need to unlock view before dragging.  
@@ -103,7 +103,7 @@ A form panel is a panel that contains attributes reading/writing values in a for
 ## 6.3 Image panel
 
 A few commonly used functionalities are mentioned here. Remember any modifications to the image (i.e., the visualization of the collected data) from the image panel will not affect the data collected.  
-![alt text](images/image_panel.png)
+![alt text](images/image_panel.png)  
 With "Mouse"/"Selection" icon selected,  
 (1) Left button click selects an object which can be the image, a ROI, a cross section, etc.  
 (2) Wheel button click resets the image size and position. Wheel button drag moves the image.  
