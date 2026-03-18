@@ -27,10 +27,16 @@ class Menu:
         # only get the device names with the correct class name
         self.device_names = [i for i in list(self.device_name_table) if self.class_name.lower() in i.split("_")] + \
             list(self.device_names.value_string)
+        indexed_sorted_device_names = sorted(
+            enumerate([name.split('/')[-1] for name in self.device_names]), key=lambda x: x[1])
+        indices1, _ = zip(
+            *indexed_sorted_device_names)
+        self.device_names = [self.device_names[i] for i in indices1]
         self.instances = [e.split('/')[-1]
                           for e in self.servers if e.split('/')[0] == self.class_name]
         self.instances = [i for i in list(
             self.instance_table) if self.class_name.lower() in i.split("_")]+(self.instances)
+        self.instances = sorted(self.instances)
 
     def start_window(self, menu_file_path, key):
         script_path = os.path.join(
