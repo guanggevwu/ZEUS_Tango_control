@@ -258,10 +258,7 @@ class OwisPS(Device):
 
     def create_read_set_as_function(self, axis):
         def read_set_as(self, attr):
-            if hasattr(self, f'_ax{axis}_old'):
-                setattr(self, f'_set_ax{axis}_as',
-                        f"set {getattr(self, f'_ax{axis}_old'):.3f} to {getattr(self, f'_ax{axis}_position'):.3f}")
-            else:
+            if not hasattr(self, f'_set_ax{axis}_as'):
                 setattr(self, f'_set_ax{axis}_as',
                         "------------N/A-----------")
             return getattr(self, f'_set_ax{axis}_as')
@@ -272,11 +269,13 @@ class OwisPS(Device):
             if hasattr(attr, 'get_write_value'):
                 attr = attr.get_write_value()
             self.logger.info(f"{attr}")
-            setattr(self, f'_ax{axis}_old', getattr(
-                self, f'_ax{axis}_position'))
+            old_position = getattr(
+                self, f'_ax{axis}_position')
             error = self.dev.PS90_SetPositionEx(
                 1, axis, ctypes.c_double(float(attr)))
             setattr(self, f'_ax{axis}_position', float(attr))
+            setattr(
+                self, f'_set_ax{axis}_as', f"set {old_position:.3f} to {getattr(self, f'_ax{axis}_position'):.3f}")
         return write_set_as
 
     @command
