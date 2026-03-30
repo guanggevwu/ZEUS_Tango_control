@@ -205,10 +205,10 @@ class DaqGUI:
         self.pad_space(self.frame3)
         self.pad_space(self.frame4)
 
+        self.schedule_logging_message()
         self.init_settings()
         self.laser_socket = socket.socket(
             socket.AF_INET, socket.SOCK_DGRAM)
-        self.schedule_logging_message()
 
     def init_settings(self):
         # self.selected_devices structure. self.selected_devices = {'[device name]': {'checkbutton': ttk.Button, 'server_pid': [int/string?], 'connection_try_times': [int], 'tango_dp': tango.DeviceProxy}, }
@@ -241,7 +241,7 @@ class DaqGUI:
                             self.frame2_checkbutton_content[key]['var'].set(
                                 value)
             except Exception as e:
-                logger.error(
+                self.insert_to_disabled(
                     f"Error in loading init.json file. Exception: {type(e)}, {e}")
                 self.selected_devices = dict()
                 self.damaged_zones = dict()
@@ -446,7 +446,7 @@ class DaqGUI:
             if 'client_pid' in value:
                 os.kill(value['client_pid'], signal.SIGTERM)
         self.laser_socket.close()
-        logger.info(
+        self.insert_to_disabled(
             "Terminate. All processes are killed.")
 
     def update_selected_devices(self, device_name, checkbox_var):

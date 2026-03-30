@@ -48,8 +48,8 @@ class TangoDeviceManagement:
             self.python_path = os.path.join(
                 self.root_path, 'venv', 'Scripts', 'python.exe')
         self.container = {'cameras': {'show_name': 'Cameras', 'class': {'Basler': None, 'Vimba': None, 'FileReader': {'included_device': ['facility/file_reader/andor_1']}}, }, 'motion_control': {'show_name': 'Motion Control', 'class': {'ESP301': None, 'Owis': None}}, 'delay_generator': {'show_name': 'Delay Generator', 'class': {'DG535': {'code_path': os.path.join(self.root_path, 'DG', 'dg535_server.py')}, 'DG645': {'code_path': os.path.join(self.root_path, 'DG', 'dg645_server.py')}}},
-                          'energy_meter': {'show_name': 'Energy Meters', 'class': {'GentecEO': None}}, '1D_devices': {'show_name': '1-D Devices', 'class': {'FileReader': {'included_device': ['facility/file_reader/spectrometer']}}},
-                          'pressure_regulator': {'show_name': 'Pressure Regulators', 'class': {'GXRegulator': None}}, 'TH': {'show_name': 'TH', 'class': {'TSP01B': None}}
+                          'energy_meter': {'show_name': 'Energy Meters', 'class': {'GentecEO': None}}, '1D_devices': {'show_name': '1-D Devices', 'class': {'FileReader': {'included_device': ['facility/file_reader/spectrometer', 'other/file_reader/oscilloscope']}}},
+                          'pressure_regulator': {'show_name': 'Pressure Regulators', 'class': {'GXRegulator': None}}, 'TH': {'show_name': 'TH', 'class': {'TSP01B': None}}, 'Labview_translator': {'show_name': 'Labview Translator', 'class': {'LabviewProgram': None}}, 'laser_warning_sign': {'show_name': 'Laser Status', 'class': {'LaserWarningSign': None}}
                           }
 
         root.title(f"ZEUS Tango Device Management")
@@ -112,11 +112,57 @@ class TangoDeviceManagement:
                 column=i % 4, row=i // 4, sticky='WE')
             i += 1
 
+        self.frame4 = ttk.Labelframe(
+            root, text='Logging', padding=pad_widget, style='Sty1.TLabelframe')
+        self.frame4.grid(column=0, row=3, sticky='nsew')
+        self.t = Text(self.frame4, width=75, height=12, font=(
+            'Helvetica', int(self.font_mid)), wrap='word')
+        self.t.tag_config("red_text", foreground="red")
+        self.t.tag_config("green_text", foreground="green")
+        self.t.tag_config("blue_text", foreground="blue")
+        self.t.grid(column=0, row=0, sticky='W')
+        self.insert_to_disabled("Tango Device Management Tool is started.")
+        sb = ttk.Scrollbar(self.frame4,
+                           orient='vertical',
+                           command=self.t.yview)
+
+        sb.grid(column=1, row=0, sticky='NS')
+        self.t['yscrollcommand'] = sb.set
+        self.schedule_logging_message()
+
         self.pad_space(self.frame1)
+        self.pad_space(self.frame4)
 
     def pad_space(self, frame):
         for child in frame.winfo_children():
             child.grid_configure(padx=[15, 0], pady=3)
+
+    def insert_to_disabled(self, text, tag_config=None, with_timestamp=True, with_alarm=None):
+        if with_alarm is None:
+            if tag_config == 'red_text':
+                with_alarm = True
+            else:
+                with_alarm = False
+        logger.info(text)
+        if with_timestamp:
+            time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+            self.logging_q.put([f'{time}, {text}', tag_config, with_alarm])
+        else:
+            self.logging_q.put([text, tag_config, with_alarm])
+
+    def schedule_logging_message(self):
+        try:
+            text, tag_config, with_alarm = self.logging_q.get(block=False)
+            self.t['state'] = 'normal'
+            self.t.insert('end', f'{text}\n', tag_config)
+            self.t.see("end")
+            self.t['state'] = 'disabled'
+            if with_alarm:
+                messagebox.showerror(message=text)
+        except Exception as e:
+            pass
+        finally:
+            self.root.after(200, self.schedule_logging_message)
 
     def open_a_catergory(self, category_name):
         '''Command for the select button in frame1. It opens a new window with a list of devices.'''
@@ -142,7 +188,7 @@ class DeviceUnderCatergoryWindow(Toplevel):
         self.category_container = {}
         for c in self.class_name:
             class_info = parent.container[category_name]['class'][c]
-            if class_info is None:
+            if class_info is None or 'included_device' not in class_info:
                 if c == 'Basler':
                     Basler_class_device = self.parent.db.get_device_name(
                         '*', c)
@@ -211,18 +257,16 @@ class DeviceUnderCatergoryWindow(Toplevel):
                     newframe1, text=device_name, command=lambda device_name=device_name: self.start_stop_device_server(device_name))
                 server_widget.grid(column=2*(idx // item_per_col), row=idx %
                                    item_per_col, sticky='NSEW')
-                print(
-                    f'server widget {idx}, {2*(idx // item_per_col)}, {idx % item_per_col}')
                 self.category_container[device_name]['server_widget'] = server_widget
                 gui_widget = ttk.Button(
                     newframe1, text='UI', command=lambda device_name=device_name: self.open_close_gui(device_name), style='small_button.TButton')
                 gui_widget.grid(column=(2*(idx // item_per_col)) + 1,
                                 row=idx % item_per_col, sticky='NSEW')
                 self.category_container[device_name]['gui_widget'] = gui_widget
-                print(
-                    f'gui widget {(2*(idx // item_per_col)) + 1}, {idx % item_per_col}')
         self.device_idx = 0
         self.interval = 1
+        self.parent.insert_to_disabled(
+            f'Opened {self.parent.container[self.category_name]["show_name"]} category window.')
         self.update_device_status()
 
     def update_device_status(self, event=None):
@@ -248,7 +292,8 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 this_button.configure(
                     style='Sty2_local_online_text_small.TButton')
                 del self.after_id['device_specific_status_check'][event['id']]
-                print('early quit')
+                self.parent.insert_to_disabled(
+                    f'{device_name} is started successfully.', tag_config='green_text')
                 return
             if event is None and this_button.cget('style') not in ['Sty2_local_online_text_small.TButton', 'Sty2_connecting.TButton']:
                 this_button.configure(
@@ -258,13 +303,10 @@ class DeviceUnderCatergoryWindow(Toplevel):
             if this_button.cget('style') != 'Sty2_connecting.TButton' or (event is not None and event['current_iter'] == event['max_iter']):
                 this_button.configure(
                     style='Sty2_offline_text_small.TButton')
-                print(f'{device_name} offline')
-            else:
-                print(f'{device_name} offline, but it is connecting.')
 
         if event is None:
             if self.device_idx == len(self.category_container) - 1:
-                self.interval = 200
+                self.interval = 500
             self.device_idx = (self.device_idx +
                                1) % len(self.category_container)
             self.after_id['usual_status_check'] = self.after(
@@ -276,9 +318,9 @@ class DeviceUnderCatergoryWindow(Toplevel):
                     2000, lambda: self.update_device_status(event))
                 'device_specific_status_check'
                 self.after_id['device_specific_status_check'][event['id']] = after_id
-                print(
-                    f'schedule next check with after_id {after_id}, current_iter: {event["current_iter"]}, max_iter: {event["max_iter"]}, device_index: {event["device_index"]}')
-                print(self.after_id)
+                # print(
+                #     f'schedule next check with after_id {after_id}, current_iter: {event["current_iter"]}, max_iter: {event["max_iter"]}, device_index: {event["device_index"]}')
+                # print(self.after_id)
             else:
                 del self.after_id['device_specific_status_check'][event['id']]
 
@@ -295,6 +337,8 @@ class DeviceUnderCatergoryWindow(Toplevel):
             event = {'id': self.device_status_checking_event_id, 'current_iter': 0,
                      'max_iter': 2, 'device_index': idx}
             self.update_device_status(event=event)
+            self.parent.insert_to_disabled(
+                f'{device_name} device server is stopped.')
         except Exception as e:
             device_class = self.parent.db.get_device_info(
                 device_name).class_name
@@ -306,12 +350,13 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 class_folder = os.path.join(
                     self.parent.root_path, device_class)
                 script_path = os.path.join(
-                    class_folder, [i for i in os.listdir(class_folder) if 'server' in i][0])
+                    class_folder, [i for i in os.listdir(class_folder) if 'server.py' in i][0])
             p = subprocess.Popen(
                 [f'{self.parent.python_path}', f'{script_path}', device_instance])
             self.category_container[device_name]['server_widget'].configure(
                 style='Sty2_connecting.TButton')
-            print('server connecting...')
+            self.parent.insert_to_disabled(
+                f'Starting server for {device_name}...', tag_config='yellow_text')
             event = {'id': self.device_status_checking_event_id, 'current_iter': 0,
                      'max_iter': 10, 'device_index': idx}
             self.update_device_status(event=event)
@@ -324,10 +369,12 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 os.kill(
                     self.category_container[device_name]['gui_pid'], signal.SIGTERM)
             except OSError:
-                print('not able to kill the process, maybe already killed.')
+                self.parent.insert_to_disabled(
+                    f'Not able to kill the GUI process for {device_name}, maybe already killed.')
             del self.category_container[device_name]['gui_pid']
             self.category_container[device_name]['gui_widget']['style'] = 'small_button.TButton'
-            print(f'Client GUI is killed.')
+            self.parent.insert_to_disabled(
+                f'Client GUI of {device_name} is killed.')
         else:
             class_folder = os.path.join(
                 self.parent.root_path, c)
@@ -347,7 +394,8 @@ class DeviceUnderCatergoryWindow(Toplevel):
             elif after_id is not None:
                 self.after_cancel(after_id)
         self.destroy()
-        print('destroy device management window')
+        self.parent.insert_to_disabled(
+            f'{self.parent.container[self.category_name]["show_name"]} window is destroyed.')
 
 
 if __name__ == '__main__':
