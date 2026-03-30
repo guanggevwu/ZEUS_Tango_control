@@ -2,7 +2,7 @@ import configparser
 from tango import AttrWriteType, DevState
 from tango.server import Device, attribute, command, device_property
 import logging
-
+import platform
 # -----------------------------
 
 handlers = [logging.StreamHandler()]
@@ -38,8 +38,6 @@ class LaserWarningSign(Device):
     )
 
     def read_source_path(self):
-        if not hasattr(self, '_source_path'):
-            self._source_path = r"Z:\software\status\laser_warning_sign\status_get.ini"
         return self._source_path
 
     def write_source_path(self, value):
@@ -143,6 +141,11 @@ class LaserWarningSign(Device):
     def init_device(self):
         Device.init_device(self)
         self.config = configparser.ConfigParser()
+        self._host_computer = platform.node()
+        if platform.system() == 'Windows':
+            self._source_path = r"Z:\software\status\laser_warning_sign\status_get.ini"
+        else:
+            self._source_path = r"/mnt/coe-zeus1/software/status/laser_warning_sign/status_get.ini"
         self.set_state(DevState.ON)
         self.set_status("Laser Warning Sign is connected.")
 
