@@ -7,10 +7,15 @@ import subprocess
 from functools import partial
 import atexit
 import signal
+if True:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from common.start_menu import Menu
 
 
-class Menu:
+class LaserWarningSignMenu(Menu):
     def __init__(self, root):
+        super().__init__()
+        self.get_class_related_info()
         root.title("Laser warning sign menu")
         frame1 = ttk.Frame(root, padding="3 3 12 12")
         frame1.grid(column=0, row=0, sticky=(N, W, E, S))
@@ -36,8 +41,8 @@ class Menu:
             self.python_path = os.path.join(
                 venv_path, 'venv', 'Scripts', 'python.exe')
 
-        self.menu_dict = {'start server': [
-            'server.py', ('testsr', 'laser_warning_sign_sr')], }
+        self.menu_dict = {'start server': ['server.py', self.instances, []],
+                          'start GUI': ['GUI.py', self.device_names, []]}
         for idx, (key, value) in enumerate(self.menu_dict.items()):
             setattr(self, value[0][:-3], StringVar())
             setattr(self, f'{value[0][:-3]}_combobox', ttk.Combobox(frame1, textvariable=getattr(
@@ -78,6 +83,6 @@ class Menu:
 
 if __name__ == '__main__':
     root = Tk()
-    dummy = Menu(root)
+    dummy = LaserWarningSignMenu(root)
     atexit.register(dummy.terminate_all)
     root.mainloop()

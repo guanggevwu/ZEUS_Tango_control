@@ -76,7 +76,7 @@ class LaserWarningSign(Device):
                 return 'off'
 
     ta1 = attribute(
-        label="Strobe light",
+        label="TA1",
         dtype="str",
         access=AttrWriteType.READ,
     )
@@ -89,7 +89,7 @@ class LaserWarningSign(Device):
                         return s
 
     ta2 = attribute(
-        label="Strobe light",
+        label="TA2",
         dtype="str",
         access=AttrWriteType.READ,
     )
@@ -102,7 +102,7 @@ class LaserWarningSign(Device):
                         return s
 
     ta3 = attribute(
-        label="Strobe light",
+        label="TA3",
         dtype="str",
         access=AttrWriteType.READ,
     )
@@ -115,7 +115,7 @@ class LaserWarningSign(Device):
                         return s
 
     mezzanine = attribute(
-        label="Strobe light",
+        label="Mezzanine",
         dtype="str",
         access=AttrWriteType.READ,
     )
@@ -128,7 +128,7 @@ class LaserWarningSign(Device):
                         return s
 
     clean_room = attribute(
-        label="Strobe light",
+        label="Clean Room",
         dtype="str",
         access=AttrWriteType.READ,
     )
