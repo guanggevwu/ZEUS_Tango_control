@@ -73,7 +73,7 @@ class Daq:
         self.debug = debug
         # atexit.register(self.termination)
 
-    def set_camera_configuration(self, config_dict=None, saving=True, default_config_dict=default_config_dict):
+    def set_camera_configuration(self, config_dict=None, saving=True, default_config_dict=default_config_dict, grab_number=10000):
         # list of user defined names of the cameras
         user_defined_name_list = [one_cam_dict['user_defined_name']
                                   for one_cam_dict in self.cam_info.values()]
@@ -83,7 +83,7 @@ class Daq:
         # 2025/02/05 change that if a configuration is passed to config_dict, then use the configuration which is basically just change polling and image number. All other changes are made by GUI. Otherwise, use default in config.py.
         # Although the option that "use default config.py" in the GUI is removed, config_dict is stilled used in the termination function.
         for cam in user_defined_name_list:
-            new_config = {}
+            new_config = {"repetition": grab_number}
             if not config_dict:
                 if "all" in default_config_dict:
                     new_config.update(default_config_dict["all"])
@@ -113,7 +113,12 @@ class Daq:
                     try:
                         old_value = getattr(bs, key)
                         if key == "trigger_source" and old_value == value:
-                            setattr(bs, key, value)
+                            try:
+                                setattr(bs, key, value)
+                            except Exception as e:
+                                if "Out of memory" in str(e):
+                                    self.logger(
+                                        f"Contact me if you see this error. I tried to catch the error but it is not stable. You can try to set the End shot number to a smaller value, for example 100, and retry. Details: {e}", 'red_text')
                         elif old_value != value:
                             setattr(bs, key, value)
                             # as "is_polling_periodically" is not an important information for the operators.

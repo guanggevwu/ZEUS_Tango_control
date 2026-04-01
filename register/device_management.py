@@ -47,7 +47,7 @@ class TangoDeviceManagement:
         elif platform.system() == 'Windows':
             self.python_path = os.path.join(
                 self.root_path, 'venv', 'Scripts', 'python.exe')
-        self.container = {'cameras': {'show_name': 'Cameras', 'class': {'Basler': None, 'Vimba': None, 'FileReader': {'included_device': ['facility/file_reader/andor_1']}}, }, 'motion_control': {'show_name': 'Motion Control', 'class': {'ESP301': None, 'Owis': None}}, 'delay_generator': {'show_name': 'Delay Generator', 'class': {'DG535': {'code_path': os.path.join(self.root_path, 'DG', 'dg535_server.py')}, 'DG645': {'code_path': os.path.join(self.root_path, 'DG', 'dg645_server.py')}}},
+        self.container = {'cameras': {'show_name': 'Cameras', 'class': {'Basler': None, 'Vimba': None, 'FileReader': {'included_device': ['facility/file_reader/andor_1']}}, }, 'motion_control': {'show_name': 'Motion Control', 'class': {'ESP301': None, 'Owis': None}}, 'delay_generator': {'show_name': 'Delay Generator', 'class': {'DG535': {'code_path': os.path.join(self.root_path, 'DG', 'dg535_server.py')}, 'DG645': {'server_code_path': os.path.join(self.root_path, 'DG', 'dg645_server.py'), 'GUI_code_path': os.path.join(self.root_path, 'DG', 'GUI.py')}}},
                           'energy_meter': {'show_name': 'Energy Meters', 'class': {'GentecEO': None}}, '1D_devices': {'show_name': '1-D Devices', 'class': {'FileReader': {'included_device': ['facility/file_reader/spectrometer', 'other/file_reader/oscilloscope']}}},
                           'pressure_regulator': {'show_name': 'Pressure Regulators', 'class': {'GXRegulator': None}}, 'TH': {'show_name': 'TH', 'class': {'TSP01B': None}}, 'Labview_translator': {'show_name': 'Labview Translator', 'class': {'LabviewProgram': None}}, 'laser_warning_sign': {'show_name': 'Laser Status', 'class': {'LaserWarningSign': None}}
                           }
@@ -344,8 +344,8 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 device_name).class_name
             device_instance = self.parent.db.get_device_info(
                 device_name).ds_full_name.split('/')[-1]
-            if self.parent.container[self.category_name]['class'][device_class] and 'code_path' in self.parent.container[self.category_name]['class'][device_class]:
-                script_path = self.parent.container[self.category_name]['class'][device_class]['code_path']
+            if self.parent.container[self.category_name]['class'][device_class] and 'server_code_path' in self.parent.container[self.category_name]['class'][device_class]:
+                script_path = self.parent.container[self.category_name]['class'][device_class]['server_code_path']
             else:
                 class_folder = os.path.join(
                     self.parent.root_path, device_class)
@@ -376,10 +376,13 @@ class DeviceUnderCatergoryWindow(Toplevel):
             self.parent.insert_to_disabled(
                 f'Client GUI of {device_name} is killed.')
         else:
-            class_folder = os.path.join(
-                self.parent.root_path, c)
-            script_path = os.path.join(
-                class_folder, [i for i in os.listdir(class_folder) if 'GUI' in i][0])
+            if self.parent.container[self.category_name]['class'][c] and 'GUI_code_path' in self.parent.container[self.category_name]['class'][c]:
+                script_path = self.parent.container[self.category_name]['class'][c]['GUI_code_path']
+            else:
+                class_folder = os.path.join(
+                    self.parent.root_path, c)
+                script_path = os.path.join(
+                    class_folder, [i for i in os.listdir(class_folder) if 'GUI' in i][0])
             p = subprocess.Popen(
                 [f'{self.parent.python_path}', f'{script_path}', device_name])
             self.category_container[device_name]['gui_pid'] = p.pid

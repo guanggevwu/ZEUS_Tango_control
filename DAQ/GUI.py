@@ -514,7 +514,8 @@ class DaqGUI:
         # if the checkbox is checked, then we use the config saved in config.py file and we pass None here. If it is unchecked, then we pass the basic configuration and ignore the configuration in the file.
         self.daq = Daq(self.selected_devices,
                        dir=self.path_var.get(), thread_event=self.my_event, GUI=self)
-        self.daq.set_camera_configuration()
+        self.daq.set_camera_configuration(
+            grab_number=self.shot_end_var.get() - self.shot_start_var.get() + 1)
         if self.options['use_plasma_mirror']:
             self.is_plasma_mirror_ready = None
             Thread(target=self.schedule_checking_damaged_zones,
