@@ -175,7 +175,7 @@ class DaqGUI:
         ttk.Label(self.frame3, text='End', font=(
             'Helvetica', int(self.font_mid*0.75))).grid(
             column=2, row=1, sticky='W')
-        self.shot_end_var = IntVar(value=9999)
+        self.shot_end_var = IntVar(value=1000)
         ttk.Entry(self.frame3, textvariable=self.shot_end_var, font=(
             'Helvetica', int(self.font_mid*0.75)), width=10).grid(
             column=3, row=1, sticky='W')

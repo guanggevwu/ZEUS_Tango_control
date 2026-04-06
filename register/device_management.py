@@ -20,7 +20,12 @@ from queue import Queue
 from tango import AttributeProxy
 from pypylon import pylon
 import time
-
+import sys
+import json
+from device_management_combination_config import container
+if True:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from common.config import device_name_table, instance_table, image_panel_config
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s %(message)s")
 
@@ -47,11 +52,7 @@ class TangoDeviceManagement:
         elif platform.system() == 'Windows':
             self.python_path = os.path.join(
                 self.root_path, 'venv', 'Scripts', 'python.exe')
-        self.container = {'cameras': {'show_name': 'Cameras', 'class': {'Basler': None, 'Vimba': None, 'FileReader': {'included_device': ['facility/file_reader/andor_1']}}, }, 'motion_control': {'show_name': 'Motion Control', 'class': {'ESP301': None, 'Owis': None}}, 'delay_generator': {'show_name': 'Delay Generator', 'class': {'DG535': {'code_path': os.path.join(self.root_path, 'DG', 'dg535_server.py')}, 'DG645': {'server_code_path': os.path.join(self.root_path, 'DG', 'dg645_server.py'), 'GUI_code_path': os.path.join(self.root_path, 'DG', 'GUI.py')}}},
-                          'energy_meter': {'show_name': 'Energy Meters', 'class': {'GentecEO': None}}, '1D_devices': {'show_name': '1-D Devices', 'class': {'FileReader': {'included_device': ['facility/file_reader/spectrometer', 'other/file_reader/oscilloscope']}}},
-                          'pressure_regulator': {'show_name': 'Pressure Regulators', 'class': {'GXRegulator': None}}, 'TH': {'show_name': 'TH', 'class': {'TSP01B': None}}, 'Labview_translator': {'show_name': 'Labview Translator', 'class': {'LabviewProgram': None}}, 'laser_warning_sign': {'show_name': 'Laser Status', 'class': {'LaserWarningSign': None}}
-                          }
-
+        self.container = container
         root.title(f"ZEUS Tango Device Management")
 
         s = ttk.Style()
@@ -185,18 +186,23 @@ class DeviceUnderCatergoryWindow(Toplevel):
         self.category_name = category_name
         self.class_name = [i for i in parent.container[
             category_name]['class']]
+        # catergory_container is a dict to store the device name and its corresponding tango_class, server_widget (ttk.Button), gui_widget (ttk.Button), gui_pid, combination_device_names (only for device names containing "_combination").
         self.category_container = {}
         for c in self.class_name:
+            if c == 'Basler':
+                Basler_class_device = self.parent.db.get_device_name(
+                    '*', c)
             class_info = parent.container[category_name]['class'][c]
-            if class_info is None or 'included_device' not in class_info:
-                if c == 'Basler':
-                    Basler_class_device = self.parent.db.get_device_name(
-                        '*', c)
+            if class_info is not None and 'only_these_devices' in class_info:
+                self.category_container.update({device_name: {
+                                               'tango_class': c} for device_name in class_info['only_these_devices']})
+            else:
                 self.category_container.update({device_name: {'tango_class': c}
                                                 for device_name in self.parent.db.get_device_name('*', c)})
-            elif 'included_device' in class_info:
-                self.category_container.update({device_name: {
-                                               'tango_class': c} for device_name in class_info['included_device']})
+            if class_info is not None and 'extra_devices' in class_info:
+                self.category_container.update(
+                    {device_name: {'tango_class': c} for device_name in class_info['extra_devices']})
+
         self.title(category_name)
         newframe1 = ttk.Frame(self)
         newframe1.grid(column=0, row=0, columnspan=1, sticky='nsew')
@@ -273,7 +279,7 @@ class DeviceUnderCatergoryWindow(Toplevel):
         '''
 
         :param event. event is a dict that contains the information for checking the device status. An example is: {'id': self.device_status_checking_event_id, 'current_iter': 0,
-                     'max_iter': 10, 'device_index': idx}. id is an increasing index for a scheduled event. One event can contain multiple synchronous scheduled functions. current_iter and max_iter are used to control how many times the checking will be repeated. device_index is the index of the device to check in self.category_container. 
+                     'max_iter': 10, 'device_index': idx}. id is an increasing index for a scheduled event. One event can contain multiple synchronous scheduled functions. current_iter and max_iter are used to control how many times the checking will be repeated. device_index is the index of the device to check in self.category_container.
         '''
         if event is None:
             idx = self.device_idx
@@ -325,8 +331,11 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 del self.after_id['device_specific_status_check'][event['id']]
 
     def start_stop_device_server(self, device_name):
+        if '_combination' in device_name:
+            self.parent.insert_to_disabled(
+                f'{device_name} is a combination device. The included devices are {device_name_table[device_name]}. They can be modified in "/common/config.py". Please start/stop the each device seperately.', tag_config='red_text')
+            return
         idx = list(self.category_container.keys()).index(device_name)
-        c = self.category_container[device_name]['tango_class']
         self.device_status_checking_event_id += 1
         try:
             dp = tango.DeviceProxy(device_name)
@@ -362,7 +371,6 @@ class DeviceUnderCatergoryWindow(Toplevel):
             self.update_device_status(event=event)
 
     def open_close_gui(self, device_name):
-        idx = list(self.category_container.keys()).index(device_name)
         c = self.category_container[device_name]['tango_class']
         if 'gui_pid' in self.category_container[device_name]:
             try:
@@ -383,6 +391,9 @@ class DeviceUnderCatergoryWindow(Toplevel):
                     self.parent.root_path, c)
                 script_path = os.path.join(
                     class_folder, [i for i in os.listdir(class_folder) if 'GUI' in i][0])
+            if '_combination' in device_name:
+                self.parent.insert_to_disabled(
+                    f'{device_name} is a combination device. The included devices are {device_name_table[device_name]}. They can be modified in "/common/config.py".')
             p = subprocess.Popen(
                 [f'{self.parent.python_path}', f'{script_path}', device_name])
             self.category_container[device_name]['gui_pid'] = p.pid

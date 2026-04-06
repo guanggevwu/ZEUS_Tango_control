@@ -72,6 +72,8 @@ class ESP301(Device):
         self.set_state(DevState.INIT)
         try:
             if self.ip:
+                self.logger.info(
+                    f"Trying to connect to ESP302 at {self.ip}")
                 self.controller_socket = socket.socket(
                     socket.AF_INET, socket.SOCK_STREAM)
                 # Set a timeout for the connection

@@ -102,6 +102,6 @@ def create_app():
 
 if __name__ == "__main__":
     parser = TaurusArgparse(
-        description='GUI for ESP device', device_default='test/esp301/esp302_test', polling_default=1000)
+        description='GUI for ESP device', device_default='test/esp301/esp302_test', nargs_string='+', polling_default=1000)
     args = parser.parse_args()
     create_app()
