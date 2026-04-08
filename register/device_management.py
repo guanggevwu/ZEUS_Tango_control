@@ -11,10 +11,8 @@ import signal
 import platform
 import atexit
 from threading import Thread, Event
-import json
 import platform
 import ctypes
-import csv
 from collections import defaultdict
 from queue import Queue
 from tango import AttributeProxy
@@ -153,17 +151,17 @@ class TangoDeviceManagement:
 
     def schedule_logging_message(self):
         try:
-            text, tag_config, with_alarm = self.logging_q.get(block=False)
-            self.t['state'] = 'normal'
-            self.t.insert('end', f'{text}\n', tag_config)
-            self.t.see("end")
-            self.t['state'] = 'disabled'
-            if with_alarm:
-                messagebox.showerror(message=text)
+            while True:
+                text, tag_config, with_alarm = self.logging_q.get(block=False)
+                self.t['state'] = 'normal'
+                self.t.insert('end', f'{text}\n', tag_config)
+                self.t.see("end")
+                self.t['state'] = 'disabled'
+                if with_alarm:
+                    messagebox.showerror(message=text)
         except Exception as e:
             pass
-        finally:
-            self.root.after(200, self.schedule_logging_message)
+        self.root.after(200, self.schedule_logging_message)
 
     def open_a_catergory(self, category_name):
         '''Command for the select button in frame1. It opens a new window with a list of devices.'''
@@ -179,8 +177,8 @@ class DeviceUnderCatergoryWindow(Toplevel):
     def __init__(self, parent, category_name):
         super().__init__(master=parent.root)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
-        self.after_id = {'usual_status_check': None,
-                         'device_specific_status_check': {}}
+        self.thread_stop_event = Event()
+        self.gui_update_queue = Queue()
         self.device_status_checking_event_id = 0
         self.parent = parent
         self.category_name = category_name
@@ -269,66 +267,79 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 gui_widget.grid(column=(2*(idx // item_per_col)) + 1,
                                 row=idx % item_per_col, sticky='NSEW')
                 self.category_container[device_name]['gui_widget'] = gui_widget
-        self.device_idx = 0
-        self.interval = 1
+        self.interval = 0
         self.parent.insert_to_disabled(
             f'Opened {self.parent.container[self.category_name]["show_name"]} category window.')
-        self.update_device_status()
+        t = Thread(target=self.routine_check_device_status, daemon=True)
+        t.start()
+        self.update_gui()
 
-    def update_device_status(self, event=None):
-        '''
-
-        :param event. event is a dict that contains the information for checking the device status. An example is: {'id': self.device_status_checking_event_id, 'current_iter': 0,
-                     'max_iter': 10, 'device_index': idx}. id is an increasing index for a scheduled event. One event can contain multiple synchronous scheduled functions. current_iter and max_iter are used to control how many times the checking will be repeated. device_index is the index of the device to check in self.category_container.
-        '''
-        if event is None:
-            idx = self.device_idx
-        else:
-            idx = event['device_index']
-        device_name = list(self.category_container.keys())[idx]
-        this_button = self.category_container[device_name]['server_widget']
+    def update_gui(self):
         try:
-            t0 = time.time()
-            dp = tango.DeviceProxy(device_name)
-            # print(f'create dp: {time.time() - t0:.6f} seconds')
-            dp.ping()
-            # print(f'ping dp: {time.time() - t0:.6f} seconds')
-            # If we are trying to checking a device status after turnin it on, we want (1) a quick quit after the decies is on to avoid unnecessary checking, and (2) button color to be green to indicate the device server is started locally.
-            if event is not None and event['id'] in self.after_id['device_specific_status_check']:
-                this_button.configure(
-                    style='Sty2_local_online_text_small.TButton')
-                del self.after_id['device_specific_status_check'][event['id']]
-                self.parent.insert_to_disabled(
-                    f'{device_name} is started successfully.', tag_config='green_text')
-                return
-            if event is None and this_button.cget('style') not in ['Sty2_local_online_text_small.TButton', 'Sty2_connecting.TButton']:
-                this_button.configure(
-                    style='Sty2_online_text_small.TButton')
-
+            while True:
+                this_widget, action = self.gui_update_queue.get(block=False)
+                if action == 'action1':
+                    if this_widget.cget('style') not in ['Sty2_local_online_text_small.TButton', 'Sty2_connecting.TButton']:
+                        this_widget.configure(
+                            style='Sty2_online_text_small.TButton')
+                elif action == 'action2':
+                    if this_widget.cget('style') not in ['Sty2_offline_text_small.TButton', 'Sty2_connecting.TButton']:
+                        this_widget.configure(
+                            style='Sty2_offline_text_small.TButton')
+                elif action == 'action3':
+                    if this_widget.cget('style') != 'Sty2_local_online_text_small.TButton':
+                        this_widget.configure(
+                            style='Sty2_local_online_text_small.TButton')
+                        self.parent.insert_to_disabled(
+                            f'{this_widget.cget("text")} is started successfully.', tag_config='green_text')
+                elif action == 'action4':
+                    this_widget.configure(
+                        style='Sty2_offline_text_small.TButton')
         except Exception as e:
-            if this_button.cget('style') != 'Sty2_connecting.TButton' or (event is not None and event['current_iter'] == event['max_iter']):
-                this_button.configure(
-                    style='Sty2_offline_text_small.TButton')
+            pass
+        if not self.thread_stop_event.is_set():
+            self.after(100, self.update_gui)
 
-        if event is None:
-            if self.device_idx == len(self.category_container) - 1:
-                self.interval = 500
-            self.device_idx = (self.device_idx +
-                               1) % len(self.category_container)
-            self.after_id['usual_status_check'] = self.after(
-                self.interval, lambda: self.update_device_status())
-        else:
-            if event['current_iter'] < event['max_iter']:
-                event['current_iter'] += 1
-                after_id = self.after(
-                    2000, lambda: self.update_device_status(event))
-                'device_specific_status_check'
-                self.after_id['device_specific_status_check'][event['id']] = after_id
-                # print(
-                #     f'schedule next check with after_id {after_id}, current_iter: {event["current_iter"]}, max_iter: {event["max_iter"]}, device_index: {event["device_index"]}')
-                # print(self.after_id)
-            else:
-                del self.after_id['device_specific_status_check'][event['id']]
+    def routine_check_device_status(self):
+        i = 0
+        while True:
+            for device_name in list(self.category_container.keys()):
+                if not self.thread_stop_event.is_set():
+                    this_button = self.category_container[device_name]['server_widget']
+                    try:
+                        if '_combination' in device_name:
+                            device_names_in_combination = device_name_table[device_name]
+                            for device_name_in_combination in device_names_in_combination:
+                                dp = tango.DeviceProxy(
+                                    device_name_in_combination)
+                                dp.ping()
+                        else:
+                            dp = tango.DeviceProxy(device_name)
+                            dp.ping()
+                        self.gui_update_queue.put([this_button, 'action1'])
+                    except Exception as e:
+                        self.gui_update_queue.put([this_button, 'action2'])
+                else:
+                    return
+                if i:
+                    time.sleep(0.1)
+            i = 1
+
+    def click_check_device_status(self, device_name, max_iter=10):
+        '''This function is called when we want to check the device status after clicking the button to start the device server. We want to check the device status more frequently and for a certain number of times before giving up, because we want to give the device server enough time to start and update the button color and give a success message as soon as the device server is started.'''
+        iter = 0
+        this_button = self.category_container[device_name]['server_widget']
+        while not self.thread_stop_event.is_set():
+            try:
+                dp = tango.DeviceProxy(device_name)
+                dp.ping()
+                self.gui_update_queue.put([this_button, 'action3'])
+                return
+            except Exception as e:
+                if iter == max_iter:
+                    self.gui_update_queue.put([this_button, 'action4'])
+                    return
+            time.sleep(1)
 
     def start_stop_device_server(self, device_name):
         if '_combination' in device_name:
@@ -343,9 +354,8 @@ class DeviceUnderCatergoryWindow(Toplevel):
             admin_device_name = dp.adm_name()
             admin_proxy = tango.DeviceProxy(admin_device_name)
             admin_proxy.command_inout("Kill")
-            event = {'id': self.device_status_checking_event_id, 'current_iter': 0,
-                     'max_iter': 2, 'device_index': idx}
-            self.update_device_status(event=event)
+            self.category_container[device_name]['server_widget'].configure(
+                style='Sty2_offline_text_small.TButton')
             self.parent.insert_to_disabled(
                 f'{device_name} device server is stopped.')
         except Exception as e:
@@ -368,7 +378,9 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 f'Starting server for {device_name}...', tag_config='yellow_text')
             event = {'id': self.device_status_checking_event_id, 'current_iter': 0,
                      'max_iter': 10, 'device_index': idx}
-            self.update_device_status(event=event)
+            t = Thread(target=self.click_check_device_status,
+                       args=(device_name, 10), daemon=True)
+            t.start()
 
     def open_close_gui(self, device_name):
         c = self.category_container[device_name]['tango_class']
@@ -401,12 +413,7 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 'gui_widget']['style'] = 'Sty2_online_text_small.TButton'
 
     def on_close(self):
-        for key, after_id in self.after_id.items():
-            if isinstance(after_id, dict):
-                for sub_after_id in after_id.values():
-                    self.after_cancel(sub_after_id)
-            elif after_id is not None:
-                self.after_cancel(after_id)
+        self.thread_stop_event.set()
         self.destroy()
         self.parent.insert_to_disabled(
             f'{self.parent.container[self.category_name]["show_name"]} window is destroyed.')

@@ -508,26 +508,30 @@ class DaqGUI:
 
     def start_acquisition(self):
         '''Start the acquisition in a new thread. It will create a Daq object and call its acquisition method. It will also save the options and selected devices to a json file. It is called by the toggle_acquisition function.'''
-        for opt in self.frame2_checkbutton_content.keys():
-            self.options[opt] = self.frame2_checkbutton_content[opt]['var'].get()
-        self.write_to_init_file()
-        # if the checkbox is checked, then we use the config saved in config.py file and we pass None here. If it is unchecked, then we pass the basic configuration and ignore the configuration in the file.
-        self.daq = Daq(self.selected_devices,
-                       dir=self.path_var.get(), thread_event=self.my_event, GUI=self)
-        self.daq.set_camera_configuration(
-            grab_number=self.shot_end_var.get() - self.shot_start_var.get() + 1)
-        if self.options['use_plasma_mirror']:
-            self.is_plasma_mirror_ready = None
-            Thread(target=self.schedule_checking_damaged_zones,
-                   daemon=True).start()
-        else:
-            self.frame2_buttons['DamagedZones']['style'] = 'small_button.TButton'
-        scan_table = self.scan_window.scan_table if hasattr(
-            self, 'scan_window') else None
-        self.daq.acquisition(
-            shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], scan_table=scan_table)
-        if not self.my_event.is_set():
-            self.toggle_acquisition()
+        try:
+            for opt in self.frame2_checkbutton_content.keys():
+                self.options[opt] = self.frame2_checkbutton_content[opt]['var'].get()
+            self.write_to_init_file()
+            # if the checkbox is checked, then we use the config saved in config.py file and we pass None here. If it is unchecked, then we pass the basic configuration and ignore the configuration in the file.
+            self.daq = Daq(self.selected_devices,
+                           dir=self.path_var.get(), thread_event=self.my_event, GUI=self)
+            self.daq.set_camera_configuration(
+                grab_number=self.shot_end_var.get() - self.shot_start_var.get() + 1)
+            if self.options['use_plasma_mirror']:
+                self.is_plasma_mirror_ready = None
+                Thread(target=self.schedule_checking_damaged_zones,
+                       daemon=True).start()
+            else:
+                self.frame2_buttons['DamagedZones']['style'] = 'small_button.TButton'
+            scan_table = self.scan_window.scan_table if hasattr(
+                self, 'scan_window') else None
+            self.daq.acquisition(
+                shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], scan_table=scan_table)
+            if not self.my_event.is_set():
+                self.toggle_acquisition()
+        except Exception as e:
+            self.insert_to_disabled(
+                f"Error in acquisition thread. Exception: {type(e)}, {e}", 'red_text')
 
     def insert_to_disabled(self, text, tag_config=None, with_timestamp=True, with_alarm=None):
         if with_alarm is None:
@@ -544,17 +548,17 @@ class DaqGUI:
 
     def schedule_logging_message(self):
         try:
-            text, tag_config, with_alarm = self.logging_q.get(block=False)
-            self.t['state'] = 'normal'
-            self.t.insert('end', f'{text}\n', tag_config)
-            self.t.see("end")
-            self.t['state'] = 'disabled'
-            if with_alarm:
-                messagebox.showerror(message=text)
+            while True:
+                text, tag_config, with_alarm = self.logging_q.get(block=False)
+                self.t['state'] = 'normal'
+                self.t.insert('end', f'{text}\n', tag_config)
+                self.t.see("end")
+                self.t['state'] = 'disabled'
+                if with_alarm:
+                    messagebox.showerror(message=text)
         except Exception as e:
             pass
-        finally:
-            self.root.after(200, self.schedule_logging_message)
+        self.root.after(200, self.schedule_logging_message)
 
 
 class DeviceListWindow(Toplevel):
