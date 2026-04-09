@@ -27,6 +27,7 @@
     "laser/esp301/esp301_1/ax2_position"
   ],
   "savable_attributes_list": [
+    "laser/labview/labview_program/shot_id",
     "test/owisps/test/ax1_position",
     "test/owisps/test/ax2_position",
     "test/owisps/test/ax3_position",
@@ -73,8 +74,6 @@
     "laser/gentec/MA3_QE195/multiplier",
     "laser/esp301/esp300_grating/ax1_position",
     "laser/esp301/esp300_grating/ax2_position",
-    "laser/labview/labview_programe/shot_id",
-    "laser/labview/labview_programe/shot_id",
     "laser/esp300/esp300_turning_box3/ax1_position",
     "laser/esp300/esp300_turning_box3/ax2_position",
     "laser/esp300/esp300_turning_box3/ax3_position",

@@ -1156,18 +1156,26 @@ class Basler(Device):
         If trigger mode is Off, then the trigger selector has no effect.
         """
         if self.camera.TriggerMode.Value.lower() == 'off':
-            self.camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
-            self.logger.info(
-                'Starting live mode')
+            if not self.camera.IsGrabbing():
+                self.camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
+                self.logger.info(
+                    'Starting live mode')
+            else:
+                self.logger.info(
+                    'Already in live mode. No need to start grabbing.')
         else:
             self.i = 0
             # Previous we use a very large number for _grab_number, but it caused some memory problem when we have many camera.
-            self._grab_number = max(
-                [self._repetition*self._frames_per_trigger, 1000])
-            self.camera.StartGrabbingMax(
-                self._grab_number, pylon.GrabStrategy_OneByOne)
-            self.logger.info(
-                f'Ready to receive triggers from {self.read_trigger_source("")}. Image retrieve will be stopped after receiving {self._grab_number} images')
+            if not self.camera.IsGrabbing():
+                self._grab_number = max(
+                    [self._repetition*self._frames_per_trigger, 1000])
+                self.camera.StartGrabbingMax(
+                    self._grab_number, pylon.GrabStrategy_OneByOne)
+                self.logger.info(
+                    f'Ready to receive triggers from {self.read_trigger_source("")}. Image retrieve will be stopped after receiving {self._grab_number} images')
+            else:
+                self.logger.info(
+                    'Already ready to receive triggers. No need to start grabbing.')
 
     @command()
     def send_software_trigger(self):

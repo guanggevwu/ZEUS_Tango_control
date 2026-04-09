@@ -10,7 +10,7 @@ if True:
     from common.start_menu import Menu
 
 
-class LabviewPrograme(Menu):
+class LabviewProgram(Menu):
     def __init__(self, root):
         super().__init__()
         self.get_class_related_info()
@@ -51,6 +51,6 @@ class LabviewPrograme(Menu):
 
 if __name__ == '__main__':
     root = Tk()
-    dummy = LabviewPrograme(root)
+    dummy = LabviewProgram(root)
     atexit.register(dummy.terminate_all)
     root.mainloop()

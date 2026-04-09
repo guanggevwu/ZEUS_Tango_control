@@ -27,7 +27,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         return '[%s] %s' % (self.prefix, msg), kwargs
 
 
-class LabviewPrograme(Device):
+class LabviewProgram(Device):
 
     port = device_property(dtype=str, default_value='61557')
     # timeout = device_property(dtype=float, default_value='1.0')
@@ -125,4 +125,4 @@ class LabviewPrograme(Device):
 
 
 if __name__ == "__main__":
-    LabviewPrograme.run_server()
+    LabviewProgram.run_server()

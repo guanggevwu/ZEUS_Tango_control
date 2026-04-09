@@ -31,6 +31,6 @@ def create_app():
 
 if __name__ == "__main__":
     parser = TaurusArgparse(
-        description='GUI for Labview programe', device_default='facility/laser_warning_sign/laser_warning_sign_1', polling_default=1000)
+        description='GUI for Laser Warning Sign', device_default='facility/laser_warning_sign/laser_warning_sign_1', polling_default=1000)
     args = parser.parse_args()
     create_app()
