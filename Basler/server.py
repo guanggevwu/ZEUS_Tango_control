@@ -346,6 +346,7 @@ class Basler(Device):
         dtype=str,
         access=AttrWriteType.READ_WRITE,
         memorized=is_memorized,
+        hw_memorized=True,
     )
 
     trigger_selector = attribute(
