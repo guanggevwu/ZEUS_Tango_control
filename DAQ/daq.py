@@ -360,54 +360,50 @@ class Daq:
                 f'Error in {info["user_defined_name"]} "thread_acquire_data" thread: {e}', 'red_text')
 
     def thread_stitch_and_go_to_next_scan_point(self, stitch, scan_table):
-        try:
-            while True:
-                if self.thread_event is not None and self.thread_event.is_set():
-                    # self.logger(f'stitching and scan thread stopped.')
-                    break
-                # t0 = datetime.now()
-                # check if all cameras have a new shot
-                if all([i['shot_num'] > self.current_shot_for_all_cam for i in self.cam_info.values()]):
-                    if stitch:
-                        stitch_save_path = os.path.join(
-                            self.dir, 'stitching', f'shot{self.current_shot_for_all_cam}_{datetime.now().strftime("%H%M%S.%f")}.tiff')
-                        large_image_p = self.stitch_images(
-                            f'shot{self.current_shot_for_all_cam}')
-                        message = f"Shot {self.current_shot_for_all_cam} for stitching is saved."
-                        Thread(target=self.thread_saving, args=(
-                            large_image_p, stitch_save_path, message)).start()
-                        # self.logger(
-                        #     f"Shot {self.current_shot_for_all_cam} for stitching {large_image_p.size} is queued.")
-                        # self.logger(f"It takes {datetime.now() - t0} to save out of thread.")
-                    self.current_shot_for_all_cam += 1
-                    self.logger(
-                        f"Shot {self.current_shot_for_all_cam-1} is completed.", 'blue_text')
-                    playsound(os.path.join(os.path.dirname(__file__), 'media',
-                                           'sound', 'shot_completion_1.mp3'), block=False)
-                    # send plasma mirror ready signal
-                    if not self.GUI.options['use_plasma_mirror']:
-                        self.GUI.send_message_to_laser_side('TA2_ready')
-                    # save scala data
-                    if self.GUI.options["save_metadata"]:
-                        self.csv_header = ['shot_number', 'time']
-                        self.save_scalars(self.current_shot_for_all_cam)
-                    if self.GUI.options["scan"]:
-                        if hasattr(self.GUI, "scan_window") and self.GUI.scan_window.winfo_exists():
-                            self.GUI.root.event_generate(
-                                "<<RefreshScanTable>>")
-                        if scan_table is not None and hasattr(self, "scan_shot_range"):
-                            for device_attr_name, ap in self.scan_attr_proxies.items():
-                                self.set_scan_value(
-                                    ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
+        while True:
+            if self.thread_event is not None and self.thread_event.is_set():
+                # self.logger(f'stitching and scan thread stopped.')
+                break
+            # t0 = datetime.now()
+            # check if all cameras have a new shot
+            if all([i['shot_num'] > self.current_shot_for_all_cam for i in self.cam_info.values()]):
+                if stitch:
+                    stitch_save_path = os.path.join(
+                        self.dir, 'stitching', f'shot{self.current_shot_for_all_cam}_{datetime.now().strftime("%H%M%S.%f")}.tiff')
+                    large_image_p = self.stitch_images(
+                        f'shot{self.current_shot_for_all_cam}')
+                    message = f"Shot {self.current_shot_for_all_cam} for stitching is saved."
+                    Thread(target=self.thread_saving, args=(
+                        large_image_p, stitch_save_path, message)).start()
+                    # self.logger(
+                    #     f"Shot {self.current_shot_for_all_cam} for stitching {large_image_p.size} is queued.")
+                    # self.logger(f"It takes {datetime.now() - t0} to save out of thread.")
+                self.current_shot_for_all_cam += 1
+                self.logger(
+                    f"Shot {self.current_shot_for_all_cam-1} is completed.", 'blue_text')
+                playsound(os.path.join(os.path.dirname(__file__), 'media',
+                                       'sound', 'shot_completion_1.mp3'), block=False)
+                # send plasma mirror ready signal
+                if not self.GUI.options['use_plasma_mirror']:
+                    self.GUI.send_message_to_laser_side('TA2_ready')
+                # save scala data
+                if self.GUI.options["save_metadata"]:
+                    self.csv_header = ['shot_number', 'time']
+                    self.save_scalars(self.current_shot_for_all_cam)
+                if self.GUI.options["scan"]:
+                    if hasattr(self.GUI, "scan_window") and self.GUI.scan_window.winfo_exists():
+                        self.GUI.root.event_generate(
+                            "<<RefreshScanTable>>")
+                    if scan_table is not None and hasattr(self, "scan_shot_range"):
+                        for device_attr_name, ap in self.scan_attr_proxies.items():
+                            self.set_scan_value(
+                                ap, self.scan_table[device_attr_name], self.current_shot_for_all_cam)
 
-                if not False in [value['is_completed'] for value in self.cam_info.values()]:
-                    self.logger("All shots completed!")
-                    self.thread_event.set()
-                    return
-                time.sleep(0.3)
-        except Exception as e:
-            self.logger(
-                f'Error in "thread_stitch_and_go_to_next_scan_point" thread: {e}', 'red_text')
+            if not False in [value['is_completed'] for value in self.cam_info.values()]:
+                self.logger("All shots completed!")
+                self.thread_event.set()
+                return
+            time.sleep(0.3)
 
     def generate_file_name(self, info, bs, shoot=True):
         rep = info['file_name']
@@ -489,8 +485,15 @@ class Daq:
                     csvfile.seek(0, os.SEEK_END)
                 data_to_write = {'shot_number': shot_number-1,
                                  'time': datetime.now().strftime("%Y-%m-%d_%H:%M:%S.%f")}
-                other_data = {
-                    key: f'{value.read().value: .6g}{value.get_config().unit}' for key, value in self.scalars.items()}
+                other_data = {}
+                data_type_map = {1: bool, 8: str}
+                for key, value in self.scalars.items():
+                    if value.get_config().data_type in data_type_map:
+                        scalar_str = value.read().value
+                    else:
+                        scalar_str = f'{float(value.read().value): .6g}'
+                    other_data.update(
+                        {key: f'{scalar_str}{value.get_config().unit}'})
                 data_to_write.update(other_data)
                 writer.writerow(data_to_write)
         self.logger(f'Write scalars: {other_data}')
