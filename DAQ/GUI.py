@@ -42,6 +42,8 @@ class DaqGUI:
         self.db = tango.Database()
         self.root_path = os.path.dirname(os.path.dirname(__file__))
         self.logging_q = Queue()
+        self.gui_update_queue = Queue()
+
         if platform.system() == 'Linux':
             self.python_path = os.path.join(
                 self.root_path, 'venv', 'bin', 'python')
@@ -82,6 +84,8 @@ class DaqGUI:
             'Helvetica', self.font_small), background='yellow')
         s.configure('Sty2_online_text_small.TButton', font=(
             'Helvetica', self.font_small), background='#5dade2')
+        s.configure('Sty2_local_online_text_small.TButton', font=(
+            'Helvetica', self.font_small), background='#52be80')
         s.configure('Sty2_client_offline.TButton', font=(
             'Helvetica', self.font_mid), background='#85929e')
         s.configure('Sty2_client_online.TButton', font=(
@@ -209,6 +213,9 @@ class DaqGUI:
         self.init_settings()
         self.laser_socket = socket.socket(
             socket.AF_INET, socket.SOCK_DGRAM)
+        self.update_gui()
+        Thread(target=self.routine_checking_device_server_status,
+               daemon=True).start()
 
     def init_settings(self):
         # self.selected_devices structure. self.selected_devices = {'[device name]': {'checkbutton': ttk.Button, 'server_pid': [int/string?], 'connection_try_times': [int], 'tango_dp': tango.DeviceProxy}, }
@@ -235,11 +242,13 @@ class DaqGUI:
                     self.options['scan'] = False
                     self.path_var.set(
                         self.init_dict['save_path']) if "save_path" in self.init_dict else ''
-
+                    self.total_bandwidth = self.init_dict['total_bandwidth'] if 'total_bandwidth' in self.init_dict else 80
                     for key, value in self.options.items():
                         if key in self.frame2_checkbutton_content:
                             self.frame2_checkbutton_content[key]['var'].set(
                                 value)
+                self.insert_to_disabled(
+                    f'Loaded initialization settings from "init.json" file.')
             except Exception as e:
                 self.insert_to_disabled(
                     f"Error in loading init.json file. Exception: {type(e)}, {e}")
@@ -247,6 +256,10 @@ class DaqGUI:
                 self.damaged_zones = dict()
                 self.checked_savable_attributes = []
                 self.options = dict()
+                self.total_bandwidth = 80
+                self.insert_to_disabled(
+                    f'Failed to load initialization settings from "init.json" file. Use default settings instead.', 'red_text')
+
         # only applied to basler cameras
         self.serial_number_vs_friendly_name = dict()
         for device in pylon.TlFactory.GetInstance().EnumerateDevices():
@@ -351,68 +364,79 @@ class DaqGUI:
         self.bandwidth_window.attributes('-topmost', True)
         self.bandwidth_window.attributes('-topmost', False)
 
-    def connect_to_device(self, device_name):
-        '''Command for the device button in frame1. It connects to the device and starts the server if it is not already running.'''
-        if 'server_pid' not in self.selected_devices[device_name]:
-            device_class = self.db.get_device_info(
-                device_name).class_name
-            device_instance = self.db.get_device_info(
-                device_name).ds_full_name.split('/')[-1]
-            class_folder = os.path.join(
-                self.root_path, device_class)
-            script_path = os.path.join(
-                class_folder, [i for i in os.listdir(class_folder) if 'server' in i][0])
-            p = subprocess.Popen(
-                [f'{self.python_path}', f'{script_path}', device_instance])
-            self.selected_devices[device_name]['server_pid'] = p.pid
-            self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_connecting.TButton'
-            self.insert_to_disabled(f'Start device server {device_name}...')
-            # Thread(target=self.check_device_server_status,
-            #        args=(device_name,)).start()
-            # self.check_device_server_status(device_name)
-            self.selected_devices[device_name]['connection_try_times'] = 0
-            self.root.after(
-                3000, lambda: self.check_device_server_status(device_name))
-        else:
-            self.kill_device_server(device_name)
-
-    def kill_device_server(self, device_name):
-        '''Command for the device button in frame1. It kills the device server if it is running. It is part of the connect_to_device function.'''
+    def update_gui(self):
         try:
-            os.kill(self.selected_devices[device_name]
-                    ['server_pid'], signal.SIGTERM)
-        except OSError:
-            self.insert_to_disabled(
-                f"{self.selected_devices[device_name]['server_pid']}  doesn't exist.")
-        del self.selected_devices[device_name]['server_pid']
-        del self.selected_devices[device_name]['connection_try_times']
-        self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_offline_text_small.TButton'
-        self.insert_to_disabled(f'{device_name} server is killed.')
+            while True:
+                action, this_widget = self.gui_update_queue.get(block=False)
+                if action == 'action1':
+                    this_widget['style'] = 'Sty2_online_text_small.TButton'
+                elif action == 'action2':
+                    this_widget['style'] = 'Sty2_local_online_text_small.TButton'
+                elif action == 'action3':
+                    this_widget['style'] = 'Sty2_offline_text_small.TButton'
+                elif action == 'action4':
+                    this_widget['style'] = 'Sty2_connecting.TButton'
+        except Exception as e:
+            pass
+        # if not self.thread_stop_event.is_set():
+        self.root.after(100, self.update_gui)
 
-    def check_device_server_status(self, device_name):
-        '''Check if the device server is running. If it is running, it will change the button style to online. If it is not running, it will try to check again. It is called by the connect_to_device function.'''
-        if 'connection_try_times' not in self.selected_devices[device_name]:
-            return
-        self.selected_devices[device_name]['connection_try_times'] += 1
+    def start_stop_device_server(self, device_name):
+        '''Start or stop device server'''
         try:
             dp = tango.DeviceProxy(device_name)
             dp.ping()  # type: ignore
-            self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_online_text_small.TButton'
-            self.selected_devices[device_name]['tango_dp'] = dp
-            self.insert_to_disabled(f'{device_name} is connected.')
-        except (tango.DevFailed, tango.ConnectionFailed) as e:
-            if self.selected_devices[device_name]['connection_try_times'] >= 4:
-                # tango.DevFailed is not gonna happen because it should always be in the data base.
-                if type(e) is tango.DevFailed:
-                    self.insert_to_disabled(
-                        f'Exception: {type(e)}. Check if "{device_name}" exists in the data base.')
-                elif type(e) is tango.ConnectionFailed:
-                    self.insert_to_disabled(
-                        f'Exception: {type(e)}. "{device_name}" server is not running. Check if the device is occupied by other process.', 'red_text')
-                self.kill_device_server(device_name)
-            else:
-                self.root.after(
-                    3000, lambda: self.check_device_server_status(device_name))
+            admin_device_name = dp.adm_name()
+            admin_proxy = tango.DeviceProxy(admin_device_name)
+            admin_proxy.command_inout("Kill")
+            self.gui_update_queue.put(
+                ('action3', self.selected_devices[device_name]['checkbutton']))
+            del self.selected_devices[device_name]['server_pid']
+            self.insert_to_disabled(
+                f'{device_name} device server is stopped.')
+        except Exception as e:
+            if 'server_pid' not in self.selected_devices[device_name]:
+                device_class = self.db.get_device_info(
+                    device_name).class_name
+                device_instance = self.db.get_device_info(
+                    device_name).ds_full_name.split('/')[-1]
+                class_folder = os.path.join(
+                    self.root_path, device_class)
+                script_path = os.path.join(
+                    class_folder, [i for i in os.listdir(class_folder) if 'server' in i][0])
+                p = subprocess.Popen(
+                    [f'{self.python_path}', f'{script_path}', device_instance])
+                self.selected_devices[device_name]['server_pid'] = p.pid
+                self.gui_update_queue.put(
+                    ('action4', self.selected_devices[device_name]['checkbutton']))
+                self.insert_to_disabled(
+                    f'Start device server {device_name}...')
+                self.selected_devices[device_name]['connection_start_time'] = datetime.now(
+                )
+
+    def routine_checking_device_server_status(self):
+        while True:
+            try:
+                for device_name in self.selected_devices:
+                    this_checkbutton = self.selected_devices[device_name]['checkbutton']
+                    try:
+                        dp = tango.DeviceProxy(device_name)
+                        dp.ping()  # type: ignore
+                        if this_checkbutton.cget('style') == 'Sty2_offline_text_small.TButton':
+                            self.gui_update_queue.put(
+                                ('action1', this_checkbutton))
+                        elif this_checkbutton.cget('style') == 'Sty2_connecting.TButton':
+                            self.gui_update_queue.put(
+                                ('action2', this_checkbutton))
+                        self.selected_devices[device_name]['tango_dp'] = dp
+                    except (tango.DevFailed, tango.ConnectionFailed) as e:
+                        if this_checkbutton.cget('style') == 'Sty2_online_text_small.TButton' or (this_checkbutton.cget('style') == 'Sty2_connecting.TButton' and (datetime.now() - self.selected_devices[device_name]['connection_start_time']).total_seconds() >= 20):
+                            self.gui_update_queue.put(
+                                ('action3', this_checkbutton))
+            # if self.selected_devices is modified in the main thread, just try again in the next loop.
+            except Exception as e:
+                pass
+            time.sleep(0.5)
 
     def start_device_GUI(self):
         '''Command for the device GUI button in frame1. It starts the client GUI for the selected devices. If the client GUI is already running, it will kill it.'''
@@ -460,7 +484,7 @@ class DaqGUI:
             if len(text) > 20:
                 text = text[:8]+'...'+text[-8:]
             device_button = ttk.Button(
-                self.frame1, command=lambda device_name=device_name: self.connect_to_device(device_name), text=text, style='Sty2_offline_text_small.TButton')
+                self.frame1, command=lambda device_name=device_name: self.start_stop_device_server(device_name), text=text, style='Sty2_offline_text_small.TButton')
             self.selected_devices[device_name] = dict()
             self.selected_devices[device_name]['checkbutton'] = device_button
         elif 'server_pid' in self.selected_devices[device_name]:
@@ -503,8 +527,10 @@ class DaqGUI:
     def write_to_init_file(self):
         '''Write the selected devices and options to the init.json file.'''
         with open(self.init_file_path, 'w') as jsonfile:
-            json.dump({"selected_devices": {key: None for key in self.selected_devices}, "options": self.options, "save_path": self.path_var.get(
+            json.dump({"selected_devices": {key: None for key in self.selected_devices}, "total_bandwidth": self.total_bandwidth, "options": self.options, "save_path": self.path_var.get(
             ), "checked_savable_attributes": self.checked_savable_attributes, "damaged_zones": list(self.damaged_zones.keys())}, jsonfile)
+        self.insert_to_disabled(
+            f'Wrote initialization settings to "init.json" file.')
 
     def start_acquisition(self):
         '''Start the acquisition in a new thread. It will create a Daq object and call its acquisition method. It will also save the options and selected devices to a json file. It is called by the toggle_acquisition function.'''
@@ -625,7 +651,7 @@ class BandwidthWindow(Toplevel):
         ttk.Label(self.frame, text='Allowed bandwidth:', font=(
             'Helvetica', int(self.parent.font_mid*0.75))).grid(
             column=0, row=0, sticky='W')
-        self.total_bandwidth_var = DoubleVar(value=80.0)
+        self.total_bandwidth_var = DoubleVar(value=self.parent.total_bandwidth)
         ttk.Entry(self.frame, textvariable=self.total_bandwidth_var, font=(
             'Helvetica', int(self.parent.font_mid*0.75)), width=20).grid(
             column=1, row=0, sticky='W')
@@ -634,7 +660,7 @@ class BandwidthWindow(Toplevel):
         ttk.Button(self.frame, text='Refresh', command=self.update_bandwidth_tree, style='Sty1.TButton').grid(
             column=3, row=0, sticky='W')
         note1 = "1. Cameras with bandwidth shown as -1 are bandwidth-not-available. Change bandwidth for them in Pylon Viewer if their result fps is much greater than other cameras."
-        note2 = "2. Suggested allowed bandwidth for all bandwidth-available cameras is 80MB/s. Decrease it if there are bandwidth-not-available cameras."
+        note2 = "2. Suggested allowed bandwidth for all bandwidth-available cameras is 80MB/s. Decrease it to make the acquisition more robust in a bad network environment."
         ttk.Label(self.frame, text=note1, font=(
             'Helvetica', int(self.parent.font_mid*0.75)), wraplength=550).grid(
             column=0, row=1, columnspan=4, pady=(5, 5), sticky='W')
@@ -673,15 +699,17 @@ class BandwidthWindow(Toplevel):
                 message=f'Error in updating bandwidth table. Please make sure all devices are connected properly. Exception: {type(e)}, {e}')
 
     def optimize_bandwidth(self):
-        total_bandwidth = self.total_bandwidth_var.get()
-        if not total_bandwidth:
-            messagebox.showinfo(message='Please input the total bandwidth!')
+        self.parent.total_bandwidth = self.total_bandwidth_var.get()
+        if not self.parent.total_bandwidth:
+            self.parent.insert_to_disabled(
+                'Please input the total bandwidth!', 'red_text')
             return
         size_of_total_frames = np.sum([v for v in self.frame_size.values()])
         for key, value in self.frame_size.items():
-            self.parent.selected_devices[key]['tango_dp'].bandwidth = total_bandwidth / \
+            self.parent.selected_devices[key]['tango_dp'].bandwidth = self.parent.total_bandwidth / \
                 size_of_total_frames * self.frame_size[key]
         self.update_bandwidth_tree()
+        self.parent.write_to_init_file()
 
 
 class DamagedZonesWindow(Toplevel):
