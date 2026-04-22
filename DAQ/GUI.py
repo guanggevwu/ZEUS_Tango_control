@@ -22,6 +22,7 @@ from tango import AttributeProxy
 from pypylon import pylon
 import time
 from constants import *
+from tktooltip import ToolTip
 
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s %(message)s")
@@ -114,14 +115,24 @@ class DaqGUI:
         for i in range(4):  # 4 columns
             self.frame1.columnconfigure(i, weight=1, uniform='g1')
         self.frame1.grid(column=0, row=0, sticky='nsew')
-        ttk.Button(self.frame1, text='Select', command=self.open_device_list, style='Sty1.TButton').grid(
-            column=0, row=0, sticky='WE')
+        select_device_btn = ttk.Button(
+            self.frame1, text='Select', command=self.open_device_list, style='Sty1.TButton')
+        select_device_btn.grid(column=0, row=0, sticky='WE')
+        ToolTip(select_device_btn,
+                msg="Select devices that will be acquired data from.", delay=HOVER_DELAY)
+
         self.client_GUI['button'] = ttk.Button(
             self.frame1, text='Device GUI', command=self.start_device_GUI, style='Sty2_client_offline.TButton')
         self.client_GUI['button'].grid(column=1, row=0, sticky='WE')
+        ToolTip(self.client_GUI['button'],
+                msg="Open the GUI for the selected devices. The device servers must be running.", delay=HOVER_DELAY)
+
         self.device_row, self.selected_device_per_row = 1, 4
-        ttk.Button(self.frame1, text='Bandwidth', command=self.open_bandwidth_window, style='Sty1.TButton').grid(
-            column=3, row=0, sticky='WE')
+        bandwidth_btn = ttk.Button(self.frame1, text='Bandwidth',
+                                   command=self.open_bandwidth_window, style='Sty1.TButton')
+        bandwidth_btn.grid(column=3, row=0, sticky='WE')
+        ToolTip(bandwidth_btn,
+                msg="Distribute bandwidth among the devices.", delay=HOVER_DELAY)
 
         # ---------------------frame 2
         self.frame2 = ttk.Labelframe(
@@ -130,8 +141,8 @@ class DaqGUI:
 
         # half column options first and then full column options with buttons
         self.frame2_checkbutton_content = {'use_plasma_mirror': {
-            'text': 'Use plasma mirror', 'init_status': True, 'button': 'DamagedZones'}, 'save_copy': {
-            'text': 'Save an extra copy of data', 'init_status': True, 'button': None}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True, 'button': None}, 'save_metadata': {'text': 'Save metadata', 'init_status': False, 'button': 'Metadata'}, 'scan': {'text': 'Scan over parameters', 'init_status': False, 'button': 'Parameters'}}
+            'text': 'Use plasma mirror', 'init_status': True, 'button': 'DamagedZones', 'hover_info': 'A background process monitors the location of the plasma mirror.\n"DamagedZone" red: plasma mirror is in damaged zone and new shot is not allowed. \n"DamagedZone" green: safe.'}, 'save_copy': {
+            'text': 'Save an extra copy of data', 'init_status': True, 'button': None, 'hover_info': "You can retrieve the data even if you accidently deleted them."}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True, 'button': None, 'hover_info': "Stitch images from various cameras together to create a larger image. The contrast is enhanced for view purpose thus this image is not for quatitative analysis."}, 'save_metadata': {'text': 'Save metadata', 'init_status': False, 'button': 'Metadata', 'hover_info': 'Selected metadata will be saved in "scalars.csv" in the folder path below.'}, 'scan': {'text': 'Scan over parameters', 'init_status': False, 'button': 'Parameters', 'hover_info': 'Automatically set the conditions before each shot.'}}
         item_per_column = 2
         current_row = 0
         self.frame2_buttons = dict()
@@ -139,6 +150,8 @@ class DaqGUI:
             checkbox_var = BooleanVar(value=value['init_status'])
             checkbox = ttk.Checkbutton(self.frame2, text=value['text'],
                                        variable=checkbox_var, style='highlight.TCheckbutton')
+            if 'hover_info' in value:
+                ToolTip(checkbox, msg=value['hover_info'], delay=HOVER_DELAY)
             if value['button'] is not None:
                 # If current_row is x.0, use x as the row number. If current_row is x.5, use x+1 as the row number. int(current_row+0.5) fits both cases. Add 1 for the start of next row.
                 checkbox.grid(
@@ -160,25 +173,28 @@ class DaqGUI:
         self.frame3 = ttk.Labelframe(
             root, text='Acquisition', padding=pad_widget, style='Sty1.TLabelframe')
         self.frame3.grid(column=0, row=2, sticky='nsew')
-        ttk.Label(self.frame3, text='Save path:', font=(
-            'Helvetica', int(self.font_mid*0.75))).grid(
-            column=0, row=0, sticky='W')
+        save_path_label = ttk.Label(self.frame3, text='Save path:', font=(
+            'Helvetica', int(self.font_mid*0.75)))
+        save_path_label.grid(column=0, row=0, sticky='W')
+        ToolTip(save_path_label,
+                msg='Select the directory where the acquired data will be saved. \nAn example is "Z:\\user_data\\[year]\\[PI last name]\\ta_data\\[date]\\[subfolder_name]".\nUse C drive for better performance.', delay=HOVER_DELAY)
         self.path_var = StringVar()
         ttk.Entry(self.frame3, textvariable=self.path_var, font=(
             'Helvetica', int(self.font_mid*0.75)), width=60).grid(
             column=1, row=0, columnspan=4, sticky='W')
 
-        ttk.Label(self.frame3, text='Start', font=(
-            'Helvetica', int(self.font_mid*0.75))).grid(
-            column=0, row=1, sticky='W')
+        start_shot_label = ttk.Label(self.frame3, text='Start', font=(
+            'Helvetica', int(self.font_mid*0.75)))
+        start_shot_label.grid(column=0, row=1, sticky='W')
+        ToolTip(start_shot_label, msg='The shot number for the next shot. \nIf you have taken some shots and "stopped" the acquisition, before "Start", you should enter the next shot number to continue saving in the above save path or use a new save path. \nA wrong shot number does NOT cause data overwriting because of unique time stamp in the file name but it adds complexity to future data processing.', delay=HOVER_DELAY)
         self.shot_start_var = IntVar(value=1)
         ttk.Entry(self.frame3, textvariable=self.shot_start_var, font=(
             'Helvetica', int(self.font_mid*0.75)), width=10).grid(
             column=1, row=1, sticky='W')
 
-        ttk.Label(self.frame3, text='End', font=(
-            'Helvetica', int(self.font_mid*0.75))).grid(
-            column=2, row=1, sticky='W')
+        end_shot_label = ttk.Label(self.frame3, text='End', font=(
+            'Helvetica', int(self.font_mid*0.75)))
+        end_shot_label.grid(column=2, row=1, sticky='W')
         self.shot_end_var = IntVar(value=1000)
         ttk.Entry(self.frame3, textvariable=self.shot_end_var, font=(
             'Helvetica', int(self.font_mid*0.75)), width=10).grid(
@@ -187,7 +203,8 @@ class DaqGUI:
             self.frame3, text='Start', command=self.toggle_acquisition, style='Sty3_start.TButton')
         self.acquisition_button.grid(
             column=0, row=2, columnspan=5, sticky='WE')
-
+        ToolTip(self.acquisition_button,
+                msg=f'Click to {self.acquisition_button.cget("text")} the data acquisition. \nMake sure to "Stop" before you make any changes to above settings and then "Start" again.', delay=HOVER_DELAY)
         self.frame4 = ttk.Labelframe(
             root, text='Logging', padding=pad_widget, style='Sty1.TLabelframe')
         self.frame4.grid(column=0, row=3, sticky='nsew')
@@ -374,8 +391,6 @@ class DaqGUI:
                     this_widget['style'] = 'Sty2_local_online_text_small.TButton'
                 elif action == 'action3':
                     this_widget['style'] = 'Sty2_offline_text_small.TButton'
-                elif action == 'action4':
-                    this_widget['style'] = 'Sty2_connecting.TButton'
         except Exception as e:
             pass
         # if not self.thread_stop_event.is_set():
@@ -389,8 +404,7 @@ class DaqGUI:
             admin_device_name = dp.adm_name()
             admin_proxy = tango.DeviceProxy(admin_device_name)
             admin_proxy.command_inout("Kill")
-            self.gui_update_queue.put(
-                ('action3', self.selected_devices[device_name]['checkbutton']))
+            self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_offline_text_small.TButton'
             del self.selected_devices[device_name]['server_pid']
             self.insert_to_disabled(
                 f'{device_name} device server is stopped.')
@@ -407,12 +421,22 @@ class DaqGUI:
                 p = subprocess.Popen(
                     [f'{self.python_path}', f'{script_path}', device_instance])
                 self.selected_devices[device_name]['server_pid'] = p.pid
-                self.gui_update_queue.put(
-                    ('action4', self.selected_devices[device_name]['checkbutton']))
+                self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_connecting.TButton'
                 self.insert_to_disabled(
                     f'Start device server {device_name}...')
                 self.selected_devices[device_name]['connection_start_time'] = datetime.now(
                 )
+            else:
+                try:
+                    os.kill(self.selected_devices[device_name]
+                            ['server_pid'], signal.SIGTERM)
+                except OSError:
+                    self.insert_to_disabled(
+                        f'{device_name} server was already killed somewhere else. Ignore.')
+                self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_offline_text_small.TButton'
+                del self.selected_devices[device_name]['server_pid']
+                self.insert_to_disabled(
+                    f'{device_name} starting is interrupted.')
 
     def routine_checking_device_server_status(self):
         while True:
@@ -430,9 +454,14 @@ class DaqGUI:
                                 ('action2', this_checkbutton))
                         self.selected_devices[device_name]['tango_dp'] = dp
                     except (tango.DevFailed, tango.ConnectionFailed) as e:
-                        if this_checkbutton.cget('style') == 'Sty2_online_text_small.TButton' or (this_checkbutton.cget('style') == 'Sty2_connecting.TButton' and (datetime.now() - self.selected_devices[device_name]['connection_start_time']).total_seconds() >= 20):
+                        if this_checkbutton.cget('style') == 'Sty2_online_text_small.TButton':
                             self.gui_update_queue.put(
                                 ('action3', this_checkbutton))
+                        elif this_checkbutton.cget('style') == 'Sty2_connecting.TButton' and (datetime.now() - self.selected_devices[device_name]['connection_start_time']).total_seconds() >= 20:
+                            self.gui_update_queue.put(
+                                ('action3', this_checkbutton))
+                            del self.selected_devices[device_name]['server_pid']
+                            a = 1
             # if self.selected_devices is modified in the main thread, just try again in the next loop.
             except Exception as e:
                 pass
@@ -466,9 +495,17 @@ class DaqGUI:
         '''Kill all the processes started by this GUI. It is called when the GUI is closed.'''
         for key, value in self.selected_devices.items():
             if 'server_pid' in value:
-                os.kill(value['server_pid'], signal.SIGTERM)
+                try:
+                    os.kill(value['server_pid'], signal.SIGTERM)
+                except OSError:
+                    self.insert_to_disabled(
+                        f'{key} server was already killed somewhere else. Ignore.')
             if 'client_pid' in value:
-                os.kill(value['client_pid'], signal.SIGTERM)
+                try:
+                    os.kill(value['client_pid'], signal.SIGTERM)
+                except OSError:
+                    self.insert_to_disabled(
+                        f'{key} client was already killed somewhere else. Ignore.')
         self.laser_socket.close()
         self.insert_to_disabled(
             "Terminate. All processes are killed.")
@@ -485,6 +522,7 @@ class DaqGUI:
                 text = text[:8]+'...'+text[-8:]
             device_button = ttk.Button(
                 self.frame1, command=lambda device_name=device_name: self.start_stop_device_server(device_name), text=text, style='Sty2_offline_text_small.TButton')
+            ToolTip(device_button, msg=f"Start or stop the device server for {device_name}. \nGray: the server is offline. \nYellow: the server is starting but not ready yet.\nGreen: the server is running on this DAQ GUI. \nBlue: the server is hosted elsewhere. \nMake sure every device is either green or blue before starting Device GUI or data acquisition. \nMake sure the servers are not blue before quitting the program.", delay=HOVER_DELAY)
             self.selected_devices[device_name] = dict()
             self.selected_devices[device_name]['checkbutton'] = device_button
         elif 'server_pid' in self.selected_devices[device_name]:
