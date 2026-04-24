@@ -141,7 +141,7 @@ class BaslerGUI():
                 panel_layout.addWidget(panel_w)
         layout.addWidget(panel)
 
-    def create_form_panel(self, layout, device_name, exclude=None, dropdown=None, withButtons=True):
+    def create_form_panel(self, layout, device_name, exclude=None, dropdown=None, withButtons=True, set_attr_font=None):
         panel2_w1 = TaurusForm(withButtons=withButtons)
         form_model = self.attr_list[device_name]['model']
         # re-order. Move trigger to front.
@@ -167,6 +167,13 @@ class BaslerGUI():
             if full_attr.split('/')[-1] in dropdown:
                 panel2_w1[idx].writeWidgetClass = create_my_dropdown_list_class(
                     full_attr.split('/')[-1], dropdown[full_attr.split('/')[-1]])
+        if set_attr_font:
+            for row in panel2_w1:
+                if row.model.split('/')[-1] in set_attr_font:
+                    for method_attr in ['readWidget', 'writeWidget', 'unitsWidget', 'labelWidget']:
+                        col_widget = getattr(row, method_attr)()
+                        if col_widget:
+                            col_widget.setFont(Qt.QFont(set_attr_font[row.model.split('/')[-1]]['font'], set_attr_font[row.model.split('/')[-1]]['size']))
 
     def combined_panel(self, device_list, combine_form_with_onshot=False):
         panel3, panel3_layout = self.create_blank_panel('v')
