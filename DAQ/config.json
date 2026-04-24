@@ -1,9 +1,6 @@
 {
   "_comment": "Default configuration for camera parameters. The keys should match the user defined names of the cameras. The values are dictionaries of parameters to set for each camera. If a parameter is not specified for a camera, it will use the default value from the DAQ class.",
-  "TA2-NearField": { "format_pixel": "Mono12" },
-  "TA2-FarField": { "format_pixel": "Mono12" },
   "TA1-SideView": { "format_pixel": "RGB8" },
-  "TA2-Gossip": { "format_pixel": "Mono12", "exposure": 1000, "gain": 240 },
   "test": {
     "format_pixel": "Mono8",
     "exposure": 100000,
@@ -15,6 +12,8 @@
     "saving_format": "%s_%t.%f",
     "trigger_source": "External",
     "is_polling_periodically": false,
-    "exposure": 5000
+    "exposure": 5000,
+    "gain": 0, 
+    "format_pixel": "mono12"
   }
 }

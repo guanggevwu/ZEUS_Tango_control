@@ -522,7 +522,7 @@ class DaqGUI:
                 text = text[:8]+'...'+text[-8:]
             device_button = ttk.Button(
                 self.frame1, command=lambda device_name=device_name: self.start_stop_device_server(device_name), text=text, style='Sty2_offline_text_small.TButton')
-            ToolTip(device_button, msg=f"Start or stop the device server for {device_name}. \nGray: the server is offline. \nYellow: the server is starting but not ready yet.\nGreen: the server is running on this DAQ GUI. \nBlue: the server is hosted elsewhere. \nMake sure every device is either green or blue before starting Device GUI or data acquisition. \nMake sure the servers are not blue before quitting the program.", delay=HOVER_DELAY)
+            ToolTip(device_button, msg=f'Start or stop the device server for {device_name}. \nGray: the server is offline. \nYellow: the server is starting but not ready yet.\nGreen: the server is running on this DAQ GUI. \nBlue: the server is hosted elsewhere. \nMake sure every device is either green or blue before click "Device GUI" or click "Start" data acquisition. \nMake sure the servers are not green before quitting the program.', delay=HOVER_DELAY)
             self.selected_devices[device_name] = dict()
             self.selected_devices[device_name]['checkbutton'] = device_button
         elif 'server_pid' in self.selected_devices[device_name]:
