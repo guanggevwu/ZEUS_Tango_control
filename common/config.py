@@ -1,6 +1,7 @@
 # the key of this table, i.e., the name of the combination needs to include its class name.
 device_name_table = {
     'TA1_gxregulator_combination': ['TA1/gx_regulator/TA1_regulator_1', 'TA1/gx_regulator/TA1_regulator_2'],
+    'TA3_gxregulator_combination': ['TA3/gx_regulator/TA3_regulator_1', 'TA3/gx_regulator/TA3_regulator_2'],
     '3PW_basler_combination': ['laser/basler/3PW_Screen', 'laser/basler/3PW_Grating-4_NF',  'laser/basler/3PW_Grating-4_FF'],
     'testcam_basler_combination': ['other/basler/40222934', 'TA3/basler/40330527'],
     'MA2_genteceo_combination': ['laser/gentec/MA2', 'laser/gentec/MA2_north', 'laser/gentec/MA2_south'],
