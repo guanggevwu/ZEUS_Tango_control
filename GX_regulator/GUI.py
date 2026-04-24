@@ -8,7 +8,7 @@ if True:
     from common.TaurusGUI_Argparse import TaurusArgparse
     from Basler.GUI import BaslerGUI, create_app
 parser = TaurusArgparse(
-    description='GUI for GX pressure regulator', device_default='TA1/gx_regulator/TA1_regulator_1', polling_default=1000)
+    description='GUI for GX pressure regulator', device_default='TA1/gx_regulator/TA1_regulator_1', nargs_string='+', polling_default=1000)
 args = parser.parse_args()
 
 
