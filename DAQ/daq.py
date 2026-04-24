@@ -7,16 +7,12 @@ from PIL import Image
 import logging
 import json
 from collections import defaultdict
-from PIL import ImageDraw
-import sys
 import platform
-from config import default_config_dict
 import shutil
 import matplotlib.pyplot as plt
 from threading import Thread
 import csv
 from playsound3 import playsound
-from tkinter import messagebox
 
 logging.basicConfig(
     format="%(asctime)s %(message)s",
@@ -73,7 +69,7 @@ class Daq:
         self.debug = debug
         # atexit.register(self.termination)
 
-    def set_camera_configuration(self, config_dict=None, saving=True, default_config_dict=default_config_dict, grab_number=10000):
+    def set_camera_configuration(self, grab_number=None, config_dict=None, load_json=True, saving=True):
         # list of user defined names of the cameras
         user_defined_name_list = [one_cam_dict['user_defined_name']
                                   for one_cam_dict in self.cam_info.values()]
@@ -82,8 +78,13 @@ class Daq:
         # the overwrite priority is "specified camera in config_dict" > "all in config_dict" > "specified camera in default_config_dict" > "all in default_config_dict"
         # 2025/02/05 change that if a configuration is passed to config_dict, then use the configuration which is basically just change polling and image number. All other changes are made by GUI. Otherwise, use default in config.py.
         # Although the option that "use default config.py" in the GUI is removed, config_dict is stilled used in the termination function.
+        if load_json:
+            with open(os.path.join(os.path.dirname(__file__), 'config.json'), 'r') as file:
+                default_config_dict = json.load(file)
+        new_config = {}
         for cam in user_defined_name_list:
-            new_config = {"repetition": grab_number}
+            if grab_number is not None:
+                new_config = {"repetition": grab_number}
             if not config_dict:
                 if "all" in default_config_dict:
                     new_config.update(default_config_dict["all"])
@@ -107,7 +108,7 @@ class Daq:
             if bs.info().dev_class.lower() in ['basler', 'vimba']:
                 bs.relax()
             elif bs.info().dev_class.lower() == 'filereader':
-                bs.read_files()
+                bs.clear_queue()
             for key, value in info['config_dict'].items():
                 if hasattr(bs, key):
                     try:
@@ -161,47 +162,6 @@ class Daq:
         else:
             data_array = image.astype(f'uint{bits}')
         return data_PIL, data_array
-
-    def stretch_image(self, current_image):
-        adjusted_image = self.imadjust(current_image)
-        if np.max(adjusted_image) != np.min(adjusted_image):
-            adjusted_image = (adjusted_image - np.min(adjusted_image)) / \
-                (np.max(adjusted_image) - np.min(adjusted_image))*255
-        return adjusted_image
-
-    def take_background(self, stitch=True):
-        '''take a background image
-        haven't updated it for a while. For example, hidden save folder.
-        '''
-        for c, info in self.cam_info.items():
-            bs = info['device_proxy']
-            if bs.info().dev_class.lower() in ['basler', 'vimba']:
-                trigger_source = bs.trigger_source
-                bs.trigger_source = "software"
-                time.sleep(0.5)
-                bs.send_software_trigger()
-                time.sleep(1)
-            if bs.is_new_image:
-                data, data_array = self.get_image(bs)
-                file_name = self.generate_file_name(info, bs, shoot=False)
-                file_name = file_name.replace('%f', 'tiff')
-                data.save(os.path.join(
-                    info['cam_dir'], file_name))
-                self.logger(
-                    f"Background for {info['user_defined_name']} is saved {data.size}")
-                if stitch:
-                    adjusted_image = self.stretch_image(data_array)
-                    info['images_to_stitch']['background'] = adjusted_image
-                    if sum([1 for one_cam in self.cam_info.values() if 'background' in one_cam['images_to_stitch']]) == len(self.cam_info):
-                        back_image = self.stitch_images('background')
-                        back_image.save(
-                            os.path.join(self.dir, 'stitching', f'background.tiff'))
-                        self.logger(
-                            f"Background for stitching {back_image.size} is saved.")
-            else:
-                self.logger('Error when taking background image.')
-            if bs.info().dev_class.lower() in ['basler', 'vimba']:
-                bs.trigger_source = trigger_source
 
     def set_acquisition_start_mode(self):
         '''Use AcquisitionStart mode to acquire a set of image from just one trigger
@@ -350,8 +310,7 @@ class Daq:
                             data_array = 0.299 * \
                                 data_array[:, :, 0] + 0.587 * data_array[:,
                                                                          :, 1] + 0.114 * data_array[:, :, 2]
-                        adjusted_image = self.stretch_image(data_array)
-                        info['images_to_stitch'][f'shot{info["shot_num"]}'] = adjusted_image
+                        info['images_to_stitch'][f'shot{info["shot_num"]}'] = data_array
                     info['shot_num'] += add_number
                     # self.logger(
                     #     f"It takes {datetime.now()-t0} to save {info['user_defined_name']} {info['shot_num']-1} out of thread.")
@@ -370,14 +329,8 @@ class Daq:
                 if stitch:
                     stitch_save_path = os.path.join(
                         self.dir, 'stitching', f'shot{self.current_shot_for_all_cam}_{datetime.now().strftime("%H%M%S.%f")}.tiff')
-                    large_image_p = self.stitch_images(
+                    self.stitch_images(
                         f'shot{self.current_shot_for_all_cam}')
-                    message = f"Shot {self.current_shot_for_all_cam} for stitching is saved."
-                    Thread(target=self.thread_saving, args=(
-                        large_image_p, stitch_save_path, message)).start()
-                    # self.logger(
-                    #     f"Shot {self.current_shot_for_all_cam} for stitching {large_image_p.size} is queued.")
-                    # self.logger(f"It takes {datetime.now() - t0} to save out of thread.")
                 self.current_shot_for_all_cam += 1
                 self.logger(
                     f"Shot {self.current_shot_for_all_cam-1} is completed.", 'blue_text')
@@ -517,7 +470,7 @@ class Daq:
         except Exception as e:
             self.logger(f"Error copying file: {e}", 'red_text')
 
-    def imadjust(self, input, tol=0.01):
+    def get_image_stretch_limits(self, input, tol=0.01):
         """
         input: numpy array
         tol: set the smallest tol and the largest tol value to tol value and (1-tol) value
@@ -527,44 +480,50 @@ class Daq:
         value_at_tol = np.partition(input.flatten(), tolindex1)[tolindex1]
         value_at_one_mninus_tol = np.partition(
             input.flatten(), tolindex2)[tolindex2]
-        output = input.copy()
-        output[input < value_at_tol] = value_at_tol
-        output[input > value_at_one_mninus_tol] = value_at_one_mninus_tol
-        return output
+        return [value_at_tol, value_at_one_mninus_tol]
 
     def stitch_images(self, image_name):
         '''stitch images and add camera name text
         The image_name is usually "background" or "shot1", "shot2"...
         '''
-        if not hasattr(self, 'col'):
-            layout = {(1, 2): 1, (2, 5): 2, (5, 10): 3, (10, 17): 4}
-            for key, value in layout.items():
-                if len(self.cam_info) >= key[0] and len(self.cam_info) < key[1]:
-                    self.col = value
-                    self.row = int(len(self.cam_info)/self.col) + \
-                        bool(len(self.cam_info) % self.col)
-                    break
-        gap_x, gap_y = 30, 30
-        tile_size_x, tile_size_y = 600, 400
-        large_image_p = Image.new(
-            "L", [(gap_x+tile_size_x)*self.col+gap_x, (gap_y+tile_size_y)*self.row+gap_y])
-        # for cam_name, image in self.image_list[image_name].items():
-        for idx, (c, info) in enumerate(self.cam_info.items()):
-            cam_name = info['user_defined_name']
-            # idx = self.cam_info.index(cam_name)
-            y_i, x_i = np.unravel_index(idx, (self.row, self.col))
-            image_resized = Image.fromarray(
-                info['images_to_stitch'][image_name]).resize((tile_size_x, tile_size_y))
-            large_image_p.paste(
-                image_resized, (gap_x+x_i*(gap_x+tile_size_x), gap_y+y_i*(gap_y+tile_size_y)))
-
-            I1 = ImageDraw.Draw(large_image_p)
-            # Add Text to an image
-            I1.text((gap_x+x_i*(gap_x+tile_size_x)+0.5*tile_size_x, gap_y+y_i *
-                    (gap_y+tile_size_y)-0.5*gap_y), cam_name, fill="white", anchor="mm", font_size=20)
-            del info['images_to_stitch'][image_name]
-        # large_image_p.show()
-        return large_image_p
+        try:
+            if not hasattr(self, 'col'):
+                layout = {(1, 2): 1, (2, 5): 2, (5, 10): 3, (10, 17): 4}
+                for key, value in layout.items():
+                    if len(self.cam_info) >= key[0] and len(self.cam_info) < key[1]:
+                        self.col = value
+                        self.row = int(len(self.cam_info)/self.col) + \
+                            bool(len(self.cam_info) % self.col)
+                        break
+            fig, ax = plt.subplots(
+                self.row, self.col, figsize=(self.col*5, self.row*5))
+            ax = ax.flatten() if len(self.cam_info) > 1 else [ax]
+            for i in range(len(ax)):
+                ax[i].axis('off')
+            for idx, (c, info) in enumerate(self.cam_info.items()):
+                img = info['images_to_stitch'][image_name]
+                limits = self.get_image_stretch_limits(img)
+                cam_name = info['user_defined_name']
+                sub_fig = ax[idx].imshow(
+                    Image.fromarray(img).resize((500, 500)), vmin=limits[0], vmax=limits[1], cmap='gray')
+                ax[idx].set_title(f'{cam_name}. size: {img.shape}')
+                fig.colorbar(sub_fig, ax=ax[idx],
+                             fraction=0.046, pad=0.04)
+                del info['images_to_stitch'][image_name]
+            fig.suptitle(
+                f'{self.dir.split(os.sep)[-1]}/{image_name} at {datetime.now().replace(microsecond=0)}', fontsize=16)
+            plt.tight_layout()
+            stitch_save_path = os.path.join(
+                self.dir, 'stitching', f'{image_name}_{datetime.now().strftime("%H%M%S.%f")}.tiff')
+            plt.savefig(stitch_save_path, bbox_inches='tight')
+            message = f"Shot {self.current_shot_for_all_cam} for stitching is saved."
+            self.logger(message)
+            if self.GUI.options['save_copy']:
+                plt.savefig(stitch_save_path.replace(
+                    self.dir, self.hidden_dir, 1), bbox_inches='tight')
+            plt.close()
+        except Exception as e:
+            self.logger(f"Error saving stitch image: {e}", 'red_text')
 
     def save_plot_data(self, x, y):
         fig, ax = plt.subplots(1, 1)
@@ -580,4 +539,4 @@ class Daq:
         logging.info("destroying Daq() in daq.py")
         config_dict = {'all': {"is_polling_periodically": True}}
         self.set_camera_configuration(
-            config_dict=config_dict, saving=False, default_config_dict={})
+            config_dict=config_dict, saving=False, load_json=False)

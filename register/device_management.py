@@ -336,6 +336,7 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 self.gui_update_queue.put([this_button, 'action3'])
                 return
             except Exception as e:
+                iter += 1
                 if iter == max_iter:
                     self.gui_update_queue.put([this_button, 'action4'])
                     return

@@ -40,7 +40,7 @@ if __name__ == "__main__":
         file_reader_app.create_image_panel(image_layout, d, **pass_config1)
         if not len(args.device) > 3:
             file_reader_app.add_command(image_layout, d, command_list=[
-                'reset_number', 'read_files'], cmd_parameters=[[0], None])
+                'reset_number'], cmd_parameters=[[0], None])
         # form panel
         form_panel, form_layout = file_reader_app.create_blank_panel('v')
         file_reader_app.gui.createPanel(form_panel, f'{d}_form')

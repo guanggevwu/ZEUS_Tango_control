@@ -568,7 +568,7 @@ class DaqGUI:
             json.dump({"selected_devices": {key: None for key in self.selected_devices}, "total_bandwidth": self.total_bandwidth, "options": self.options, "save_path": self.path_var.get(
             ), "checked_savable_attributes": self.checked_savable_attributes, "damaged_zones": list(self.damaged_zones.keys())}, jsonfile)
         self.insert_to_disabled(
-            f'Wrote initialization settings to "init.json" file.')
+            f'Saved initialization settings to "init.json" file.')
 
     def start_acquisition(self):
         '''Start the acquisition in a new thread. It will create a Daq object and call its acquisition method. It will also save the options and selected devices to a json file. It is called by the toggle_acquisition function.'''

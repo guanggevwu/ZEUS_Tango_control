@@ -192,7 +192,7 @@ class BaslerGUI():
                     widget_one_device_layout, d, 'file_number')
             panel3_layout.addWidget(widget_one_device)
             self.add_command(panel3_layout, d, command_list=[
-                             'get_ready', 'relax', 'reset_number', 'send_software_trigger', 'read_files'],  cmd_parameters=[None, None, [0], None, None])
+                             'get_ready', 'relax', 'reset_number', 'send_software_trigger', 'clear_queue'],  cmd_parameters=[None, None, [0], None, None])
         self.gui.createPanel(panel3, f'{len(device_list)} devices')
 
     def create_blank_panel(self, VorH='V'):
@@ -249,7 +249,7 @@ def create_app():
         basler_app.create_image_panel(image_layout, d, **pass_config1)
         if not len(args.device) > 3:
             basler_app.add_command(image_layout, d, command_list=[
-                                   'get_ready', 'relax', 'reset_number', 'send_software_trigger', 'read_files'], cmd_parameters=[None, None, [0], None, None])
+                                   'get_ready', 'relax', 'reset_number', 'send_software_trigger', 'clear_queue'], cmd_parameters=[None, None, [0], None, None])
         # form panel
         form_panel, form_layout = basler_app.create_blank_panel('v')
         basler_app.gui.createPanel(form_panel, f'{friendly_name}_form')

@@ -13,9 +13,12 @@ import sys
 import csv
 import platform
 import sif_parser
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+import threading
+from watchfiles import watch
+import queue
 
 if True:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from Basler.server import Basler, LoggerAdapter
 # -----------------------------
 
@@ -126,7 +129,9 @@ class FileReader(Device):
         return self._file_extension
 
     def write_file_extension(self, value):
-        self._file_extension = value
+        if self._file_extension != value:
+            self._file_extension = value
+            self.change_watching_folder_and_extension()
 
     folder_path = attribute(
         label="folder",
@@ -140,34 +145,36 @@ class FileReader(Device):
         return self._folder_path
 
     def write_folder_path(self, value):
-        if os.path.isdir(value):
+        if self._folder_path != value and os.path.isdir(value):
             self._folder_path = value
-            self.read_file_list()
-            self.previous_list = self._file_list
-            self._file_number = len(self._file_list)
+            self.change_watching_folder_and_extension()
             logging.info(
-                f"{self._file_number} {self._file_extension} files are found in the {self._folder_path}")
+                f"Watching folder: {self._folder_path} for files with extension: {self._file_extension}")
 
-    file_list = attribute(
-        label="file list",
-        dtype=(str,),
-        max_dim_x=10000,
-        access=AttrWriteType.READ,
-    )
+    def _watch_loop(self):
+        print(f"--- Started watching: {self._folder_path} ---")
+        # stop_event automatically stops this generator when set()
+        for changes in watch(self._folder_path, stop_event=self.stop_event):
+            for change_type, file_path in changes:
+                if change_type.name == 'added' and file_path.endswith(tuple(self._file_extension.split(','))):
+                    print(
+                        f"New file found in {self._folder_path}: {file_path}")
+                    self.new_files_queue.put(file_path)
+        print(f"--- Stopped watching: {self._folder_path} ---")
 
-    def read_file_list(self):
-        if self._debug:
-            t0 = time.perf_counter()
-        self.file_extension_list = self._file_extension.split(',')
-        try:
-            # only count files that meet the file extension requirement and that has a size larger than 0.
-            self._file_list = [i.name for i in os.scandir(self._folder_path) if i.is_file(
-            ) and i.stat().st_size and i.name.split('.')[-1] in self.file_extension_list]
-        except FileNotFoundError:
-            self._file_list = []
-        if self._debug:
-            logging.info(f'filter {time.perf_counter()-t0}')
-        return self._file_list
+    def start_watching(self):
+        self.stop_event.clear()
+        self.new_files_queue.queue.clear()
+        self.monitor_thread = threading.Thread(
+            target=self._watch_loop, daemon=True)
+        self.monitor_thread.start()
+
+    def change_watching_folder_and_extension(self):
+        print("\nChanging folder or extension...")
+        self.stop_event.set()  # Signals watch() to stop
+        if self.monitor_thread:
+            self.monitor_thread.join()  # Wait for the old thread to finish
+        self.start_watching()
 
     current_file = attribute(
         label="current file",
@@ -213,21 +220,13 @@ class FileReader(Device):
     )
 
     def read_is_new_image(self):
-        # logging.info(f'{len(self.previous_list)=}')
-        # logging.info(f'{len(self.read_file_list())=}')
-        if self._debug:
-            t0 = time.perf_counter()
-        new_files = [i for i in self.read_file_list()
-                     if i not in self.previous_list]
-        if self._debug:
-            logging.info(time.perf_counter() - t0)
+        try:
+            new_file = self.new_files_queue.get(block=False)
+        except queue.Empty:
+            new_file = None
 
-        if new_files != []:
-            new_files = sorted(new_files, key=lambda x: os.path.getmtime(
-                os.path.join(self._folder_path, x)))
-            self.previous_list = self.previous_list + [new_files[0]]
-            logging.info(f"Detected a new file {new_files[0]}.")
-            self._current_file = new_files[0]
+        if new_file:
+            self._current_file = new_file.split(os.sep)[-1]
             while True:
                 try:
                     if self.file_type == "image":
@@ -415,6 +414,9 @@ class FileReader(Device):
         # self._polling_period = self.get_attribute_poll_period('is_new_image')
         # if self._polling_period == 0:
         #     self._polling_period = 200
+        self.new_files_queue = queue.Queue()
+        self.stop_event = threading.Event()
+        self.monitor_thread = None
         logging.info(
             f'FileReader is started.')
         self.set_state(DevState.ON)
@@ -438,8 +440,8 @@ class FileReader(Device):
         self.logger.info("Reset file number")
 
     @command()
-    def read_files(self):
-        self.write_folder_path(self._folder_path)
+    def clear_queue(self):
+        self.new_files_queue.queue.clear()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,8 @@
 Tango_device_management_log.txt
 DAQ/scan_table.csv
 DAQ_GUI_log.txt
+DAQ/temp_code*
+
 *_locations.txt
 init.json
 scan_table.csv
