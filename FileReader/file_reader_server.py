@@ -154,7 +154,7 @@ class FileReader(Device):
     def _watch_loop(self):
         print(f"--- Started watching: {self._folder_path} ---")
         # stop_event automatically stops this generator when set()
-        for changes in watch(self._folder_path, stop_event=self.stop_event):
+        for changes in watch(self._folder_path, recursive=False, stop_event=self.stop_event):
             for change_type, file_path in changes:
                 if change_type.name == 'added' and file_path.endswith(tuple(self._file_extension.split(','))):
                     print(
@@ -285,7 +285,8 @@ class FileReader(Device):
                             f"We encounterred an PermissionError reading {os.path.join(self._folder_path, self._current_file)}. However, this could be the new file was building.")
                     self.logger.info("Will try in 0.5 second.")
                     time.sleep(0.5)
-                except ValueError:
+                except Exception:
+                    self.logger.info("Will try in 0.5 second.")
                     time.sleep(0.5)
             self._read_time = datetime.datetime.fromtimestamp(os.path.getmtime(
                 os.path.join(self._folder_path, self._current_file))).strftime("%H-%M-%S.%f")

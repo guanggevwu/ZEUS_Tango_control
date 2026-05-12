@@ -405,7 +405,8 @@ class DaqGUI:
             admin_proxy = tango.DeviceProxy(admin_device_name)
             admin_proxy.command_inout("Kill")
             self.selected_devices[device_name]['checkbutton']['style'] = 'Sty2_offline_text_small.TButton'
-            del self.selected_devices[device_name]['server_pid']
+            if 'server_pid' in self.selected_devices[device_name]:
+                del self.selected_devices[device_name]['server_pid']
             self.insert_to_disabled(
                 f'{device_name} device server is stopped.')
         except Exception as e:

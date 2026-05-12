@@ -76,6 +76,7 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "esp300_turning_box3": {'server': 'ESP301/esp300_turning_box3', '_class': 'ESP301', 'name': 'laser/esp300/esp300_turning_box3'},
             "esp302_test": {'server': 'ESP301/esp302_test', '_class': 'ESP301', 'name': 'test/esp301/esp302_test', 'property': {'ip': '192.168.131.75'}},
             "esp302_ta2_2": {'server': 'ESP301/esp302_ta2_2', '_class': 'ESP301', 'name': 'TA2/esp301/esp302_ta2_2', 'property': {'ip': '192.168.131.142'}},
+            "esp302_ta3_2": {'server': 'ESP301/esp302_ta3_2', '_class': 'ESP301', 'name': 'TA3/esp301/esp302_ta3_2', 'property': {'ip': '192.168.131.196', 'axis_property': '2,3'}},
             "file_reader_1": {'server': 'FileReader/file_reader_1', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_1'},
             "file_reader_2": {'server': 'FileReader/image_reader_2', '_class': 'FileReader', 'name': 'facility/file_reader/image_reader_2', 'property': {'file_type': 'image'}},
             "file_reader_3": {'server': 'FileReader/xy_reader', '_class': 'FileReader', 'name': 'facility/file_reader/xy_reader', 'property': {'file_type': 'xy'}},

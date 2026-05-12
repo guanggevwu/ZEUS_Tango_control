@@ -359,29 +359,42 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 style='Sty2_offline_text_small.TButton')
             self.parent.insert_to_disabled(
                 f'{device_name} device server is stopped.')
+            if 'server_pid' in self.category_container[device_name]:
+                del self.category_container[device_name]['server_pid']
         except Exception as e:
-            device_class = self.parent.db.get_device_info(
-                device_name).class_name
-            device_instance = self.parent.db.get_device_info(
-                device_name).ds_full_name.split('/')[-1]
-            if self.parent.container[self.category_name]['class'][device_class] and 'server_code_path' in self.parent.container[self.category_name]['class'][device_class]:
-                script_path = self.parent.container[self.category_name]['class'][device_class]['server_code_path']
+            if 'server_pid' not in self.category_container[device_name]:
+                device_class = self.parent.db.get_device_info(
+                    device_name).class_name
+                device_instance = self.parent.db.get_device_info(
+                    device_name).ds_full_name.split('/')[-1]
+                if self.parent.container[self.category_name]['class'][device_class] and 'server_code_path' in self.parent.container[self.category_name]['class'][device_class]:
+                    script_path = self.parent.container[self.category_name]['class'][device_class]['server_code_path']
+                else:
+                    class_folder = os.path.join(
+                        self.parent.root_path, device_class)
+                    script_path = os.path.join(
+                        class_folder, [i for i in os.listdir(class_folder) if 'server.py' in i][0])
+                p = subprocess.Popen(
+                    [f'{self.parent.python_path}', f'{script_path}', device_instance])
+                self.category_container[device_name]['server_pid'] = p.pid
+                self.category_container[device_name]['server_widget'].configure(
+                    style='Sty2_connecting.TButton')
+                self.parent.insert_to_disabled(
+                    f'Starting server for {device_name}...', tag_config='yellow_text')
+                t = Thread(target=self.click_check_device_status,
+                        args=(device_name, 10), daemon=True)
+                t.start()
             else:
-                class_folder = os.path.join(
-                    self.parent.root_path, device_class)
-                script_path = os.path.join(
-                    class_folder, [i for i in os.listdir(class_folder) if 'server.py' in i][0])
-            p = subprocess.Popen(
-                [f'{self.parent.python_path}', f'{script_path}', device_instance])
-            self.category_container[device_name]['server_widget'].configure(
-                style='Sty2_connecting.TButton')
-            self.parent.insert_to_disabled(
-                f'Starting server for {device_name}...', tag_config='yellow_text')
-            event = {'id': self.device_status_checking_event_id, 'current_iter': 0,
-                     'max_iter': 10, 'device_index': idx}
-            t = Thread(target=self.click_check_device_status,
-                       args=(device_name, 10), daemon=True)
-            t.start()
+                try:
+                    os.kill(self.category_container[device_name]
+                            ['server_pid'], signal.SIGTERM)
+                except OSError:
+                    self.parent.insert_to_disabled(
+                        f'{device_name} server was already killed somewhere else. Ignore.')
+                self.category_container[device_name]['server_widget']['style'] = 'Sty2_offline_text_small.TButton'
+                del self.category_container[device_name]['server_pid']
+                self.parent.insert_to_disabled(
+                    f'{device_name} starting is interrupted.')                
 
     def open_close_gui(self, device_name):
         c = self.category_container[device_name]['tango_class']

@@ -7,13 +7,13 @@
     "saving_format": "%s_%t_%e_%h.%f"
   },
   "file_reader_1": { "saving_format": "FileReader_%s.%f" },
-  "scope": { "saving_format": "%s_%t_%o.%f" },
+  "scope": { "saving_format": "%s_%t_%o.%f" },  
   "all": {
     "saving_format": "%s_%t.%f",
     "trigger_source": "External",
     "is_polling_periodically": false,
-    "exposure": 5000,
-    "gain": 0, 
-    "format_pixel": "mono12"
+    "exposure": 100000,
+    "gain": 0,
+    "format_pixel": "Mono12"
   }
 }

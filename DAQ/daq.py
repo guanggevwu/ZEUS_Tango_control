@@ -110,25 +110,30 @@ class Daq:
             elif bs.info().dev_class.lower() == 'filereader':
                 bs.clear_queue()
             for key, value in info['config_dict'].items():
-                if hasattr(bs, key):
-                    try:
-                        old_value = getattr(bs, key)
-                        if key == "trigger_source" and old_value == value:
-                            try:
+                attempt_idx = 0
+                if hasattr(bs, key) and bs.get_attribute_config(key).writable != tango.AttrWriteType.READ:
+                    while attempt_idx < 2:
+                        try:
+                            old_value = getattr(bs, key)
+                            if key == "trigger_source" and old_value == value:
+                                try:
+                                    setattr(bs, key, value)
+                                except Exception as e:
+                                    if "Out of memory" in str(e) and attempt_idx:
+                                        self.logger(
+                                            f"Contact me if you see this error. I tried to catch the error but it is not stable. You can try to set the End shot number to a smaller value, for example 100, and retry. Details: {e}", 'red_text')
+                            elif old_value != value:
                                 setattr(bs, key, value)
-                            except Exception as e:
-                                if "Out of memory" in str(e):
+                                # as "is_polling_periodically" is not an important information for the operators.
+                                if key != "is_polling_periodically":
                                     self.logger(
-                                        f"Contact me if you see this error. I tried to catch the error but it is not stable. You can try to set the End shot number to a smaller value, for example 100, and retry. Details: {e}", 'red_text')
-                        elif old_value != value:
-                            setattr(bs, key, value)
-                            # as "is_polling_periodically" is not an important information for the operators.
-                            if key != "is_polling_periodically":
+                                        f"{info['user_defined_name']}/{key} is changed from {old_value} to {value}")
+                            break
+                        except Exception as e:
+                            if attempt_idx:
                                 self.logger(
-                                    f"{info['user_defined_name']}/{key} is changed from {old_value} to {value}")
-                    except Exception as e:
-                        self.logger(
-                            f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}. Details: {e}", 'red_text')
+                                    f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}. Details: {e}", 'red_text')
+                            attempt_idx += 1
             # if the saving_format is not set in the configuration
             if ('saving_format' not in info['config_dict']):
                 info['file_name'] = '%s'
@@ -208,7 +213,8 @@ class Daq:
                 try:
                     self.set_scan_value(
                         self.scan_attr_proxies[device_attr_name], value, shot_start)
-                    self.GUI.root.event_generate("<<RefreshScanTable>>")
+                    if hasattr(self.GUI, "scan_window") and self.GUI.scan_window.winfo_exists():
+                        self.GUI.root.event_generate("<<RefreshScanTable>>")
                 except Exception as e:
                     self.logger(
                         f"Error setting scan value for {device_attr_name} at shot {shot_start}: {e}", 'red_text')
@@ -327,10 +333,7 @@ class Daq:
             # check if all cameras have a new shot
             if all([i['shot_num'] > self.current_shot_for_all_cam for i in self.cam_info.values()]):
                 if stitch:
-                    stitch_save_path = os.path.join(
-                        self.dir, 'stitching', f'shot{self.current_shot_for_all_cam}_{datetime.now().strftime("%H%M%S.%f")}.tiff')
-                    self.stitch_images(
-                        f'shot{self.current_shot_for_all_cam}')
+                    Thread(target=self.stitch_images, args=(f'shot{self.current_shot_for_all_cam}',)).start()
                 self.current_shot_for_all_cam += 1
                 self.logger(
                     f"Shot {self.current_shot_for_all_cam-1} is completed.", 'blue_text')
@@ -516,7 +519,7 @@ class Daq:
             stitch_save_path = os.path.join(
                 self.dir, 'stitching', f'{image_name}_{datetime.now().strftime("%H%M%S.%f")}.tiff')
             plt.savefig(stitch_save_path, bbox_inches='tight')
-            message = f"Shot {self.current_shot_for_all_cam} for stitching is saved."
+            message = f"Shot {image_name.replace('shot', '')} for stitching is saved."
             self.logger(message)
             if self.GUI.options['save_copy']:
                 plt.savefig(stitch_save_path.replace(
