@@ -285,6 +285,9 @@ class DaqGUI:
         for key in self.selected_devices:
             self.update_selected_devices(key, BooleanVar(value=True))
 
+        # check if selected metadata attributes are valid. 
+        MetadataWindow.show_attr_value(None, self.checked_savable_attributes, metadata_button_widget=self.frame2_buttons['Metadata'])
+
     def schedule_checking_damaged_zones(self):
         '''Threading function to check the damaged zones from plasma mirror stage. It will send TA2_ready or TA2_not_ready message to laser side via UDP socket.
 
@@ -828,8 +831,8 @@ class MetadataWindow(Toplevel):
         self.title("Metadata Module")
         self.parent = parent
         items_per_column = 20
-        ttk.Button(self, text='Validate', command=self.show_attr_value,
-                   style='Sty1.TButton').grid(column=0, row=0)
+        ttk.Button(self, text='Validate', command=lambda: self.show_attr_value(
+            list(self.parent.checked_savable_attributes), self.parent.frame2_buttons['Metadata']), style='Sty1.TButton').grid(column=0, row=0)
         with open(os.path.join(os.path.dirname(__file__), 'list.json')) as jsonfile:
             # self.savable_attributes is a dict with key is attribute name.
             self.savable_attributes = {i: {} for i in json.load(
@@ -857,9 +860,10 @@ class MetadataWindow(Toplevel):
                 self.savable_attributes[attr]['label'].grid(
                     column=1, row=idx % items_per_column, sticky='E')
 
-    def show_attr_value(self):
+    def show_attr_value(self, attr_string_list, metadata_button_widget=None ):
         '''Button command: show the current value of the attributes'''
-        for attr in self.parent.checked_savable_attributes:
+        all_attributes_ready = True
+        for attr in attr_string_list:
             try:
                 attr_proxy = AttributeProxy(attr)
                 tango_attr_value = str(
@@ -868,12 +872,18 @@ class MetadataWindow(Toplevel):
             except Exception as e:
                 tango_attr_value = f'{type(e)}'
                 color = "red"
-            self.savable_attributes[attr]['label']['text'] = tango_attr_value
-            self.savable_attributes[attr]['label']['foreground'] = color
-        for attr in self.savable_attributes:
-            if attr not in self.parent.checked_savable_attributes:
-                self.savable_attributes[attr]['label']['text'] = ''
-
+                all_attributes_ready = False
+            if self:
+                self.savable_attributes[attr]['label']['text'] = tango_attr_value
+                self.savable_attributes[attr]['label']['foreground'] = color
+        if self:
+            for attr in self.savable_attributes:
+                if attr not in attr_string_list:
+                    self.savable_attributes[attr]['label']['text'] = ''
+        if not all_attributes_ready:
+            metadata_button_widget['style'] = 'Sty3_stop_small.TButton'
+        else:
+            metadata_button_widget['style'] = 'Sty3_start_small.TButton'
 
 class ScanWindow(Toplevel):
     def __init__(self, parent):
