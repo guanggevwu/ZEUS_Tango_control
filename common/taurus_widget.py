@@ -1,8 +1,9 @@
 
 from taurus import Device, changeDefaultPollingPeriod
+from taurus.external.qt import Qt
 from taurus.qt.qtgui.input import TaurusValueComboBox, TaurusValueCheckBox, TaurusValueLineEdit
 from taurus.qt.qtgui.compact import TaurusReadWriteSwitcher
-from taurus.qt.qtgui.display import TaurusLabel
+from taurus.qt.qtgui.display import TaurusLabel, TaurusLed
 from taurus.qt.qtgui.button import TaurusCommandButton
 
 
@@ -11,6 +12,17 @@ class MyTaurusValueCheckBox(TaurusValueCheckBox):
         super().__init__()
         self.autoApply = True
         self.showText = False
+
+
+class BoolLedSwitcher(TaurusReadWriteSwitcher):
+    """Shows a TaurusLed; double-click or F2 switches to a checkbox for editing.
+    Use as the read widget of a TaurusForm row with write widget set to None:
+        row.setReadWidgetClass(BoolLedSwitcher)
+        row.setWriteWidgetClass(None)
+    """
+    readWClass = TaurusLed
+    writeWClass = MyTaurusValueCheckBox
+    exitEditTriggers = ("applied", Qt.Qt.Key_Escape)
 
 
 def add_value_pairs(values, autoApply=True):

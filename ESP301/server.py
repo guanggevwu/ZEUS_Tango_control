@@ -234,12 +234,6 @@ class ESP301(Device):
             if hasattr(attr, 'get_write_value'):
                 attr = attr.get_write_value()
             self.dev_write(f"{axis}PA{attr:.3f}\r".encode())
-            # if self.extra_script == "plasma_mirror" and attr != getattr(self, f'_ax{axis}_position'):
-            #     # The query for message starts before the move is finished so that the NO ERROR message might not be updated yet. Adding a small delay here. With the added delay, the error message may still not be updated but it allows 0.1 second for the stage to move a little bit, which might be good for plasma mirror.
-            #     time.sleep(0.1)
-            #     if "NO ERROR" in self.read_message():
-            #         self.send_message_to_laser_side()
-            setattr(self, f'_ax{axis}_position', attr)
         return write_position
 
     def create_set_as_attribute(self, axis):
@@ -274,6 +268,7 @@ class ESP301(Device):
                 self, f'_set_ax{axis}_as', f"set {old_position:.3f} to {getattr(self, f'_ax{axis}_position'):.3f}")
         return write_set_as
 
+    # Now the relative motion is achived by setting a absolute position with the current position plus the step, so there is no need to create separate attributes and commands for relative motion. The client can just read the current position, add the step to it, and write it back to the position attribute to achieve relative motion. However, keep the ax_step attributes for recording the step values for user reference and for use in the GUI.
     def create_ax_step_attribute(self, axis):
         attr = attribute(
             name=f"ax{axis}_step",
@@ -282,7 +277,6 @@ class ESP301(Device):
             unit=getattr(self, f"_axis{axis}_unit"),
             format='6.3f',
             memorized=True,
-            hw_memorized=True,
             access=AttrWriteType.READ_WRITE,
         )
         return attr
@@ -327,10 +321,6 @@ class ESP301(Device):
             access=AttrWriteType.READ_WRITE,
         )
 
-        cmd_move_relative_axis12 = command(
-            f=self.move_relative_axis12,
-            dtype_in=bool,)
-
         cmd_move_to_negative_limit = command(
             f=self.move_to_negative_limit, dtype_in=int,)
         cmd_move_to_positive_limit = command(
@@ -341,26 +331,28 @@ class ESP301(Device):
 
         for axis in range(1, 4):
             if axis in self.axis:
-                setattr(self, f'read_ax{axis}_position',
-                        self.create_read_position_function(axis))
-                setattr(self, f'write_ax{axis}_position',
-                        self.create_write_position_function(axis))
-                self.add_attribute(self.create_position_attribute(axis))
+                try:
+                    setattr(self, f'read_ax{axis}_position',
+                            self.create_read_position_function(axis))
+                    setattr(self, f'write_ax{axis}_position',
+                            self.create_write_position_function(axis))
+                    self.add_attribute(self.create_position_attribute(axis))
+                    setattr(self, f'read_set_ax{axis}_as',
+                            self.create_read_set_as_function(axis))
+                    setattr(self, f'write_set_ax{axis}_as',
+                            self.create_write_set_as_function(axis))
+                    self.add_attribute(self.create_set_as_attribute(axis))
+                    self.add_attribute(self.create_ax_step_attribute(axis))
+                    setattr(self, f'read_ax{axis}_status',
+                            self.create_read_status_function(axis))
+                    setattr(self, f'write_ax{axis}_status',
+                            self.create_write_status_function(axis))
+                    self.add_attribute(self.create_ax_status(axis))
+                    self.add_command(cmd_move_to_negative_limit)
+                    self.add_command(cmd_move_to_positive_limit)
+                except Exception as e:
+                    print(f"Error adding attributes for axis {axis}: {e}")
 
-                setattr(self, f'read_set_ax{axis}_as',
-                        self.create_read_set_as_function(axis))
-                setattr(self, f'write_set_ax{axis}_as',
-                        self.create_write_set_as_function(axis))
-                self.add_attribute(self.create_set_as_attribute(axis))
-
-                self.add_attribute(self.create_ax_step_attribute(axis))
-                setattr(self, f'read_ax{axis}_status',
-                        self.create_read_status_function(axis))
-                setattr(self, f'write_ax{axis}_status',
-                        self.create_write_status_function(axis))
-                self.add_attribute(self.create_ax_status(axis))
-                self.add_command(cmd_move_to_negative_limit)
-                self.add_command(cmd_move_to_positive_limit)
         # only for a special case
         ax12_distance = attribute(
             name="ax12_distance",
@@ -385,21 +377,19 @@ class ESP301(Device):
             doc='steps for axis 1 and axis 2 are the same, so this attribute is used for both axes.',
         )
 
-        # self.add_command(cmd)
         if hasattr(self, "extra_script"):
             if self.extra_script == "turning_box_3":
                 # axis 1: -88 to 14 mm. axis 2: 0 to 135 deg. When axis 1 is in -88 to -46 (limit might be close to -30), axis 2 is free to rotate.
                 self.TA1 = [0, 135]
                 self.TA2 = [89, 0]
                 self.TA3 = [101, 90]
-                # ta_test position is not fixed, it is set when the user clicks the button.
-                self.TA_test = [0, 2.5]
+                self.TA2_to_TA3_intermediate = [41, None]
                 self.add_attribute(customized_location)
                 self.add_command(cmd_reset_to_TA1)
+                self.remove_attribute("current_location")
             if self.extra_script == "grating":
                 self.add_attribute(ax12_distance)
                 self.add_attribute(ax12_step)
-                self.add_command(cmd_move_relative_axis12)
 
     def read_ax12_distance(self, attr):
         return float(f'{(self._ax1_position-self._ax2_position):.3f}')
@@ -458,91 +448,57 @@ class ESP301(Device):
 
     def threaded_write_customized_location(self, attr):
         value = attr.get_write_value()
-        ax1_previous_step = self._ax1_step
-        ax2_previous_step = self._ax2_step
-        ax1_previous_position = self._ax1_position
-        ax2_previous_position = self._ax2_position
         # value is the requested position, i.e., from self._customized_location to value.
         if value.lower() == 'ta2' and self._customized_location == 'TA1':
             # rotate and then move forward
-            self._ax1_step = self.TA2[0] - self.TA1[0]
-            self._ax2_step = self.TA2[1] - self.TA1[1]
-            self.move_relative_axis([2, True])
-            self.wait_until_arrive(2, ax2_previous_position+self._ax2_step)
+            self.write_ax2_position(self, self.TA2[1])
+            self.wait_until_arrive(2, self.TA2[1])
             if self.should_stop:
                 return
-            self.move_relative_axis([1, True])
+            self.write_ax1_position(self, self.TA2[0])
         elif value.lower() == 'ta3' and self._customized_location == 'TA1':
             # rotate and then move forward
-            self._ax1_step = self.TA3[0] - self.TA1[0]
-            self._ax2_step = self.TA3[1] - self.TA1[1]
-            self.move_relative_axis([2, True])
-            self.wait_until_arrive(2, ax2_previous_position+self._ax2_step)
+            self.write_ax2_position(self, self.TA3[1])
+            self.wait_until_arrive(2, self.TA3[1])
             if self.should_stop:
                 return
-            self.move_relative_axis([1, True])
+            self.write_ax1_position(self, self.TA3[0])
         elif value.lower() == 'ta1' and self._customized_location == 'TA2':
             # move backward and then rotate
-            self._ax1_step = self.TA1[0] - self.TA2[0]
-            self._ax2_step = self.TA1[1] - self.TA2[1]
-            self.move_relative_axis([1, True])
-            self.wait_until_arrive(1, ax1_previous_position+self._ax1_step)
+            self.write_ax1_position(self, self.TA1[0])
+            self.wait_until_arrive(1, self.TA1[0])
             if self.should_stop:
                 return
-            self.move_relative_axis([2, True])
+            self.write_ax2_position(self, self.TA1[1])
         elif value.lower() == 'ta1' and self._customized_location == 'TA3':
             # move backward and then rotate
-            self._ax1_step = self.TA1[0] - self.TA3[0]
-            self._ax2_step = self.TA1[1] - self.TA3[1]
-            self.move_relative_axis([1, True])
-            self.wait_until_arrive(1, ax1_previous_position+self._ax1_step)
+            self.write_ax1_position(self, self.TA1[0])
+            self.wait_until_arrive(1, self.TA1[0])
             if self.should_stop:
                 return
-            self.move_relative_axis([2, True])
+            self.write_ax2_position(self, self.TA1[1])
         elif value.lower() == 'ta2' and self._customized_location == 'TA3':
             # move backward, rotate and then move forward. Note the procedure is different.
-            self._ax1_step = -60
-            self._ax2_step = self.TA2[1] - self.TA3[1]
-            self.move_relative_axis([1, True])
-            self.wait_until_arrive(1, ax1_previous_position+self._ax1_step)
+            self.write_ax1_position(self, self.TA2_to_TA3_intermediate[0])
+            self.wait_until_arrive(1, self.TA2_to_TA3_intermediate[0])
             if self.should_stop:
                 return
-            self.move_relative_axis([2, True])
-            self.wait_until_arrive(2, ax2_previous_position+self._ax2_step)
+            self.write_ax2_position(self, self.TA2[1])
+            self.wait_until_arrive(2, self.TA2[1])
             if self.should_stop:
                 return
-            self._ax1_step = 48
-            self.move_relative_axis([1, True])
+            self.write_ax1_position(self, self.TA2[0])
         elif value.lower() == 'ta3' and self._customized_location == 'TA2':
             # move backward, rotate and then move forward.
-            self._ax1_step = -48
-            self._ax2_step = self.TA3[1] - self.TA2[1]
-            self.move_relative_axis([1, True])
-            self.wait_until_arrive(1, ax1_previous_position+self._ax1_step)
+            self.write_ax1_position(self, self.TA2_to_TA3_intermediate[0])
+            self.wait_until_arrive(1, self.TA2_to_TA3_intermediate[0])
             if self.should_stop:
                 return
-            self.move_relative_axis([2, True])
-            self.wait_until_arrive(2, ax2_previous_position+self._ax2_step)
+            self.write_ax2_position(self, self.TA3[1])
+            self.wait_until_arrive(2, self.TA3[1])
             if self.should_stop:
                 return
-            self._ax1_step = 60
-            self.move_relative_axis([1, True])
-        elif value == 'TA_test':
-            self.TA_test[0] = self._ax1_position
-            self.TA_test[1] = self._ax2_position + 5
-            self._ax1_step = 5
-            self._ax2_step = 5
-            self.move_relative_axis([1, True])
-            self.wait_until_arrive(1, ax1_previous_position+self._ax1_step)
-            if self.should_stop:
-                return
-            self.move_relative_axis([2, True])
-            self.wait_until_arrive(2, ax2_previous_position+self._ax2_step)
-            if self.should_stop:
-                return
-            self.move_relative_axis1(plus=False)
-        self._ax1_step = ax1_previous_step
-        self._ax2_step = ax2_previous_step
+            self.write_ax1_position(self, self.TA3[0])
 
     error_message = attribute(
         label="error message",
@@ -594,54 +550,11 @@ class ESP301(Device):
             self.dev_write(f"{value}\r".encode())
             self._raw_command_return = self.dev_read()
 
-    # @command(dtype_in=int)
-    # def home(self, axis=1):
-    #     self.dev_write(f"{axis}OR\r".encode())
-
-    # @command
-    # def home(self,):
-    #     axis = self.axis.split(',')
-    #     for a in axis:
-    #         self.dev_write(f"{a}ST\r".encode())
-    #     self.dev_write(f"{1}OR\r".encode())
-
-    # @command(dtype_in=int)
-    # def emergency_stop(self):
-    #     axis = self.axis.split(',')
-    #     for a in axis:
-    #         self.dev_write(f"{a}AB\r".encode())
-
     @command()
     def stop(self):
         for a in self.axis:
             self.dev_write(f"{a}ST\r".encode())
         self.should_stop = True
-
-    @clear_error_wrap
-    @command()
-    def move_relative_axis(self, input: list[int]):
-        if input[1]:
-            self.dev_write(
-                f"{input[0]}PR{getattr(self, f'_ax{input[0]}_step'):.3f}\r".encode())
-        else:
-            self.dev_write(
-                f"{input[0]}PR{-getattr(self, f'_ax{input[0]}_step'):.3f}\r".encode())
-        self.logger.info(f'relative moving, [axis, direction], {input}')
-        # if self.extra_script == "plasma_mirror":
-        #     time.sleep(0.1)
-        #     if "NO ERROR" in self.read_message():
-        #         self.send_message_to_laser_side()
-
-    @clear_error_wrap
-    def move_relative_axis12(self, plus: bool = True):
-        if plus:
-            self.dev_write(f"1PR{self._ax12_step:.3f}\r".encode())
-            self.dev_write(f"2PR{self._ax12_step:.3f}\r".encode())
-        else:
-            self.dev_write(f"1PR{-self._ax12_step:.3f}\r".encode())
-            self.dev_write(f"2PR{-self._ax12_step:.3f}\r".encode())
-        self.logger.info(
-            f'relative moving of axis 1 and axis 2: {plus=}, {self._ax12_step}')
 
     @clear_error_wrap
     def move_to_negative_limit(self, axis):
@@ -729,13 +642,6 @@ class ESP301(Device):
         print(f'Moving to TA1, axis 1 position: {self.TA1[0]:.3f}')
         self.dev_write(f"2PA{self.TA1[1]:.3f}\r".encode())
         print(f'Moving to TA1, axis 2 position: {self.TA1[1]:.3f}')
-
-    # def send_message_to_laser_side(self):
-    #     message = f'{datetime.datetime.now()}: TA2_ready'
-    #     self.laser_socket.sendto(
-    #         message.encode(), ("192.168.131.71", 5005))
-    #     self.logger.info(
-    #         f"{datetime.datetime.now()}: send TA2_ready to laser side")
 
 
 if __name__ == "__main__":

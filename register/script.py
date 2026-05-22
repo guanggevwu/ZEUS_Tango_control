@@ -89,6 +89,7 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "TA3_regulator_2": {'server': 'GXRegulator/TA3_regulator_2', '_class': 'GXRegulator', 'name': 'TA3/gx_regulator/TA3_regulator_2', 'property': {'high_voltage_channel': '2', 'low_voltage_channel': '3'}},
             "labview": {'server': 'LabviewProgram/labview', '_class': 'LabviewProgram', 'name': 'laser/labview/labview_program', 'property': {'port': '61557'}},
             "taurus_test": {'server': 'TaurusTest/taurustest', '_class': 'TaurusTest', 'name': 'sys/taurustest/1'},
+            "my_motor_test": {'server': 'MyMotor/test', '_class': 'MyMotor', 'name': 'my/motor/1'},
             "Vimba_TA2_1": {'server': 'Vimba/TA2-1', '_class': 'Vimba', 'name': 'TA2/vimba/TA2-1'},
             "owis_test": {'server': 'OwisPS/test', '_class': 'OwisPS', 'name': 'test/owisps/test', 'property': {'axis': '1,2', 'part_number': 'S41.N29.08BH.V6'}},
             "owis_TA1_1": {'server': 'OwisPS/TA1-owis1', '_class': 'OwisPS', 'name': 'TA1/owisps/TA1-owis1', 'property': {'axis': '1,2,3,4,5,6,7,8,9', 'part_number': 'S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6,S41.N29.08BH.V6'}},

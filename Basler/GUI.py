@@ -19,7 +19,7 @@ if platform.system() == 'Windows':
 
 if True:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
+    from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class, BoolLedSwitcher
     from common.TaurusGUI_Argparse import TaurusArgparse
     from common.config import device_name_table, image_panel_config
 
@@ -141,7 +141,7 @@ class BaslerGUI():
                 panel_layout.addWidget(panel_w)
         layout.addWidget(panel)
 
-    def create_form_panel(self, layout, device_name, exclude=None, dropdown=None, withButtons=True, set_attr_font=None):
+    def create_form_panel(self, layout, device_name, include=None, exclude=None, dropdown=None, withButtons=True, set_attr_font=None):
         panel2_w1 = TaurusForm(withButtons=withButtons)
         form_model = self.attr_list[device_name]['model']
         # re-order. Move trigger to front.
@@ -153,6 +153,10 @@ class BaslerGUI():
         if exclude is not None:
             form_model = [i for i in form_model if i.split(
                 '/')[-1] not in exclude]
+        elif include is not None:
+            form_model = [device_name +
+                          '/' + i for i in include if device_name +
+                          '/' + i in form_model]
         panel2_w1.model = form_model
         layout.addWidget(panel2_w1)
         if not dropdown:
@@ -163,17 +167,31 @@ class BaslerGUI():
             # change the bool write to auto apply. Only apply to writable bool widget.
             if full_attr.split('/')[-1] in self.attr_list[device_name]['attrs'] and self.attr_list[device_name]['dp'].attribute_query(full_attr.split('/')[-1]).data_type == 1 and self.attr_list[device_name]['dp'].attribute_query(full_attr.split('/')[-1]).writable == tango._tango.AttrWriteType.READ_WRITE:
                 idx = form_model.index(full_attr)
-                panel2_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
+                panel2_w1[idx].writeWidgetClass = None
+                panel2_w1[idx].readWidgetClass = BoolLedSwitcher
             if full_attr.split('/')[-1] in dropdown:
                 panel2_w1[idx].writeWidgetClass = create_my_dropdown_list_class(
                     full_attr.split('/')[-1], dropdown[full_attr.split('/')[-1]])
         if set_attr_font:
             for row in panel2_w1:
                 if row.model.split('/')[-1] in set_attr_font:
+                    row_font = Qt.QFont(set_attr_font[row.model.split(
+                        '/')[-1]]['font'], set_attr_font[row.model.split('/')[-1]]['size'])
                     for method_attr in ['readWidget', 'writeWidget', 'unitsWidget', 'labelWidget']:
                         col_widget = getattr(row, method_attr)()
                         if col_widget:
-                            col_widget.setFont(Qt.QFont(set_attr_font[row.model.split('/')[-1]]['font'], set_attr_font[row.model.split('/')[-1]]['size']))
+                            col_widget.setFont(row_font)
+                            # For custom composite write widgets, style the child editors/buttons as well.
+                            for child in col_widget.findChildren(Qt.QWidget):
+                                # somehow TaurusValueLineEdit does not inherit the font from the parent widget, so set it explicitly here. For other custom composite widgets, only set the font for buttons and line edits to avoid making the label too small to read.
+                                if hasattr(child, 'model') and any(substring in child.model for substring in ["_position", "ax12_step"]):
+                                    child.setFont(row_font)
+                                elif isinstance(child, (Qt.QPushButton, Qt.QLineEdit)):
+                                    compact_font = Qt.QFont(row_font)
+                                    compact_size = max(
+                                        1, int(round(row_font.pointSize() * 0.6)))
+                                    compact_font.setPointSize(compact_size)
+                                    child.setFont(compact_font)
 
     def combined_panel(self, device_list, combine_form_with_onshot=False):
         panel3, panel3_layout = self.create_blank_panel('v')

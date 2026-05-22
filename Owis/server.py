@@ -182,10 +182,14 @@ class OwisPS(Device):
                     self.create_read_set_as_function(axis))
             setattr(self, f'write_set_ax{axis}_as',
                     self.create_write_set_as_function(axis))
+            setattr(self, f'read_ax{axis}_status',
+                    self.create_read_status_function(axis))
+            setattr(self, f'write_ax{axis}_status',
+                    self.create_write_status_function(axis))
             self.add_attribute(self.create_position_attribute(axis))
             self.add_attribute(self.create_ax_step_attribute(axis))
             self.add_attribute(self.create_set_as_attribute(axis))
-
+            self.add_attribute(self.create_ax_status(axis))
             # self.add_command(self.create_command_member(axis))
             # self.add_command(self.create_init_axis_function(axis))
 
@@ -245,6 +249,34 @@ class OwisPS(Device):
         def write_ax_step(self, attr):
             setattr(self, f'_ax{axis}_step', attr.get_write_value())
         return write_ax_step
+
+    def create_ax_status(self, axis):
+        attr = attribute(
+            name=f"ax{axis}_status",
+            label=f"axis {axis} status",
+            dtype=bool,
+            memorized=True,
+            access=AttrWriteType.READ_WRITE,
+        )
+        return attr
+
+    def create_read_status_function(self, axis):
+        def read_status(self, attr):
+            reply = self.dev.PS90_GetAxisState(1, axis)
+            if reply != 3:
+                return False
+            else:
+                return True
+        return read_status
+
+    def create_write_status_function(self, axis):
+        def write_status(self, attr):
+            value = attr.get_write_value()
+            if value:
+                self.free_switch_ax(axis)
+            else:
+                self.dev.PS90_MotorOff(1, axis)
+        return write_status
 
     def create_set_as_attribute(self, axis):
         attr = attribute(

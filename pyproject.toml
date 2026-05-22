@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zeus-tango-control"
+version = "0.1.0"
+description = "ZEUS Tango control utilities and GUIs"
+readme = "README.md"
+requires-python = ">=3.11"
+
+[project.entry-points."taurus.form.item_factories"]
+my_motor = "common.my_motor_widget:mymotor_item_factory"
+
+[tool.setuptools.packages.find]
+include = [
+	"common",
+	"common.*"
+]
