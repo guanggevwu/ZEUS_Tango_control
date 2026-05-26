@@ -285,8 +285,9 @@ class DaqGUI:
         for key in self.selected_devices:
             self.update_selected_devices(key, BooleanVar(value=True))
 
-        # check if selected metadata attributes are valid. 
-        MetadataWindow.show_attr_value(None, self.checked_savable_attributes, metadata_button_widget=self.frame2_buttons['Metadata'])
+        # check if selected metadata attributes are valid.
+        MetadataWindow.show_attr_value(
+            None, self.checked_savable_attributes, metadata_button_widget=self.frame2_buttons['Metadata'])
 
     def schedule_checking_damaged_zones(self):
         '''Threading function to check the damaged zones from plasma mirror stage. It will send TA2_ready or TA2_not_ready message to laser side via UDP socket.
@@ -856,11 +857,11 @@ class MetadataWindow(Toplevel):
                 checkbox.grid(
                     column=0, row=idx % items_per_column, sticky='W')
                 self.savable_attributes[attr]['label'] = ttk.Label(
-                    sub_frame, text='', foreground="black")
+                    sub_frame, text='', foreground="black")z
                 self.savable_attributes[attr]['label'].grid(
                     column=1, row=idx % items_per_column, sticky='E')
 
-    def show_attr_value(self, attr_string_list, metadata_button_widget=None ):
+    def show_attr_value(self, attr_string_list, metadata_button_widget=None):
         '''Button command: show the current value of the attributes'''
         all_attributes_ready = True
         for attr in attr_string_list:
@@ -884,6 +885,7 @@ class MetadataWindow(Toplevel):
             metadata_button_widget['style'] = 'Sty3_stop_small.TButton'
         else:
             metadata_button_widget['style'] = 'Sty3_start_small.TButton'
+
 
 class ScanWindow(Toplevel):
     def __init__(self, parent):
@@ -1063,8 +1065,11 @@ if __name__ == '__main__':
         myappid = 'zeus.daq'  # arbitrary string
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     root = Tk()
-    root.iconphoto(True, PhotoImage(file=os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'title.png')))
+    icon_dir = os.path.join(os.path.dirname(
+        os.path.dirname(__file__)), 'common', 'img')
+    root.iconphoto(True, PhotoImage(file=os.path.join(icon_dir, 'title.png')))
+    if platform.system() == 'Windows':
+        root.iconbitmap(default=os.path.join(icon_dir, 'title.ico'))
     dummy = DaqGUI(root)
     atexit.register(dummy.terminate)
     root.mainloop()
