@@ -13,7 +13,6 @@ import platform
 import atexit
 from threading import Thread, Event
 import json
-import platform
 import ctypes
 import csv
 from collections import defaultdict
@@ -857,7 +856,7 @@ class MetadataWindow(Toplevel):
                 checkbox.grid(
                     column=0, row=idx % items_per_column, sticky='W')
                 self.savable_attributes[attr]['label'] = ttk.Label(
-                    sub_frame, text='', foreground="black")z
+                    sub_frame, text='', foreground="black")
                 self.savable_attributes[attr]['label'].grid(
                     column=1, row=idx % items_per_column, sticky='E')
 
@@ -1062,14 +1061,11 @@ class ScanWindow(Toplevel):
 
 if __name__ == '__main__':
     if platform.system() == 'Windows':
-        myappid = 'zeus.daq'  # arbitrary string
+        myappid = 'zeus.device_management'  # arbitrary string
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     root = Tk()
-    icon_dir = os.path.join(os.path.dirname(
-        os.path.dirname(__file__)), 'common', 'img')
-    root.iconphoto(True, PhotoImage(file=os.path.join(icon_dir, 'title.png')))
-    if platform.system() == 'Windows':
-        root.iconbitmap(default=os.path.join(icon_dir, 'title.ico'))
+    root.iconphoto(True, PhotoImage(file=os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'title.png')))
     dummy = DaqGUI(root)
     atexit.register(dummy.terminate)
     root.mainloop()

@@ -8,6 +8,66 @@ version = "0.1.0"
 description = "ZEUS Tango control utilities and GUIs"
 readme = "README.md"
 requires-python = ">=3.11"
+dependencies = [
+	# "certifi",  # likely transitive (requests)
+	# "cffi",  # likely transitive
+	# "charset-normalizer",  # likely transitive (requests)
+	# "click",  # no direct imports found
+	"colorama",
+	# "contourpy",  # likely transitive (matplotlib)
+	# "cycler",  # likely transitive (matplotlib)
+	"elliptec",
+	# "fisx",  # no direct imports found
+	# "fonttools",  # likely transitive (matplotlib)
+	# "gevent",  # no direct imports found
+	# "greenlet",  # likely transitive (gevent)
+	# "guidata",  # no direct imports found
+	# "guiqwt",  # no direct imports found
+	# "h5py",  # no direct imports found
+	# "idna",  # likely transitive (requests)
+	# "kiwisolver",  # likely transitive (matplotlib)
+	# "lxml",  # no direct imports found
+	"matplotlib",
+	"numpy",
+	# "packaging",  # likely transitive
+	"pillow",
+	# "Pint",  # no direct imports found
+	# "ply",  # no direct imports found
+	"psutil",
+	# "pycparser",  # likely transitive (cffi)
+	# "pyepics",  # no direct imports found
+	# "PyMca5",  # no direct imports found
+	# "pyparsing",  # likely transitive
+	"pypylon",
+	"PyQt5",
+	# "PyQt5-Qt5",  # likely transitive (PyQt5)
+	# "PyQt5-sip",  # likely transitive (PyQt5)
+	# "pyqtgraph",  # no direct imports found
+	# "PyQtWebEngine",  # no direct imports found
+	# "PyQtWebEngine-Qt5",  # likely transitive (PyQtWebEngine)
+	"pyserial",
+	"pytango",
+	# "python-dateutil",  # likely transitive (matplotlib)
+	# "PythonQwt",  # no direct imports found
+	"PyVISA",
+	# "QtPy",  # no direct imports found
+	# "requests",  # no direct imports found
+	"scipy",
+	# "six",  # likely transitive
+	"taurus",
+	"taurus-pyqtgraph",
+	"tkinter-tooltip",
+	# "tomli",  # usually not needed on Python >= 3.11
+	# "typing_extensions",  # likely transitive
+	# "urllib3",  # likely transitive (requests)
+	"watchfiles",
+	# "zope.event",  # likely transitive
+	# "zope.interface",  # likely transitive
+	"playsound3",
+	"pyvisa-py",
+	"nidaqmx",
+	"py-thorlabs-tsp @ git+https://gitlab.com/guanggevwu/py-thorlabs-tsp-fork.git",
+]
 
 [project.entry-points."taurus.form.item_factories"]
 my_motor = "common.my_motor_widget:mymotor_item_factory"
