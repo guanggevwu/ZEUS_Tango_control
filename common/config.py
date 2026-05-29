@@ -23,5 +23,7 @@ image_panel_config = {
     'laser/basler/3PW_Screen': {'image': 'flux', 'calibration': True},
     # 'test/basler/test': {'image': 'image_with_MeV_mark', 'calibration': True},
     'laser/basler/3PW_Grating-4_FF': {'image': 'image', 'calibration': False},
-    'TA1/basler/TA1-EspecH': {'image': 'image_with_MeV_mark'},
 }
+
+# "40330527" is TA3 ESPECH, "40222934" is test camera. Now the GUI will always show the MeV mark if image_with_MeV_mark attribute exists in the device server.
+basler_server_config = {"mev_mark": {"serial_number": [ "40222934"]}}

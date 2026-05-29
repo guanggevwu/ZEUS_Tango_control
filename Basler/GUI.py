@@ -37,11 +37,11 @@ class BaslerGUI():
         self.app = TaurusApplication(cmd_line_parser=None,
                                      app_name=app_name)
         self.gui = TaurusGui()
-        self.attr_list = {}
+        self.device_list = {}
 
     def add_device(self, device_name):
         # this is important to exclude "is_new_image" attribute because we don't want client side periodically polling it.
-        # a dictionary containing the device info is stored in self.attr_list[device_name]
+        # a dictionary containing the device info is stored in self.device_list[device_name]
         exclude = ['is_new_image']
         device_info = {}
         device_info['dp'] = Device(device_name)
@@ -49,7 +49,7 @@ class BaslerGUI():
         device_info['commands'] = device_info['dp'].get_command_list()
         device_info['model'] = [device_name] + [device_name + '/' +
                                                 attr for attr in device_info['attrs'] if attr not in exclude]
-        self.attr_list[device_name] = device_info
+        self.device_list[device_name] = device_info
 
     def create_image_panel(self, layout, device_name, image='image', image_number=True, energy_meter=False, calibration=False):
         '''create Taurus Image panel'''
@@ -77,10 +77,13 @@ class BaslerGUI():
 
         # sets of widgets. Image in mid.
         # Check file_reader data dimension to determine use image or plot.
-        if 'file_reader' in device_name and self.attr_list[device_name]['dp'].data_type == "xy":
+        if 'file_reader' in device_name and self.device_list[device_name]['dp'].data_type == "xy":
             panel1_w1 = TaurusPlot()
             model = [(f'{device_name}/x', f'{device_name}/y')]
             panel1_w1.setModel(model)
+        elif hasattr(self.device_list[device_name]['dp'], 'image_with_MeV_mark'):
+            panel1_w1 = TaurusImageDialog()
+            panel1_w1.model = device_name + '/' + 'image_with_MeV_mark'
         else:
             panel1_w1 = TaurusImageDialog()
             panel1_w1.model = device_name + '/' + image
@@ -99,13 +102,13 @@ class BaslerGUI():
         panel_widget.append(TaurusLabel())
         panel_widget.append(TaurusLabel())
         panel_widget[0].model, panel_widget[0].bgRole = f'{attr_name}#label', ''
-        if ("eval" not in attr_name and self.attr_list[device_name]['dp'].get_attribute_config(attr_name.split('/')[-1]).unit):
+        if ("eval" not in attr_name and self.device_list[device_name]['dp'].get_attribute_config(attr_name.split('/')[-1]).unit):
             panel_widget[1].model = attr_name + '#rvalue'
         else:
             panel_widget[1].model = attr_name
         panel_layout.addWidget(panel_widget[0])
         panel_layout.addWidget(panel_widget[1])
-        if "eval" not in attr_name and self.attr_list[device_name]['dp'].get_attribute_config(attr_name.split('/')[-1]).writable_attr_name != 'None':
+        if "eval" not in attr_name and self.device_list[device_name]['dp'].get_attribute_config(attr_name.split('/')[-1]).writable_attr_name != 'None':
             panel_widget.append(TaurusValueLineEdit())
             panel_widget[-1].model = attr_name + '#wvalue.magnitude'
             panel_layout.addWidget(panel_widget[-1])
@@ -125,13 +128,13 @@ class BaslerGUI():
         panel, panel_layout = self.create_blank_panel('h')
         if command_list is None:
             command_list = [
-                i.cmd_name for i in self.attr_list[device_name]['dp'].command_list_query()[3:]]
+                i.cmd_name for i in self.device_list[device_name]['dp'].command_list_query()[3:]]
         if cmd_parameters is None:
             cmd_parameters = [None]*len(command_list)
         if modified_cmd_name is None:
             modified_cmd_name = command_list
         for cmd, parameters, modified_name in zip(command_list, cmd_parameters, modified_cmd_name):
-            if cmd in self.attr_list[device_name]['commands']:
+            if cmd in self.device_list[device_name]['commands']:
                 panel_w = TaurusCommandButton(
                     command=cmd, parameters=parameters
                 )
@@ -143,7 +146,7 @@ class BaslerGUI():
 
     def create_form_panel(self, layout, device_name, include=None, exclude=None, dropdown=None, withButtons=True, set_attr_font=None):
         panel2_w1 = TaurusForm(withButtons=withButtons)
-        form_model = self.attr_list[device_name]['model']
+        form_model = self.device_list[device_name]['model']
         # re-order. Move trigger to front.
         re_order_list = {'trigger_source': 12, 'filter_option': 4}
         for key, value in re_order_list.items():
@@ -165,7 +168,7 @@ class BaslerGUI():
                 ('AcquisitionStart', 'AcquisitionStart'), ('FrameStart', 'FrameStart')), }
         for idx, full_attr in enumerate(form_model):
             # change the bool write to auto apply. Only apply to writable bool widget.
-            if full_attr.split('/')[-1] in self.attr_list[device_name]['attrs'] and self.attr_list[device_name]['dp'].attribute_query(full_attr.split('/')[-1]).data_type == 1 and self.attr_list[device_name]['dp'].attribute_query(full_attr.split('/')[-1]).writable == tango._tango.AttrWriteType.READ_WRITE:
+            if full_attr.split('/')[-1] in self.device_list[device_name]['attrs'] and self.device_list[device_name]['dp'].attribute_query(full_attr.split('/')[-1]).data_type == 1 and self.device_list[device_name]['dp'].attribute_query(full_attr.split('/')[-1]).writable == tango._tango.AttrWriteType.READ_WRITE:
                 idx = form_model.index(full_attr)
                 panel2_w1[idx].writeWidgetClass = None
                 panel2_w1[idx].readWidgetClass = BoolLedSwitcher

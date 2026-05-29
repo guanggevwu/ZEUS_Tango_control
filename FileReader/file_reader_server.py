@@ -152,15 +152,15 @@ class FileReader(Device):
                 f"Watching folder: {self._folder_path} for files with extension: {self._file_extension}")
 
     def _watch_loop(self):
-        print(f"--- Started watching: {self._folder_path} ---")
+        logging.info(f"--- Started watching: {self._folder_path} ---")
         # stop_event automatically stops this generator when set()
         for changes in watch(self._folder_path, recursive=False, stop_event=self.stop_event):
             for change_type, file_path in changes:
-                if change_type.name == 'added' and file_path.endswith(tuple(self._file_extension.split(','))):
-                    print(
+                if change_type.name == 'added' and file_path.endswith(tuple(self._file_extension.split(','))) and os.path.isfile(file_path) and os.path.getsize(file_path) > 0:
+                    logging.info(
                         f"New file found in {self._folder_path}: {file_path}")
                     self.new_files_queue.put(file_path)
-        print(f"--- Stopped watching: {self._folder_path} ---")
+        logging.info(f"--- Stopped watching: {self._folder_path} ---")
 
     def start_watching(self):
         self.stop_event.clear()
@@ -170,7 +170,7 @@ class FileReader(Device):
         self.monitor_thread.start()
 
     def change_watching_folder_and_extension(self):
-        print("\nChanging folder or extension...")
+        logging.info("Changing folder or extension...")
         self.stop_event.set()  # Signals watch() to stop
         if self.monitor_thread:
             self.monitor_thread.join()  # Wait for the old thread to finish

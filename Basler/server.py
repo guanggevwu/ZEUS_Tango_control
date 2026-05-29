@@ -15,10 +15,8 @@ from threading import Thread
 from queue import Queue
 import csv
 import platform
-
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.other import generate_basename
+from common.config import basler_server_config
+from common.other import generate_basename
 # -----------------------------
 
 
@@ -699,7 +697,7 @@ class Basler(Device):
                     self._calibration = 0
                     self._flux = np.zeros((2, 2))
                 self._has_MeV_mark = 0
-                if self.friendly_name == "TA1-EspecH" or self.friendly_name == 'test':
+                if self.serial_number in basler_server_config["mev_mark"]["serial_number"]:
                     self._has_MeV_mark = 1
                 self.q = Queue()
                 print(

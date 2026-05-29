@@ -22,13 +22,13 @@ dependencies = [
 	# "gevent",  # no direct imports found
 	# "greenlet",  # likely transitive (gevent)
 	# "guidata",  # no direct imports found
-	# "guiqwt",  # no direct imports found
+	"guiqwt==4.4.4",  # no direct imports found
 	# "h5py",  # no direct imports found
 	# "idna",  # likely transitive (requests)
 	# "kiwisolver",  # likely transitive (matplotlib)
 	# "lxml",  # no direct imports found
 	"matplotlib",
-	"numpy",
+	"numpy==1.26.4",
 	# "packaging",  # likely transitive
 	"pillow",
 	# "Pint",  # no direct imports found
@@ -36,6 +36,7 @@ dependencies = [
 	"psutil",
 	# "pycparser",  # likely transitive (cffi)
 	# "pyepics",  # no direct imports found
+	"pyinstaller",
 	# "PyMca5",  # no direct imports found
 	# "pyparsing",  # likely transitive
 	"pypylon",
@@ -43,20 +44,21 @@ dependencies = [
 	# "PyQt5-Qt5",  # likely transitive (PyQt5)
 	# "PyQt5-sip",  # likely transitive (PyQt5)
 	# "pyqtgraph",  # no direct imports found
-	# "PyQtWebEngine",  # no direct imports found
+	"PyQtWebEngine",  # no direct imports found
 	# "PyQtWebEngine-Qt5",  # likely transitive (PyQtWebEngine)
 	"pyserial",
 	"pytango",
 	# "python-dateutil",  # likely transitive (matplotlib)
-	# "PythonQwt",  # no direct imports found
+	"PythonQwt==0.11.2",  # no direct imports found
 	"PyVISA",
 	# "QtPy",  # no direct imports found
 	# "requests",  # no direct imports found
 	"scipy",
 	# "six",  # likely transitive
-	"taurus",
+	"taurus==5.1.8",
 	"taurus-pyqtgraph",
 	"tkinter-tooltip",
+	"sif-parser",
 	# "tomli",  # usually not needed on Python >= 3.11
 	# "typing_extensions",  # likely transitive
 	# "urllib3",  # likely transitive (requests)
