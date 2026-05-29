@@ -1,25 +1,19 @@
-#!/usr/bin/python3 -u
-# -*- coding: utf-8 -*-
-from tango import AttrWriteType, DevState, DevFloat, EncodedAttribute
-from tango.server import Device, attribute, command, device_property
-from pypylon import pylon
-import numpy as np
-import time
-import datetime
-import logging
-from PIL import Image
-import os
-import sys
-import csv
-import platform
-import sif_parser
-import threading
-from watchfiles import watch
 import queue
+from watchfiles import watch
+import threading
+import sif_parser
+import platform
+import csv
+import os
+from PIL import Image
+import logging
+import datetime
+import time
+import numpy as np
+from tango.server import Device, attribute, command, device_property
+from tango import AttrWriteType, DevState, DevFloat, EncodedAttribute
+from common.logger_adapter import LoggerAdapter
 
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from Basler.server import Basler, LoggerAdapter
 # -----------------------------
 
 handlers = [logging.StreamHandler()]

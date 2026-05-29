@@ -1,17 +1,8 @@
-from taurus.qt.qtgui.input import TaurusValueComboBox, TaurusValueCheckBox, TaurusValueLineEdit
-from taurus.qt.qtgui.compact import TaurusReadWriteSwitcher
-from taurus.qt.qtgui.display import TaurusLabel
+from common.GUI import GuiBase
+from common.TaurusGUI_Argparse import TaurusArgparse
+from common.config import device_name_table
 import tango
 import os
-import sys
-from taurus.qt.qtgui.button import TaurusCommandButton
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
-if True:
-    from common.config import device_name_table, image_panel_config
-    from common.TaurusGUI_Argparse import TaurusArgparse
-    from common.taurus_widget import RelativeMotion
-    from Basler.GUI import BaslerGUI, create_app
 
 
 def create_app():
@@ -21,7 +12,7 @@ def create_app():
         device_list = args.device
     else:
         device_list = [args.device]
-    esp_app = BaslerGUI(device_list, args.polling)
+    esp_app = GuiBase(device_list, args.polling)
 
     # get the configuration
     for d in device_list:

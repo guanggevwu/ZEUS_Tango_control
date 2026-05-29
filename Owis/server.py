@@ -1,24 +1,13 @@
-#!/usr/bin/python3 -u
-# -*- coding: utf-8 -*-
 from tango import AttrWriteType, DevState
 from tango.server import Device, attribute, command, device_property
 import datetime
 import logging
-import time
 import platform
 import ctypes
 import os
 import sys
+from common.logger_adapter import LoggerAdapter
 # -----------------------------
-
-
-class LoggerAdapter(logging.LoggerAdapter):
-    def __init__(self, prefix, logger):
-        super(LoggerAdapter, self).__init__(logger, {})
-        self.prefix = prefix
-
-    def process(self, msg, kwargs):
-        return '[%s] %s' % (self.prefix, msg), kwargs
 
 
 class OwisPS(Device):

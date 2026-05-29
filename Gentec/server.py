@@ -1,5 +1,3 @@
-#!/usr/bin/python3 -u
-# -*- coding: utf-8 -*-
 from tango import AttrWriteType, DevState
 from tango.server import Device, attribute, command, device_property
 import time

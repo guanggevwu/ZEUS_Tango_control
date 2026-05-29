@@ -1,30 +1,14 @@
-#!/usr/bin/python3 -u
-# -*- coding: utf-8 -*-
 from tango import AttrWriteType, DevState, DevFloat, EncodedAttribute
 from tango.server import Device, attribute, command, device_property
-import numpy as np
 import datetime
 import logging
 import os
-import sys
-from scipy.ndimage import convolve
 import csv
 import platform
 import nidaqmx
 import datetime
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.other import generate_basename
+from common.logger_adapter import LoggerAdapter
 # -----------------------------
-
-
-class LoggerAdapter(logging.LoggerAdapter):
-    def __init__(self, prefix, logger):
-        super(LoggerAdapter, self).__init__(logger, {})
-        self.prefix = prefix
-
-    def process(self, msg, kwargs):
-        return '[%s] %s' % (self.prefix, msg), kwargs
 
 
 class GXRegulator(Device):
@@ -62,7 +46,6 @@ class GXRegulator(Device):
     def read_read_time(self):
         return self._read_time
 
-
     pressure_psi = attribute(
         label="pressure",
         dtype=float,
@@ -78,10 +61,12 @@ class GXRegulator(Device):
     def write_pressure_psi(self, value):
         self._pressure_psi = value
         with nidaqmx.Task() as task:
-            task.ao_channels.add_ao_voltage_chan(f"Dev1/ao{self.high_voltage_channel}", min_val=0, max_val=10)
-            task.ao_channels.add_ao_voltage_chan(f"Dev1/ao{self.low_voltage_channel}", min_val=0, max_val=10)
+            task.ao_channels.add_ao_voltage_chan(
+                f"Dev1/ao{self.high_voltage_channel}", min_val=0, max_val=10)
+            task.ao_channels.add_ao_voltage_chan(
+                f"Dev1/ao{self.low_voltage_channel}", min_val=0, max_val=10)
             # 10 V, 1000 psi.
-            task.write([self._pressure_psi/1000*10,0])
+            task.write([self._pressure_psi/1000*10, 0])
             self._read_time = datetime.datetime.now().strftime("%Y%m%d.%H:%M:%S.%f")
         if self._save_data:
             if os.path.isfile(self._save_path):
@@ -112,7 +97,6 @@ class GXRegulator(Device):
     high_voltage_channel = device_property(dtype=str, default_value='')
     low_voltage_channel = device_property(dtype=str, default_value='')
 
-
     save_data = attribute(
         label="save data",
         dtype=bool,
@@ -138,7 +122,6 @@ class GXRegulator(Device):
         else:
             self._save_data = value
         logging.info(f'save status is changed to {value}')
-
 
     save_path = attribute(
         label='save path (folder)',
@@ -174,7 +157,6 @@ class GXRegulator(Device):
         self._save_path = value
         self.push_change_event("save_path", self.read_save_path())
 
-
     is_debug_mode = attribute(
         label='debug',
         dtype=bool,
@@ -206,7 +188,6 @@ class GXRegulator(Device):
         if self._is_polling_periodically:
             self.poll_attribute('pressure_bar', value)
             self.poll_attribute('pressure_psi', value)
-
 
     def init_device(self):
         self._host_computer = platform.node()

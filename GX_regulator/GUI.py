@@ -1,12 +1,8 @@
-from taurus_pyqtgraph import TaurusPlot
-import os
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from common.GUI import GuiBase
+from common.TaurusGUI_Argparse import TaurusArgparse
+from common.config import device_name_table
 
-if True:
-    from common.config import device_name_table, image_panel_config
-    from common.TaurusGUI_Argparse import TaurusArgparse
-    from Basler.GUI import BaslerGUI, create_app
+
 parser = TaurusArgparse(
     description='GUI for GX pressure regulator', device_default='TA1/gx_regulator/TA1_regulator_1', nargs_string='+', polling_default=1000)
 args = parser.parse_args()
@@ -19,14 +15,15 @@ def create_app():
         device_list = args.device
     else:
         device_list = [args.device]
-    basler_app = BaslerGUI(device_list, args.polling)
+    basler_app = GuiBase(device_list, args.polling)
 
     # get the configuration
     for d in device_list:
         basler_app.add_device(d)
         form_panel, form_layout = basler_app.create_blank_panel('v')
         basler_app.gui.createPanel(form_panel, f'{d}_form')
-        basler_app.create_form_panel(form_layout, d, set_attr_font={key: {'font':'"Sans Serif"', 'size':20} for key in ['pressure_bar', 'pressure_psi']})
+        basler_app.create_form_panel(form_layout, d, set_attr_font={key: {
+                                     'font': '"Sans Serif"', 'size': 20} for key in ['pressure_bar', 'pressure_psi']})
 
     basler_app.gui.removePanel('Manual')
     basler_app.gui.show()

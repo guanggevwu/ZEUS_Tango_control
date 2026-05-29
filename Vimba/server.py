@@ -1,32 +1,14 @@
-#!/usr/bin/python3 -u
-# -*- coding: utf-8 -*-
 from tango import AttrWriteType, DevState, DevFloat, EncodedAttribute
 from tango.server import Device, attribute, command, device_property
 import numpy as np
-import time
 import datetime
 import logging
-import os
 import sys
-from PIL import Image
-from threading import Thread
 from queue import Queue
 import platform
 from vmbpy import *
-
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.other import generate_basename
+from common.logger_adapter import LoggerAdapter
 # -----------------------------
-
-
-class LoggerAdapter(logging.LoggerAdapter):
-    def __init__(self, prefix, logger):
-        super(LoggerAdapter, self).__init__(logger, {})
-        self.prefix = prefix
-
-    def process(self, msg, kwargs):
-        return '[%s] %s' % (self.prefix, msg), kwargs
 
 
 def grabbing_wrap(func):

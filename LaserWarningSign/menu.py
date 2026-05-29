@@ -7,9 +7,7 @@ import subprocess
 from functools import partial
 import atexit
 import signal
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.start_menu import Menu
+from common.start_menu import Menu
 
 
 class LaserWarningSignMenu(Menu):

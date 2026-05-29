@@ -1,13 +1,10 @@
 from tkinter import *
 from tkinter import ttk
 import sys
-import os
 from functools import partial
 import atexit
 
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.start_menu import Menu
+from common.start_menu import Menu
 
 
 class FileReaderMenu(Menu):

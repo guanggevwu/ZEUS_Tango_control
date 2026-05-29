@@ -1,15 +1,9 @@
-#!/usr/bin/python3 -u
-# -*- coding: utf-8 -*-
 from tango import AttrWriteType, DevState
 from tango.server import Device, attribute, command, device_property
 import logging
 import pyvisa
 import platform
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-if True:
-    from Basler.server import Basler, LoggerAdapter
+from common.logger_adapter import LoggerAdapter
 # -----------------------------
 handlers = [logging.StreamHandler()]
 logging.basicConfig(handlers=handlers,

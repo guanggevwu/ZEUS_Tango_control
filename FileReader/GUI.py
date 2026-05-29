@@ -1,12 +1,7 @@
-from taurus_pyqtgraph import TaurusPlot
-import os
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from common.GUI import GuiBase
+from common.TaurusGUI_Argparse import TaurusArgparse
+from common.config import device_name_table, image_panel_config
 
-if True:
-    from common.config import device_name_table, image_panel_config
-    from common.TaurusGUI_Argparse import TaurusArgparse
-    from Basler.GUI import BaslerGUI, create_app
 parser = TaurusArgparse(
     description='GUI for File Reader', device_default='test/basler/testcam', nargs_string='+', polling_default=1000)
 parser.add_argument('-s', '--simple', action='store_true',
@@ -20,7 +15,7 @@ if __name__ == "__main__":
         device_list = args.device
     else:
         device_list = [args.device]
-    file_reader_app = BaslerGUI(device_list, args.polling)
+    file_reader_app = GuiBase(device_list, args.polling)
 
     # get the configuration
     for d in device_list:

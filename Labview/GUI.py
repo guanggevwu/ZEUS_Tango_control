@@ -1,12 +1,6 @@
-from taurus_pyqtgraph import TaurusPlot
-import os
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
-if True:
-    from common.config import device_name_table, image_panel_config
-    from common.TaurusGUI_Argparse import TaurusArgparse
-    from Basler.GUI import BaslerGUI, create_app
+from common.GUI import GuiBase
+from common.TaurusGUI_Argparse import TaurusArgparse
+from common.config import device_name_table, image_panel_config
 
 
 def create_app():
@@ -16,7 +10,7 @@ def create_app():
         device_list = args.device
     else:
         device_list = [args.device]
-    basler_app = BaslerGUI(device_list, args.polling)
+    basler_app = GuiBase(device_list, args.polling)
 
     # get the configuration
     for d in device_list:

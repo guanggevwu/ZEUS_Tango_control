@@ -1,21 +1,16 @@
-import argparse
-from taurus_pyqtgraph import TaurusTrend, TaurusPlot
+from taurus_pyqtgraph import TaurusPlot
 from taurus.qt.qtgui.application import TaurusApplication
 from taurus.qt.qtgui.taurusgui import TaurusGui
 from taurus.external.qt import Qt
 from taurus import Device, changeDefaultPollingPeriod
 from taurus.qt.qtgui.panel import TaurusForm
-from taurus.qt.qtgui.input import TaurusValueComboBox
 from taurus import tauruscustomsettings
 import os
 import platform
-import sys
 
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
-    from common.TaurusGUI_Argparse import TaurusArgparse
-    from common.config import device_name_table, image_panel_config
+from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
+from common.TaurusGUI_Argparse import TaurusArgparse
+from common.config import device_name_table
 
 if platform.system() == 'Windows':
     tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(
@@ -42,17 +37,18 @@ for device_name in device_list:
         attrs = dp.get_attribute_list()
         commands = dp.get_command_list()
         model = [device_name + '/' +
-                attr for attr in attrs if not attr.startswith('hide_')]
+                 attr for attr in attrs if not attr.startswith('hide_')]
         statistic_panel = ['shot', 'statistics_shots',
-                        'average', 'max', 'min', 'rsd',  'start_statistics', ]
+                           'average', 'max', 'min', 'rsd',  'start_statistics', ]
         panel1 = Qt.QWidget()
         panel1_layout = Qt.QVBoxLayout()
         panel1.setLayout(panel1_layout)
         panel1_w1 = TaurusForm()
 
-        form_model = [i for i in model if i.split('/')[-1] not in statistic_panel]
+        form_model = [i for i in model if i.split(
+            '/')[-1] not in statistic_panel]
         order_list = ['model', 'main_value', 'read_time', 'save_data',
-                    'save_path', 'display_range', 'auto_range', 'wavelength']
+                      'save_path', 'display_range', 'auto_range', 'wavelength']
         for idx, attr in enumerate(order_list):
             form_model.remove(f'{device_name}/{attr}')
             form_model.insert(idx, f'{device_name}/{attr}')
@@ -105,13 +101,14 @@ for device_name in device_list:
                 if col_widget:
                     col_widget.setFont(Qt.QFont("Sans Serif", 20))
 
-
         panel3.compact = is_form_compact
 
         gui.createPanel(panel1, f'{device_name.split("/")[-1]}_parameters')
-        gui.createPanel(panel3, f'{device_name.split("/")[-1]}statistics_numbers')
-        gui.createPanel(panel2, f'{device_name.split("/")[-1]}statistics_trend')
-    except Exception as  e:
+        gui.createPanel(
+            panel3, f'{device_name.split("/")[-1]}statistics_numbers')
+        gui.createPanel(
+            panel2, f'{device_name.split("/")[-1]}statistics_trend')
+    except Exception as e:
         print(f"Unable to add {device_name} GUI and thus dropped it.")
 
 gui.removePanel('Manual')

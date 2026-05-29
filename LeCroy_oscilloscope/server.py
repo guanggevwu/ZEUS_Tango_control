@@ -1,14 +1,7 @@
 import win32com.client
-import matplotlib.pyplot as plt
-import numpy as np
 from tango import AttrWriteType, DevState
 from tango.server import Device, attribute, command, device_property
-import time
-import datetime
 import logging
-import os
-import csv
-import time
 import platform
 # -----------------------------
 

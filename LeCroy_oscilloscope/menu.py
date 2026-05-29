@@ -1,13 +1,10 @@
 import atexit
 from functools import partial
-import os
 from tkinter import ttk
 from tkinter import *
 import sys
 
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.start_menu import Menu
+from common.start_menu import Menu
 
 
 class LeCroyMenu(Menu):

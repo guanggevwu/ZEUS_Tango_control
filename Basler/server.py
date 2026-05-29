@@ -1,6 +1,4 @@
-#!/usr/bin/python3 -u
-# -*- coding: utf-8 -*-
-from tango import AttrWriteType, DevState, DevFloat, EncodedAttribute
+from tango import AttrWriteType, DevState
 from tango.server import Device, attribute, command, device_property
 from pypylon import pylon
 import numpy as np
@@ -8,7 +6,6 @@ import time
 import datetime
 import logging
 import os
-import sys
 from scipy.ndimage import convolve
 from PIL import Image, ImageDraw, ImageFont
 from threading import Thread
@@ -16,17 +13,9 @@ from queue import Queue
 import csv
 import platform
 from common.config import basler_server_config
+from common.logger_adapter import LoggerAdapter
 from common.other import generate_basename
 # -----------------------------
-
-
-class LoggerAdapter(logging.LoggerAdapter):
-    def __init__(self, prefix, logger):
-        super(LoggerAdapter, self).__init__(logger, {})
-        self.prefix = prefix
-
-    def process(self, msg, kwargs):
-        return '[%s] %s' % (self.prefix, msg), kwargs
 
 
 class Basler(Device):

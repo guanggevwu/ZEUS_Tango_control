@@ -1,24 +1,18 @@
-import argparse
-from taurus_pyqtgraph import TaurusTrend, TaurusPlot
 from taurus.qt.qtgui.application import TaurusApplication
 from taurus.qt.qtgui.taurusgui import TaurusGui
 from taurus.external.qt import Qt
 from taurus import Device, changeDefaultPollingPeriod
 from taurus.qt.qtgui.panel import TaurusForm
-from taurus.qt.qtgui.input import TaurusValueComboBox
 from taurus.qt.qtgui.button import TaurusCommandButton
 
-import sys
 import os
 from taurus import tauruscustomsettings
 import platform
 if platform.system() == 'Windows':
     tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'zeus.png')
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
-    from common.TaurusGUI_Argparse import TaurusArgparse
+from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
+from common.TaurusGUI_Argparse import TaurusArgparse
 
 parser = TaurusArgparse(
     description='GUI for Gentec-EO devices', device_default='test/dg535/1', polling_default=3000)
@@ -66,7 +60,7 @@ for channel in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:
     dropdown[f'{channel}_relative_channel'] = tuple(
         i for i in common_dropdown if i != (channel, channel))
 dropdown['trigger'] = (('Internal', 'Internal'), ('External rising', 'External rising'),
-                       ('External falling', 'External falling'), ('Single shot external rising edges', 'Single shot external rising edges'), ('Single shot external falling edges','Single shot external falling edges'), ('Single shot', 'Single shot'), ('Line', 'Line'))
+                       ('External falling', 'External falling'), ('Single shot external rising edges', 'Single shot external rising edges'), ('Single shot external falling edges', 'Single shot external falling edges'), ('Single shot', 'Single shot'), ('Line', 'Line'))
 
 # change the bool write to auto apply.
 for idx, full_attr in enumerate(form_model):

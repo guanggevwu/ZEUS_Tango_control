@@ -2,10 +2,8 @@ from tkinter import *
 from tkinter import ttk
 import tango
 import sys
-import os
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.config import device_name_table, image_panel_config
+from common.config import device_name_table, image_panel_config
+
 
 class Gentec:
     def __init__(self, root):

@@ -21,9 +21,7 @@ import time
 import sys
 import json
 from device_management_combination_config import container
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.config import device_name_table, instance_table, image_panel_config
+from common.config import device_name_table, instance_table, image_panel_config
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s %(message)s")
 
@@ -384,7 +382,7 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 self.parent.insert_to_disabled(
                     f'Starting server for {device_name}...', tag_config='yellow_text')
                 t = Thread(target=self.click_check_device_status,
-                        args=(device_name, 10), daemon=True)
+                           args=(device_name, 10), daemon=True)
                 t.start()
             else:
                 try:
@@ -396,7 +394,7 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 self.category_container[device_name]['server_widget']['style'] = 'Sty2_offline_text_small.TButton'
                 del self.category_container[device_name]['server_pid']
                 self.parent.insert_to_disabled(
-                    f'{device_name} starting is interrupted.')                
+                    f'{device_name} starting is interrupted.')
 
     def open_close_gui(self, device_name):
         c = self.category_container[device_name]['tango_class']

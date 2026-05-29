@@ -5,7 +5,7 @@ from taurus.qt.qtgui.input import TaurusValueLineEdit
 from taurus.qt.qtgui.panel.taurusvalue import UnitLessLineEdit
 from taurus.core.units import Quantity
 import re
-from .taurus_widget import BoolLedSwitcher
+from common.taurus_widget import BoolLedSwitcher
 
 
 class MyMotorExtraWidget(TaurusWidget):

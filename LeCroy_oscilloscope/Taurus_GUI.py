@@ -11,9 +11,7 @@ from taurus import tauruscustomsettings
 if platform.system() == 'Windows':
     tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'zeus.png')
-if True:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
+from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
 
 device_name = sys.argv[1] if len(
     sys.argv) > 1 else 'facility/lecroy/wavesurfer_3034z_1'
