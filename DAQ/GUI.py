@@ -555,9 +555,16 @@ class DaqGUI:
             self.my_event.set()
             self.acquisition_button['style'] = 'Sty3_start.TButton'
             self.acquisition_button['text'] = 'Start'
-            del self.daq
+            if hasattr(self, 'daq'):
+                del self.daq
             self.insert_to_disabled("Stopped acquisition.")
         else:
+            inferred_start_shot_number = self.infer_start_shot_number(
+                self.path_var.get())
+            shot_start_number = self.confirm_start_shot_number(
+                inferred_start_shot_number)
+            if shot_start_number is None:
+                return
             self.my_event = Event()
             Thread(target=self.start_acquisition).start()
             self.acquisition_button['style'] = 'Sty3_stop.TButton'
@@ -576,6 +583,7 @@ class DaqGUI:
 
     def start_acquisition(self):
         '''Start the acquisition in a new thread. It will create a Daq object and call its acquisition method. It will also save the options and selected devices to a json file. It is called by the toggle_acquisition function.'''
+        shot_start_number = self.shot_start_var.get()
         try:
             for opt in self.frame2_checkbutton_content.keys():
                 self.options[opt] = self.frame2_checkbutton_content[opt]['var'].get()
@@ -584,7 +592,7 @@ class DaqGUI:
             self.daq = Daq(self.selected_devices,
                            dir=self.path_var.get(), thread_event=self.my_event, GUI=self)
             self.daq.set_camera_configuration(
-                grab_number=self.shot_end_var.get() - self.shot_start_var.get() + 1)
+                grab_number=self.shot_end_var.get() - shot_start_number + 1)
             if self.options['use_plasma_mirror']:
                 self.is_plasma_mirror_ready = None
                 Thread(target=self.schedule_checking_damaged_zones,
@@ -593,13 +601,50 @@ class DaqGUI:
                 self.frame2_buttons['DamagedZones']['style'] = 'small_button.TButton'
             scan_table = self.scan_window.scan_table if hasattr(
                 self, 'scan_window') else None
-            self.daq.acquisition(
-                shot_start=self.shot_start_var.get(), shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], scan_table=scan_table)
+            self.daq.acquisition(shot_start=shot_start_number, shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], scan_table=scan_table)
             if not self.my_event.is_set():
                 self.toggle_acquisition()
         except Exception as e:
             self.insert_to_disabled(
                 f"Error in acquisition thread. Exception: {type(e)}, {e}", 'red_text')
+
+    def confirm_start_shot_number(self, inferred_start_shot_number):
+        '''Ask the operator whether to use the inferred start shot number.'''
+        current_start_shot_number = self.shot_start_var.get()
+        if inferred_start_shot_number == current_start_shot_number:
+            return current_start_shot_number
+        message = (
+            'Use inferred start shot number?\n\n'
+            f'Yes: {inferred_start_shot_number} (inferred from existing data)\n'
+            f'No: {current_start_shot_number} (currently entered)\n'
+            'Cancel'
+        )
+        answer = messagebox.askyesnocancel(
+            title='Confirm start shot number', message=message)
+        if answer is None:
+            return None
+        if answer:
+            self.shot_start_var.set(inferred_start_shot_number)
+            return inferred_start_shot_number
+        return self.shot_start_var.get()
+
+    def infer_start_shot_number(self, path):
+        '''Infer the next shot number from saved image files under path.'''
+        if not path or not os.path.isdir(path):
+            return 1
+        import re
+        max_shot_number = 0
+        for root_dir, _, file_names in os.walk(path):
+            for file_name in file_names:
+                match = re.search(r'Shot(\d+)_', file_name)
+                if match is None:
+                    continue
+                shot_number = int(match.group(1))
+                if shot_number > max_shot_number:
+                    max_shot_number = shot_number
+        return max_shot_number + 1 if max_shot_number else 1
+    
+
 
     def insert_to_disabled(self, text, tag_config=None, with_timestamp=True, with_alarm=None):
         if with_alarm is None:
