@@ -7,7 +7,7 @@ name = "zeus-tango-control"
 version = "0.1.0"
 description = "ZEUS Tango control utilities and GUIs"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
 	# "certifi",  # likely transitive (requests)
 	# "cffi",  # likely transitive
