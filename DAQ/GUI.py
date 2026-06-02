@@ -597,6 +597,9 @@ class DaqGUI:
             self.acquisition_button['text'] = 'Start'
             self.insert_to_disabled("Stopped acquisition.")
         else:
+            if self.frame2_checkbutton_content['save_metadata']['var'].get() and self.frame2_buttons['Metadata'].cget('style') == 'Sty3_stop_small.TButton':
+                self.insert_to_disabled('Please make sure the all the selected metadata are available and then "Start" again.', 'red_text')
+                return
             inferred_start_shot_number = self.infer_start_shot_number(
                 self.path_var.get())
             shot_start_number = self.confirm_start_shot_number(
