@@ -1,5 +1,5 @@
 import socket
-from tkinter import Tk, messagebox, Toplevel, Text, StringVar, IntVar, DoubleVar, BooleanVar, PhotoImage
+from tkinter import Tk, messagebox, Toplevel, Text, StringVar, IntVar, DoubleVar, BooleanVar, PhotoImage, TclError
 from tkinter import ttk
 import tango
 import numpy as np
@@ -22,7 +22,6 @@ from pypylon import pylon
 import time
 from constants import *
 from tktooltip import ToolTip
-
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s %(message)s")
 
@@ -39,10 +38,13 @@ logger.addHandler(fh)
 class DaqGUI:
     def __init__(self, root):
         self.root = root
+        self.is_closing = False
+        self.after_ids = {}
         self.db = tango.Database()
         self.root_path = os.path.dirname(os.path.dirname(__file__))
         self.logging_q = Queue()
         self.gui_update_queue = Queue()
+        self.root.protocol('WM_DELETE_WINDOW', self.on_close)
 
         if platform.system() == 'Linux':
             self.python_path = os.path.join(
@@ -125,6 +127,8 @@ class DaqGUI:
         self.client_GUI['button'].grid(column=1, row=0, sticky='WE')
         ToolTip(self.client_GUI['button'],
                 msg="Open the GUI for the selected devices. The device servers must be running.", delay=HOVER_DELAY)
+
+
 
         self.device_row, self.selected_device_per_row = 1, 4
         bandwidth_btn = ttk.Button(self.frame1, text='Bandwidth',
@@ -233,6 +237,35 @@ class DaqGUI:
         Thread(target=self.routine_checking_device_server_status,
                daemon=True).start()
 
+    def schedule_after(self, name, delay_ms, callback):
+        if self.is_closing:
+            return
+        try:
+            self.after_ids[name] = self.root.after(delay_ms, callback)
+        except TclError:
+            pass
+
+    def cancel_scheduled_callbacks(self):
+        for after_id in list(self.after_ids.values()):
+            if after_id is None:
+                continue
+            try:
+                self.root.after_cancel(after_id)
+            except TclError:
+                pass
+        self.after_ids.clear()
+
+    def on_close(self):
+        if self.is_closing:
+            return
+        self.is_closing = True
+        self.cancel_scheduled_callbacks()
+        self.terminate()
+        try:
+            self.root.destroy()
+        except TclError:
+            pass
+
     def init_settings(self):
         # self.selected_devices structure. self.selected_devices = {'[device name]': {'checkbutton': ttk.Button, 'server_pid': [int/string?], 'connection_try_times': [int], 'tango_dp': tango.DeviceProxy}, }
         self.init_file_path = os.path.join(
@@ -324,8 +357,11 @@ class DaqGUI:
                             f'Plasma mirror is safe.', 'green_text')
                         my_message = 'TA2_ready'
                         self.send_message_to_laser_side(my_message)
-                self.root.after(CHECKING_PLASMA_MIRROR_INTERVAL *
-                                1000, self.schedule_checking_damaged_zones)
+                self.schedule_after(
+                    'checking_damaged_zones',
+                    CHECKING_PLASMA_MIRROR_INTERVAL * 1000,
+                    self.schedule_checking_damaged_zones,
+                )
         except Exception as e:
             self.send_message_to_laser_side('TA2_not_ready')
             self.insert_to_disabled(
@@ -385,6 +421,8 @@ class DaqGUI:
         self.bandwidth_window.attributes('-topmost', False)
 
     def update_gui(self):
+        if self.is_closing:
+            return
         try:
             while True:
                 action, this_widget = self.gui_update_queue.get(block=False)
@@ -397,7 +435,7 @@ class DaqGUI:
         except Exception as e:
             pass
         # if not self.thread_stop_event.is_set():
-        self.root.after(100, self.update_gui)
+        self.schedule_after('update_gui', 100, self.update_gui)
 
     def start_stop_device_server(self, device_name):
         '''Start or stop device server'''
@@ -497,6 +535,9 @@ class DaqGUI:
 
     def terminate(self):
         '''Kill all the processes started by this GUI. It is called when the GUI is closed.'''
+        if getattr(self, '_terminated', False):
+            return
+        self._terminated = True
         for key, value in self.selected_devices.items():
             if 'server_pid' in value:
                 try:
@@ -511,8 +552,7 @@ class DaqGUI:
                     self.insert_to_disabled(
                         f'{key} client was already killed somewhere else. Ignore.')
         self.laser_socket.close()
-        self.insert_to_disabled(
-            "Terminate. All processes are killed.")
+        logger.info("Terminate. All processes are killed.")
 
     def update_selected_devices(self, device_name, checkbox_var):
         '''The function is called when check or uncheck the devices in the device list window. Update the selected devices based on the checkbox state. If the checkbox is checked, it will create a button for the device. If it is unchecked, it will remove the button and delete the device from the selected devices dictionary.'''
@@ -555,8 +595,6 @@ class DaqGUI:
             self.my_event.set()
             self.acquisition_button['style'] = 'Sty3_start.TButton'
             self.acquisition_button['text'] = 'Start'
-            if hasattr(self, 'daq'):
-                del self.daq
             self.insert_to_disabled("Stopped acquisition.")
         else:
             inferred_start_shot_number = self.infer_start_shot_number(
@@ -590,7 +628,7 @@ class DaqGUI:
             self.write_to_init_file()
             # if the checkbox is checked, then we use the config saved in config.py file and we pass None here. If it is unchecked, then we pass the basic configuration and ignore the configuration in the file.
             self.daq = Daq(self.selected_devices,
-                           dir=self.path_var.get(), thread_event=self.my_event, GUI=self)
+                           dir=self.path_var.get(), GUI=self)
             self.daq.set_camera_configuration(
                 grab_number=self.shot_end_var.get() - shot_start_number + 1)
             if self.options['use_plasma_mirror']:
@@ -601,7 +639,8 @@ class DaqGUI:
                 self.frame2_buttons['DamagedZones']['style'] = 'small_button.TButton'
             scan_table = self.scan_window.scan_table if hasattr(
                 self, 'scan_window') else None
-            self.daq.acquisition(shot_start=shot_start_number, shot_end=self.shot_end_var.get(), stitch=self.options['stitch'], scan_table=scan_table)
+            self.daq.acquisition(shot_start=shot_start_number, shot_end=self.shot_end_var.get(
+            ), stitch=self.options['stitch'], scan_table=scan_table)
             if not self.my_event.is_set():
                 self.toggle_acquisition()
         except Exception as e:
@@ -643,8 +682,6 @@ class DaqGUI:
                 if shot_number > max_shot_number:
                     max_shot_number = shot_number
         return max_shot_number + 1 if max_shot_number else 1
-    
-
 
     def insert_to_disabled(self, text, tag_config=None, with_timestamp=True, with_alarm=None):
         if with_alarm is None:
@@ -660,6 +697,8 @@ class DaqGUI:
             self.logging_q.put([text, tag_config, with_alarm])
 
     def schedule_logging_message(self):
+        if self.is_closing:
+            return
         try:
             while True:
                 text, tag_config, with_alarm = self.logging_q.get(block=False)
@@ -669,9 +708,10 @@ class DaqGUI:
                 self.t['state'] = 'disabled'
                 if with_alarm:
                     messagebox.showerror(message=text)
-        except Exception as e:
+        except (Exception, TclError) as e:
             pass
-        self.root.after(200, self.schedule_logging_message)
+        self.schedule_after('logging_message', 200,
+                            self.schedule_logging_message)
 
 
 class DeviceListWindow(Toplevel):

@@ -1,6 +1,4 @@
 import os
-from taurus import tauruscustomsettings
-import platform
 from common.TaurusGUI_Argparse import TaurusArgparse
 from common.config import device_name_table, image_panel_config
 from common.GUI import GuiBase
@@ -8,7 +6,7 @@ from common.GUI import GuiBase
 
 def create_app():
     parser = TaurusArgparse(
-        description='GUI for Basler camera', device_default='test/basler/test', nargs_string='+', polling_default=1500)
+        description='GUI for Basler camera', device_default='test/basler/test', nargs_string='+', polling_default=3000)
     args = parser.parse_args()
 
     if 'combination' in args.device[0]:

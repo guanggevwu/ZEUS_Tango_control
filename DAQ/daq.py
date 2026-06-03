@@ -1,3 +1,10 @@
+import tracemalloc
+import queue
+from playsound3 import playsound
+import csv
+from threading import Thread
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 import tango
 import numpy as np
 from datetime import datetime
@@ -9,10 +16,6 @@ import json
 from collections import defaultdict
 import platform
 import shutil
-import matplotlib.pyplot as plt
-from threading import Thread
-import csv
-from playsound3 import playsound
 
 logging.basicConfig(
     format="%(asctime)s %(message)s",
@@ -20,13 +23,14 @@ logging.basicConfig(
 
 
 class Daq:
-    def __init__(self, select_cam_list, dir='', debug=False, thread_event=None, GUI=None):
+    def __init__(self, select_cam_list, dir='', debug=False, GUI=None):
         if GUI is None:
             self.logger = logging.getLogger(__name__).info
         else:
             # call the GUI logger
             self.GUI = GUI
             self.logger = GUI.insert_to_disabled
+            self.thread_event = GUI.my_event
         # Structure of self.cam_info. The key is the full device name 'xx/xx/xx'. Each value is a dictionray.
         # The value dictionary has key-value pairs of ['device_proxy', tango.DeviceProxy()], ['user_defined_name', tango.DeviceProxy().user_defined_name], ['cam_dir', path_of_the_camera_data_folder:string], ['shot_number', shot_number:int]['images_to_stitch', images_to_stitch_dict:dictionary]
         # images_to_stitch_dict has key-value pairs of format [shot_number:string, image_to_stitch]. shot_number:string is "background", "shot1"... image_to_stitch is the adjust numpy image array.
@@ -42,8 +46,6 @@ class Daq:
         else:
             self.path_list = [self.dir]
         self.select_cam_list = select_cam_list
-        self.thread_event = thread_event
-        Yes_for_all = False
         if not len(select_cam_list):
             raise Exception("Please select cameras!")
         for c in select_cam_list:
@@ -67,7 +69,10 @@ class Daq:
             except Exception as e:
                 raise Exception(f"Error. {e}")
         self.debug = debug
-        # atexit.register(self.termination)
+        self.snapshot = None
+        if self.debug:
+            tracemalloc.start()
+            self.snapshot = tracemalloc.take_snapshot()
 
     def set_camera_configuration(self, grab_number=None, config_dict=None, load_json=True, saving=True):
         # list of user defined names of the cameras
@@ -168,33 +173,6 @@ class Daq:
             data_array = image.astype(f'uint{bits}')
         return data_PIL, data_array
 
-    def set_acquisition_start_mode(self):
-        '''Use AcquisitionStart mode to acquire a set of image from just one trigger
-        '''
-        for c, info in self.cam_info.items():
-            bs = info['device_proxy']
-            # trigger_selector not applicable for one of the cameras. need fix it.
-            bs.trigger_selector = "AcquisitionStart"
-            bs.frames_per_trigger = 1
-            bs.repetition = self.shots
-
-    def test_mode(self):
-        """
-        test the camera using software trigger
-        """
-        for c, info in self.cam_info.items():
-            if info['device_proxy'].info().dev_class.lower() in ['basler', 'vimba']:
-                info['device_proxy'].trigger_source = "software"
-
-    def simulate_send_software_trigger(self, interval, shots=1):
-        for i in range(shots):
-            for c in self.cam_info:
-                bs = self.cam_info[c]['device_proxy']
-                if bs.trigger_source.lower() == "software":
-                    bs.send_software_trigger()
-            time.sleep(interval)
-            logging.info(f"trigger {i} sent!")
-
     def acquisition(self, stitch=True, shot_start=1, shot_end=float('inf'), scan_table=None):
         '''
         Main acquisition function. Use external trigger and save data.
@@ -238,19 +216,57 @@ class Daq:
             self.logger(
                 f'Bandwidth and resulting fps: {resulting_fps_dict}. Triggering rate is limited by the slowest camera.')
         threads = []
+        # thread verison 1.4s vs synchronous version 1.8s in a test with 7 cameras.
         for c, info in self.cam_info.items():
-            t = Thread(target=self.thread_acquire_data, args=[
-                       info, stitch, shot_end,], daemon=True)
-            threads.append(t)
-            t.start()
+            acquire_thread = Thread(target=self.thread_acquire_data, args=[
+                info, stitch, shot_end,], daemon=True)
+            threads.append(acquire_thread)
+            acquire_thread.start()
+            info["saving_queue"] = queue.Queue()
+            saving_thread = Thread(target=self.thread_saving_for_one_camera, args=(
+                info,), daemon=True)
+            threads.append(saving_thread)
+            saving_thread.start()
         t_shot_completion = Thread(target=self.thread_stitch_and_go_to_next_scan_point, args=[
                                    stitch, scan_table], daemon=True)
         threads.append(t_shot_completion)
         t_shot_completion.start()
+        self.saving_stitching_queue = queue.Queue()
+        stitching_thread = Thread(
+            target=self.thread_stitch_images, args=(), daemon=True)
+        threads.append(stitching_thread)
+        stitching_thread.start()
         self.logger('Waiting for a trigger...', 'blue_text')
         for t in threads:
             t.join()
+        self.logger('Acquisition completed.', 'blue_text')
         # acquisition
+
+    def thread_saving_for_one_camera(self, info):
+        while not self.thread_event.is_set():
+            try:
+                item = info["saving_queue"].get(timeout=1)
+            except queue.Empty:
+                continue
+            operation, data, save_path, message = item
+            if operation == "saving_image":
+                try:
+                    data.save(save_path)
+                    self.logger(message)
+                    if self.GUI.options['save_copy']:
+                        data.save(save_path.replace(
+                            self.dir, self.hidden_dir, 1))
+                except Exception as e:
+                    self.logger(f"Error saving file: {e}", 'red_text')
+            else:
+                try:
+                    shutil.copy(data, save_path)
+                    self.logger(message)
+                    if self.GUI.options['save_copy']:
+                        shutil.copy(data, save_path.replace(
+                            self.dir, self.hidden_dir, 1))
+                except Exception as e:
+                    self.logger(f"Error copying file: {e}", 'red_text')
 
     def thread_acquire_data(self, info, stitch, shot_end,):
         try:
@@ -287,8 +303,8 @@ class Daq:
                         #     f"It takes {datetime.now()-t0} to acquire {info['user_defined_name']} {info['shot_num']}.")
                         save_path = os.path.join(info['cam_dir'], file_name)
                         message = f"Shot {info['shot_num']} for {info['user_defined_name']} {data.size} is saved."
-                        Thread(target=self.thread_saving,
-                               args=(data, save_path, message)).start()
+                        info["saving_queue"].put(
+                            ("saving_image", data, save_path, message))
                         add_number = 1
                         # For scope, it saves multiple files per shot. stitch_local set to True only every bs.files_per_shot.
                         stitch_local = True
@@ -300,8 +316,8 @@ class Daq:
                         destination_path = os.path.join(
                             info['cam_dir'], file_name)
                         message = f"Shot {info['shot_num']} for {info['user_defined_name']} is saved."
-                        Thread(target=self.thread_copy, args=(
-                            source_path, destination_path, message)).start()
+                        info["saving_queue"].put(
+                            ("copy_file", source_path, destination_path, message))
                         xy_reader_count += 1
                         if xy_reader_count == bs.files_per_shot:
                             data_array = self.save_plot_data(bs.x, bs.y)
@@ -324,6 +340,23 @@ class Daq:
             self.logger(
                 f'Error in {info["user_defined_name"]} "thread_acquire_data" thread: {e}', 'red_text')
 
+    def thread_stitch_images(self):
+        try:
+            while not self.thread_event.is_set():
+                try:
+                    shot_name = self.saving_stitching_queue.get(timeout=1)
+                except queue.Empty:
+                    continue
+                self.stitch_images(shot_name)
+                if self.debug and self.snapshot is not None:
+                    tmp = tracemalloc.take_snapshot()
+                    top_stats = tmp.compare_to(self.snapshot, 'lineno')
+                    for stat in top_stats[:5]:
+                        self.logger(stat)
+                    self.snapshot = tmp
+        except Exception as e:
+            self.logger(f'Error in stitching thread: {e}', 'red_text')
+
     def thread_stitch_and_go_to_next_scan_point(self, stitch, scan_table):
         while True:
             if self.thread_event is not None and self.thread_event.is_set():
@@ -332,20 +365,32 @@ class Daq:
             # t0 = datetime.now()
             # check if all cameras have a new shot
             if all([i['shot_num'] > self.current_shot_for_all_cam for i in self.cam_info.values()]):
-                if stitch:
-                    Thread(target=self.stitch_images, args=(f'shot{self.current_shot_for_all_cam}',)).start()
-                self.current_shot_for_all_cam += 1
+                # task 4. Announce the shot completion and play sound.
                 self.logger(
-                    f"Shot {self.current_shot_for_all_cam-1} is completed.", 'blue_text')
+                    f"Shot {self.current_shot_for_all_cam} is completed.", 'blue_text')
                 playsound(os.path.join(os.path.dirname(__file__), 'media',
                                        'sound', 'shot_completion_1.mp3'), block=False)
-                # send plasma mirror ready signal
-                if not self.GUI.options['use_plasma_mirror']:
-                    self.GUI.send_message_to_laser_side('TA2_ready')
-                # save scala data
-                if self.GUI.options["save_metadata"]:
-                    self.csv_header = ['shot_number', 'time']
-                    self.save_scalars(self.current_shot_for_all_cam)
+                # task 1. Add stitching image number to queue.
+                if stitch:
+                    self.saving_stitching_queue.put(
+                        f'shot{self.current_shot_for_all_cam}')
+                # task 2. Send plasma mirror ready signal.
+                try:
+                    if not self.GUI.options['use_plasma_mirror']:
+                        self.GUI.send_message_to_laser_side('TA2_ready')
+                except Exception as e:
+                    self.logger(
+                        f"Error sending TA2_ready signal to laser side: {e}", 'red_text')
+                # task 3. Save metadata.
+                try:
+                    if self.GUI.options["save_metadata"]:
+                        self.csv_header = ['shot_number', 'time']
+                        self.save_scalars(self.current_shot_for_all_cam)
+                except Exception as e:
+                    self.logger(f"Error saving scalars: {e}", 'red_text')
+                # task 5. Add 1 to shot number.
+                self.current_shot_for_all_cam += 1
+                # task 6. Update scan values and go to scan location.
                 if self.GUI.options["scan"]:
                     if hasattr(self.GUI, "scan_window") and self.GUI.scan_window.winfo_exists():
                         self.GUI.root.event_generate(
@@ -439,7 +484,7 @@ class Daq:
                 if (not current_header) or (current_header.strip() != ','.join(self.csv_header)):
                     writer.writeheader()
                     csvfile.seek(0, os.SEEK_END)
-                data_to_write = {'shot_number': shot_number-1,
+                data_to_write = {'shot_number': shot_number,
                                  'time': datetime.now().strftime("%Y-%m-%d_%H:%M:%S.%f")}
                 other_data = {}
                 data_type_map = {1: bool, 8: str}
@@ -453,25 +498,6 @@ class Daq:
                 data_to_write.update(other_data)
                 writer.writerow(data_to_write)
         self.logger(f'Write scalars: {other_data}')
-
-    def thread_saving(self, data, save_path, message):
-        try:
-            data.save(save_path)
-            self.logger(message)
-            if self.GUI.options['save_copy']:
-                data.save(save_path.replace(self.dir, self.hidden_dir, 1))
-        except Exception as e:
-            self.logger(f"Error saving file: {e}", 'red_text')
-
-    def thread_copy(self, source_path, destination_path, message):
-        try:
-            shutil.copy(source_path, destination_path)
-            self.logger(message)
-            if self.GUI.options['save_copy']:
-                shutil.copy(source_path, destination_path.replace(
-                    self.dir, self.hidden_dir, 1))
-        except Exception as e:
-            self.logger(f"Error copying file: {e}", 'red_text')
 
     def get_image_stretch_limits(self, input, tol=0.01):
         """
@@ -489,6 +515,7 @@ class Daq:
         '''stitch images and add camera name text
         The image_name is usually "background" or "shot1", "shot2"...
         '''
+        fig = None
         try:
             if not hasattr(self, 'col'):
                 layout = {(1, 2): 1, (2, 5): 2, (5, 10): 3, (10, 17): 4}
@@ -498,8 +525,9 @@ class Daq:
                         self.row = int(len(self.cam_info)/self.col) + \
                             bool(len(self.cam_info) % self.col)
                         break
-            fig, ax = plt.subplots(
-                self.row, self.col, figsize=(self.col*5, self.row*5))
+            fig = Figure(figsize=(self.col*5, self.row*5))
+            FigureCanvasAgg(fig)
+            ax = fig.subplots(self.row, self.col)
             ax = ax.flatten() if len(self.cam_info) > 1 else [ax]
             for i in range(len(ax)):
                 ax[i].axis('off')
@@ -515,28 +543,32 @@ class Daq:
                 del info['images_to_stitch'][image_name]
             fig.suptitle(
                 f'{self.dir.split(os.sep)[-1]}/{image_name} at {datetime.now().replace(microsecond=0)}', fontsize=16)
-            plt.tight_layout()
+            fig.tight_layout()
             stitch_save_path = os.path.join(
                 self.dir, 'stitching', f'{image_name}_{datetime.now().strftime("%H%M%S.%f")}.tiff')
-            plt.savefig(stitch_save_path, bbox_inches='tight')
+            fig.savefig(stitch_save_path, bbox_inches='tight')
             message = f"Shot {image_name.replace('shot', '')} for stitching is saved."
             self.logger(message)
             if self.GUI.options['save_copy']:
-                plt.savefig(stitch_save_path.replace(
+                fig.savefig(stitch_save_path.replace(
                     self.dir, self.hidden_dir, 1), bbox_inches='tight')
-            plt.close()
         except Exception as e:
             self.logger(f"Error saving stitch image: {e}", 'red_text')
+        finally:
+            if fig is not None:
+                fig.clear()
 
     def save_plot_data(self, x, y):
-        fig, ax = plt.subplots(1, 1)
+        fig = Figure()
+        canvas = FigureCanvasAgg(fig)
+        ax = fig.add_subplot(111)
         ax.plot(x, y)
-        # If we haven't already shown or saved the plot, then we need to
-        # draw the figure first...
-        fig.canvas.draw()
-        data = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
-        data = data.reshape(fig.canvas.get_width_height()[::-1] + (4,))
-        return data[:, :, 0]
+        canvas.draw()
+        data = np.frombuffer(canvas.buffer_rgba(), dtype=np.uint8)
+        data = data.reshape(canvas.get_width_height()[::-1] + (4,))
+        result = data[:, :, 0].copy()
+        fig.clear()
+        return result
 
     def __del__(self):
         logging.info("destroying Daq() in daq.py")
