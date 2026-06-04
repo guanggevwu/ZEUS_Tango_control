@@ -5,6 +5,7 @@ import functools
 import logging
 import os
 import platform
+import threading
 import sys
 from typing import Any
 
@@ -63,7 +64,10 @@ class NewPortXPS(Device):
         self.set_state(DevState.INIT)
 
         self._xps = None
-        self._socket_id = None
+        self._socket_id_read = None
+        self._socket_id_write = None
+        self._axis_write_sockets: dict[int, int] = {}
+        self._axis_abort_sockets: dict[int, int] = {}
         self._message = ""
         self._error_message = ""
         self._raw_command_return = ""
@@ -74,6 +78,7 @@ class NewPortXPS(Device):
         self._position_offset: dict[int, float] = {}
         self._axis_steps: dict[int, float] = {}
         self._axis_status: dict[int, bool] = {}
+        self._axis_motion_threads: dict[int, threading.Thread] = {}
 
         try:
             self._setup_axes()
@@ -88,8 +93,16 @@ class NewPortXPS(Device):
 
     def delete_device(self):
         try:
-            if self._xps is not None and self._socket_id is not None:
-                self._xps.TCP_CloseSocket(self._socket_id)
+            if self._xps is not None:
+                socket_ids = set(self._axis_write_sockets.values())
+                socket_ids.update(self._axis_abort_sockets.values())
+                if self._socket_id_read is not None:
+                    socket_ids.add(self._socket_id_read)
+                if self._socket_id_write is not None:
+                    socket_ids.add(self._socket_id_write)
+
+                for socket_id in socket_ids:
+                    self._xps.TCP_CloseSocket(socket_id)
         except Exception:
             pass
 
@@ -135,14 +148,54 @@ class NewPortXPS(Device):
 
         self.logger.info(f"Trying to connect to XPS at {self.ip}:{self.port}")
         self._xps = XPS()
-        self._socket_id = self._xps.TCP_ConnectToServer(
-            self.ip, self.port, self.timeout)
-        if self._socket_id is None or self._socket_id < 0:
+        self._socket_id_read = self._connect_socket("read")
+        if self._socket_id_read is None or self._socket_id_read < 0:
             raise RuntimeError(
-                "TCP_ConnectToServer returned invalid socket id")
+                "TCP_ConnectToServer returned invalid read socket id"
+            )
+
+        self._socket_id_write = self._connect_socket("default write")
+        if self._socket_id_write is None or self._socket_id_write < 0:
+            raise RuntimeError(
+                "TCP_ConnectToServer returned invalid write socket id"
+            )
+
+        for axis in self.axis:
+            self._axis_write_sockets[axis] = self._connect_socket(
+                f"axis {axis} write")
+            self._axis_abort_sockets[axis] = self._connect_socket(
+                f"axis {axis} abort")
 
         if hasattr(self._xps, "Login"):
+            self._call_xps(
+                "Login", self.username, self.password, use_read_socket=True
+            )
             self._call_xps("Login", self.username, self.password)
+            for axis in self.axis:
+                self._call_xps(
+                    "Login",
+                    self.username,
+                    self.password,
+                    socket_id=self._axis_write_sockets[axis],
+                )
+                self._call_xps(
+                    "Login",
+                    self.username,
+                    self.password,
+                    socket_id=self._axis_abort_sockets[axis],
+                )
+
+    def _connect_socket(self, socket_name: str) -> int:
+        if self._xps is None:
+            raise RuntimeError("XPS connection is not initialized")
+
+        socket_id = self._xps.TCP_ConnectToServer(
+            self.ip, self.port, self.timeout)
+        if socket_id is None or socket_id < 0:
+            raise RuntimeError(
+                f"TCP_ConnectToServer returned invalid {socket_name} socket id"
+            )
+        return socket_id
 
     def _initialize_internal_state(self):
         for axis in self.axis:
@@ -180,15 +233,21 @@ class NewPortXPS(Device):
         # Some driver methods may return a string payload directly.
         return 0, result
 
-    def _error_string(self, err_code: int) -> str:
-        if self._xps is None or self._socket_id is None:
+    def _error_string(self, err_code: int, socket_id: int | None = None) -> str:
+        if self._xps is None:
             return f"XPS error {err_code}"
         if not hasattr(self._xps, "ErrorStringGet"):
             return f"XPS error {err_code}"
 
+        sid = socket_id
+        if sid is None:
+            sid = self._socket_id_write if self._socket_id_write is not None else self._socket_id_read
+        if sid is None:
+            return f"XPS error {err_code}"
+
         try:
             err, payload = self._extract_error_and_payload(
-                self._xps.ErrorStringGet(self._socket_id, err_code)
+                self._xps.ErrorStringGet(sid, err_code)
             )
             if err == 0 and payload is not None:
                 return str(payload)
@@ -196,24 +255,36 @@ class NewPortXPS(Device):
             pass
         return f"XPS error {err_code}"
 
-    def _call_xps(self, method_name: str, *args):
-        if self._xps is None or self._socket_id is None:
+    def _call_xps(
+        self,
+        method_name: str,
+        *args,
+        use_read_socket: bool = False,
+        socket_id: int | None = None,
+    ):
+        if self._xps is None:
             raise RuntimeError("XPS connection is not initialized")
+
+        selected_socket_id = socket_id
+        if selected_socket_id is None:
+            selected_socket_id = self._socket_id_read if use_read_socket else self._socket_id_write
+        if selected_socket_id is None:
+            raise RuntimeError("XPS socket is not initialized")
+
         if not hasattr(self._xps, method_name):
             raise RuntimeError(f"XPS driver method not found: {method_name}")
 
         method = getattr(self._xps, method_name)
-        result = method(self._socket_id, *args)
+        result = method(selected_socket_id, *args)
         err, payload = self._extract_error_and_payload(result)
         if err != 0:
-            err_text = self._error_string(err)
+            err_text = self._error_string(err, selected_socket_id)
             self._error_message = f"{self._now()} {err_text}"
-            raise RuntimeError(f"{method_name} failed: {err_text}")
         return payload
 
     def _read_axis_controller_position(self, axis: int) -> float:
         pos = self._call_xps("GroupPositionCurrentGet",
-                             self.positioners[axis], 1)
+                             self.positioners[axis], 1, use_read_socket=True)
         if isinstance(pos, list):
             if len(pos) == 0:
                 return 0.0
@@ -226,22 +297,44 @@ class NewPortXPS(Device):
         controller_pos = self._read_axis_controller_position(axis)
         return controller_pos + self._position_offset[axis]
 
-    def _move_group_absolute_controller(self, controller_targets: list[float]):
-        self._call_xps("GroupMoveAbsolute",
-                       self.group_name, controller_targets)
+    def _axis_group_name(self, axis: int) -> str:
+        return self.positioners[axis].split(".", 1)[0]
 
-    def _move_group_relative_controller(self, controller_delta: list[float]):
-        self._call_xps("GroupMoveRelative", self.group_name, controller_delta)
+    def _start_axis_motion(self, axis: int, command_name: str, controller_value: float):
+        running_thread = self._axis_motion_threads.get(axis)
+        if running_thread is not None and running_thread.is_alive():
+            raise RuntimeError(f"Axis {axis} is already moving")
+
+        positioner_name = self.positioners[axis]
+        command_value = float(controller_value)
+
+        def _motion_worker():
+            try:
+                self._call_xps(
+                    command_name,
+                    positioner_name,
+                    [command_value],
+                    socket_id=self._axis_write_sockets[axis],
+                )
+            except Exception as exc:
+                self._message = f"Axis {axis} motion failed: {exc}"
+                self.logger.info(self._message)
+
+        motion_thread = threading.Thread(
+            target=_motion_worker,
+            name=f"xps-axis-{axis}-{command_name}",
+            daemon=True,
+        )
+        self._axis_motion_threads[axis] = motion_thread
+        motion_thread.start()
+
+    def _move_group_relative_controller(self, axis: int, controller_delta: float):
+        self._start_axis_motion(axis, "GroupMoveRelative", controller_delta)
 
     @clear_error_wrap
     def _write_axis_position(self, axis: int, user_target: float):
-        controller_targets = []
-        for a in self.axis:
-            ctrl = self._read_axis_controller_position(a)
-            if a == axis:
-                ctrl = float(user_target) - self._position_offset[a]
-            controller_targets.append(ctrl)
-        self._move_group_absolute_controller(controller_targets)
+        controller_target = float(user_target) - self._position_offset[axis]
+        self._start_axis_motion(axis, "GroupMoveAbsolute", controller_target)
         setattr(self, f"_ax{axis}_position", float(user_target))
 
     @clear_error_wrap
@@ -442,12 +535,13 @@ class NewPortXPS(Device):
     def create_read_status_function(self, axis):
         def read_status(self, attr):
             status_value = self._axis_status.get(axis, True)
-            if hasattr(self._xps, "GroupStatusGet"):
-                try:
-                    self._call_xps("GroupStatusGet", self.group_name)
-                    status_value = True
-                except Exception:
-                    status_value = False
+            try:
+                status_code = int(self._call_xps(
+                    "GroupStatusGet", self._axis_group_name(axis), use_read_socket=True)
+                )
+                status_value = 10 <= status_code <= 18
+            except Exception:
+                status_value = False
             self._axis_status[axis] = status_value
             return status_value
 
@@ -457,13 +551,28 @@ class NewPortXPS(Device):
         def write_status(self, attr):
             value = attr.get_write_value() if hasattr(
                 attr, "get_write_value") else bool(attr)
-            self._axis_status[axis] = bool(value)
+            # self._axis_status[axis] = bool(value)
             if value:
-                if hasattr(self._xps, "GroupInitialize"):
-                    self._call_xps("GroupInitialize", self.group_name)
+                status_code = -1
+                try:
+                    status_code = int(self._call_xps(
+                        "GroupStatusGet", self._axis_group_name(axis), use_read_socket=True
+                    ))
+                except Exception:
+                    status_code = -1
+
+                if 0 <= status_code <= 9:
+                    self._call_xps(
+                        "GroupInitialize", self._axis_group_name(axis)
+                    )
+                elif 20 <= status_code <= 38:
+                    self._call_xps(
+                        "GroupMotionEnable", self._axis_group_name(axis)
+                    )
             else:
-                if hasattr(self._xps, "GroupKill"):
-                    self._call_xps("GroupKill", self.group_name)
+                if self._axis_status[axis]:
+                    self._call_xps("GroupMotionDisable",
+                                   self._axis_group_name(axis))
 
         return write_status
 
@@ -567,39 +676,41 @@ class NewPortXPS(Device):
     def write_raw_command(self, value):
         if value == "":
             return
-        if self._xps is None or self._socket_id is None:
+        if self._xps is None or self._socket_id_write is None:
             raise RuntimeError("XPS connection is not initialized")
         if not hasattr(self._xps, "Send"):
             raise RuntimeError("XPS driver does not provide Send()")
-        result = self._xps.Send(self._socket_id, value)
+        result = self._xps.Send(self._socket_id_write, value)
         self._raw_command_return = str(result)
         self._message = f"RAW: {value}"
 
     @command()
     def stop(self):
-        if hasattr(self._xps, "GroupMoveAbort"):
-            self._call_xps("GroupMoveAbort", self.group_name)
+        for axis in self.axis:
+            try:
+                self._call_xps(
+                    "GroupMoveAbort",
+                    self._axis_group_name(axis),
+                    socket_id=self._axis_abort_sockets[axis],
+                )
+                self.logger.info(f"Stopped axis {axis}")
+            except Exception as exc:
+                pass
         self._message = "Motion stopped"
 
     @clear_error_wrap
     def move_to_negative_limit(self, axis):
         if axis not in self.axis:
             raise ValueError(f"Axis {axis} is not configured")
-        delta = [0.0 for _ in self.axis]
-        idx = self.axis.index(axis)
         search_distance = float(getattr(self, "limit_search_distance", 1000.0))
-        delta[idx] = -abs(search_distance)
-        self._move_group_relative_controller(delta)
+        self._move_group_relative_controller(axis, -abs(search_distance))
 
     @clear_error_wrap
     def move_to_positive_limit(self, axis):
         if axis not in self.axis:
             raise ValueError(f"Axis {axis} is not configured")
-        delta = [0.0 for _ in self.axis]
-        idx = self.axis.index(axis)
         search_distance = float(getattr(self, "limit_search_distance", 1000.0))
-        delta[idx] = abs(search_distance)
-        self._move_group_relative_controller(delta)
+        self._move_group_relative_controller(axis, abs(search_distance))
 
     @command(dtype_in=int)
     def set_as_zero(self, axis):
