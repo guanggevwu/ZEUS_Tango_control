@@ -343,29 +343,7 @@ class ESP301(Device):
                 except Exception as e:
                     print(f"Error adding attributes for axis {axis}: {e}")
 
-        # only for a special case
-        ax12_distance = attribute(
-            name="ax12_distance",
-            label="ax12 distance",
-            dtype=float,
-            unit=self._axis1_unit,
-            format='6.3f',
-            access=AttrWriteType.READ,
-            doc='ax12_distance = ax1_position - ax2_position. I.e., distance between ax1 and ax2.',
 
-        )
-
-        ax12_step = attribute(
-            name="ax12_step",
-            label="ax12 step",
-            dtype=float,
-            unit=self._axis1_unit,
-            format='6.3f',
-            memorized=True,
-            hw_memorized=True,
-            access=AttrWriteType.READ_WRITE,
-            doc='steps for axis 1 and axis 2 are the same, so this attribute is used for both axes.',
-        )
 
         if hasattr(self, "extra_script"):
             if self.extra_script == "turning_box_3":
@@ -378,6 +356,29 @@ class ESP301(Device):
                 self.add_command(cmd_reset_to_TA1)
                 self.remove_attribute("current_location")
             if self.extra_script == "grating":
+                # only for a special case
+                ax12_distance = attribute(
+                    name="ax12_distance",
+                    label="ax12 distance",
+                    dtype=float,
+                    unit=self._axis1_unit,
+                    format='6.3f',
+                    access=AttrWriteType.READ,
+                    doc='ax12_distance = ax1_position - ax2_position. I.e., distance between ax1 and ax2.',
+
+                )
+
+                ax12_step = attribute(
+                    name="ax12_step",
+                    label="ax12 step",
+                    dtype=float,
+                    unit=self._axis1_unit,
+                    format='6.3f',
+                    memorized=True,
+                    hw_memorized=True,
+                    access=AttrWriteType.READ_WRITE,
+                    doc='steps for axis 1 and axis 2 are the same, so this attribute is used for both axes.',
+                )
                 self.add_attribute(ax12_distance)
                 self.add_attribute(ax12_step)
 
