@@ -16,6 +16,7 @@ import json
 from collections import defaultdict
 import platform
 import shutil
+from constants import SHOT_NUMBER_INCONSISTENCY_THRESHOLD
 
 logging.basicConfig(
     format="%(asctime)s %(message)s",
@@ -177,6 +178,7 @@ class Daq:
         '''
         Main acquisition function. Use external trigger and save data.
         '''
+        self.shot_number_warning_shown = False
         self.current_shot_for_all_cam = shot_start
         # set scan value
         # self.scan_attr_proxies is a dictionary. Its key is a string device/attr and its value is the attribute proxy
@@ -221,21 +223,22 @@ class Daq:
             acquire_thread = Thread(target=self.thread_acquire_data, args=[
                 info, stitch, shot_end,], daemon=True)
             threads.append(acquire_thread)
-            acquire_thread.start()
             info["saving_queue"] = queue.Queue()
             saving_thread = Thread(target=self.thread_saving_for_one_camera, args=(
                 info,), daemon=True)
             threads.append(saving_thread)
-            saving_thread.start()
         t_shot_completion = Thread(target=self.thread_stitch_and_go_to_next_scan_point, args=[
                                    stitch, scan_table], daemon=True)
         threads.append(t_shot_completion)
-        t_shot_completion.start()
         self.saving_stitching_queue = queue.Queue()
         stitching_thread = Thread(
             target=self.thread_stitch_images, args=(), daemon=True)
         threads.append(stitching_thread)
-        stitching_thread.start()
+        check_shot_number_consistency_thread = Thread(
+            target=self.check_shot_number_consistency, args=(), daemon=True)
+        threads.append(check_shot_number_consistency_thread)
+        for t in threads:
+            t.start()
         self.logger('Waiting for a trigger...', 'blue_text')
         for t in threads:
             t.join()
@@ -357,6 +360,35 @@ class Daq:
         except Exception as e:
             self.logger(f'Error in stitching thread: {e}', 'red_text')
 
+    def check_shot_number_consistency(self):
+        consecutive_inconsistency_count = 0
+        while self.thread_event is None or not self.thread_event.is_set():
+            shot_number_dict = {
+                info['user_defined_name']: info.get('shot_num', None)
+                for info in self.cam_info.values()
+            }
+            valid_shot_numbers = [
+                value for value in shot_number_dict.values() if value is not None]
+            is_consistent = len(valid_shot_numbers) <= 1 or len(
+                set(valid_shot_numbers)) == 1
+            if is_consistent:
+                consecutive_inconsistency_count = 0
+            else:
+                consecutive_inconsistency_count += 1
+                if consecutive_inconsistency_count >= SHOT_NUMBER_INCONSISTENCY_THRESHOLD and not self.shot_number_warning_shown:
+                    camera_status_message = '\n'.join(
+                        [f'{name}: {shot_number}' for name,
+                            shot_number in shot_number_dict.items()]
+                    )
+                    warning_message = (
+                        'Potential shot number inconsistency was detected.\n\n'
+                        f'Current shot numbers:\n{camera_status_message}\n\n'
+                        'Please fix the mismatch and then restart the acquisition. '
+                    )
+                    self.logger(warning_message, 'red_text')
+                    self.shot_number_warning_shown = True
+            time.sleep(1)
+
     def thread_stitch_and_go_to_next_scan_point(self, stitch, scan_table):
         while True:
             if self.thread_event is not None and self.thread_event.is_set():
@@ -475,28 +507,50 @@ class Daq:
                 f'Shot {shot_number}. {attr_proxy.get_device_proxy().dev_name().split("/")[-1]}/{attr_proxy.name()}: empty scan value. It was {attr_proxy.read().value} {attr_proxy.get_config().unit}.')
 
     def save_scalars(self, shot_number,):
-        self.csv_header.extend(self.scalars.keys())
+        # Create mapping from attribute name to attribute label for CSV header
+        # and maintain list to handle duplicate labels
+        key_to_label_map = {}
+        csv_header_labels = []
+        for key, value in self.scalars.items():
+            device_name = key.rsplit('/', 1)[0]
+            label = value.get_config().label
+            label_key = f"{device_name}/{label}"
+            key_to_label_map[key] = label_key
+            csv_header_labels.append(label_key)
+
+        # Build complete header with shot_number and time
+        full_header = ['shot_number', 'time'] + csv_header_labels
+        expected_header = ','.join(full_header)
+
+        data_type_map = {1: bool, 8: str}
         for p in self.path_list:
             with open(os.path.join(p, 'scalars.csv'), 'a+', newline='') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=self.csv_header)
                 csvfile.seek(0)
-                current_header = csvfile.readline()
-                if (not current_header) or (current_header.strip() != ','.join(self.csv_header)):
-                    writer.writeheader()
+                current_header = csvfile.readline().strip()
+
+                # Write header if file is empty or if scalars selection changed
+                if not current_header or current_header != expected_header:
                     csvfile.seek(0, os.SEEK_END)
-                data_to_write = {'shot_number': shot_number,
-                                 'time': datetime.now().strftime("%Y-%m-%d_%H:%M:%S.%f")}
+                    csvfile.write(expected_header + '\n')
+
+                # Prepare data row in the same order as current header
+                row_data = [shot_number, datetime.now().strftime(
+                    "%Y-%m-%d_%H:%M:%S.%f")]
                 other_data = {}
-                data_type_map = {1: bool, 8: str}
+
                 for key, value in self.scalars.items():
                     if value.get_config().data_type in data_type_map:
                         scalar_str = value.read().value
                     else:
                         scalar_str = f'{float(value.read().value): .6g}'
-                    other_data.update(
-                        {key: f'{scalar_str}{value.get_config().unit}'})
-                data_to_write.update(other_data)
-                writer.writerow(data_to_write)
+                    formatted_value = f'{scalar_str}{value.get_config().unit}'
+                    row_data.append(formatted_value)
+                    other_data[key_to_label_map[key]] = formatted_value
+
+                # Write row
+                writer = csv.writer(csvfile)
+                writer.writerow(row_data)
+
         self.logger(f'Write scalars: {other_data}')
 
     def get_image_stretch_limits(self, input, tol=0.01):

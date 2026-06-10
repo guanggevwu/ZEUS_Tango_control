@@ -128,8 +128,6 @@ class DaqGUI:
         ToolTip(self.client_GUI['button'],
                 msg="Open the GUI for the selected devices. The device servers must be running.", delay=HOVER_DELAY)
 
-
-
         self.device_row, self.selected_device_per_row = 1, 4
         bandwidth_btn = ttk.Button(self.frame1, text='Bandwidth',
                                    command=self.open_bandwidth_window, style='Sty1.TButton')
@@ -598,7 +596,8 @@ class DaqGUI:
             self.insert_to_disabled("Stopped acquisition.")
         else:
             if self.frame2_checkbutton_content['save_metadata']['var'].get() and self.frame2_buttons['Metadata'].cget('style') == 'Sty3_stop_small.TButton':
-                self.insert_to_disabled('Please make sure the all the selected metadata are available and then "Start" again.', 'red_text')
+                self.insert_to_disabled(
+                    'Please make sure the all the selected metadata are available and then "Start" again.', 'red_text')
                 return
             inferred_start_shot_number = self.infer_start_shot_number(
                 self.path_var.get())
@@ -937,9 +936,18 @@ class MetadataWindow(Toplevel):
             end = min((frame_idx+1)*items_per_column,
                       len(self.savable_attributes))
             for idx, attr in enumerate(list(self.savable_attributes.keys())[start:end]):
+                # Get device name (a/b part) and construct label display text
+                device_name = attr.rsplit('/', 1)[0]
+                try:
+                    attr_proxy = AttributeProxy(attr)
+                    attr_label = attr_proxy.get_config().label
+                    display_text = f"{device_name}/{attr_label}"
+                except:
+                    display_text = attr
+
                 checkbox_var = BooleanVar(
                     value=True) if attr in self.parent.checked_savable_attributes else BooleanVar(value=False)
-                checkbox = ttk.Checkbutton(sub_frame, text=attr, command=lambda to_be_saved_attr=attr, checkbox_var=checkbox_var: self.parent.update_checked_savable_attributes(
+                checkbox = ttk.Checkbutton(sub_frame, text=display_text, command=lambda to_be_saved_attr=attr, checkbox_var=checkbox_var: self.parent.update_checked_savable_attributes(
                     to_be_saved_attr, checkbox_var), variable=checkbox_var, style='highlight.TCheckbutton')
                 checkbox.grid(
                     column=0, row=idx % items_per_column, sticky='W')

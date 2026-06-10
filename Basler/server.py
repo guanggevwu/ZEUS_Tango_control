@@ -207,6 +207,21 @@ class Basler(Device):
         memorized=is_memorized,
         doc='Bandwidth assigned to this device. For some simple cameras, this parameter is not availabe, shown as -1.'
     )
+
+    bandGevTimestampTickFrequency = attribute(
+        label="GevTimestampTickFrequency",
+        dtype=float,
+        access=AttrWriteType.READ,
+    )
+
+    def read_bandGevTimestampTickFrequency(self):
+        try:
+            self._bandGevTimestampTickFrequency = float(
+                self.camera.GetNodeMap().GetNode('GevTimestampTickFrequency').Value)
+        except:
+            self._bandGevTimestampTickFrequency = -1
+        return self._bandGevTimestampTickFrequency
+
     naming_format = attribute(
         label='naming format',
         dtype=str,
