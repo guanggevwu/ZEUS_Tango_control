@@ -7,7 +7,7 @@ device_name_table = {
     'MA2_genteceo_combination': ['laser/gentec/MA2', 'laser/gentec/MA2_north', 'laser/gentec/MA2_south'],
     "TA2_motor_combination": ["TA2/esp301/esp302_ta2_2", "TA2/esp301/esp302_ta2_1"],
     "TA1_motor_combination": ["test/esp301/esp302_ta1_2"],
-    "TA3_motor_combination": ["TA3/esp301/esp302_ta3_1", "TA3/esp301/esp302_ta3_2"]
+    "TA3_motor_combination": ["TA3/esp301/esp302_ta3_1", "TA3/esp301/esp302_ta3_2", "TA1/esp301/esp302_ta1_7"]
 }
 # For most of the combination cases , the instance name is same as the last part of the device name. For non-combination cases, the instance name is searched by class name  and thus no problem here.
 instance_exception = {"testcam_basler_combination": ["testsr"]}
@@ -27,4 +27,4 @@ image_panel_config = {
 }
 
 # "40330527" is TA3 ESPECH, "40222934" is test camera. Now the GUI will always show the MeV mark if image_with_MeV_mark attribute exists in the device server.
-basler_server_config = {"mev_mark": {"serial_number": [ "40222934"]}}
+basler_server_config = {"mev_mark": {"serial_number": ["40222934"]}}

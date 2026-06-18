@@ -78,6 +78,15 @@ class DaqGUI:
             'Helvetica', self.font_small))
         s.map("highlight.TCheckbutton",
               background=[('selected', '#5dade2'), ('!selected', 'lightgrey')])
+        # Styles for metadata window checkbuttons with availability indication
+        s.configure('highlight_available.TCheckbutton', font=(
+            'Helvetica', self.font_small), foreground='green')
+        s.map("highlight_available.TCheckbutton",
+              background=[('selected', '#5dade2'), ('!selected', 'lightgrey')])
+        s.configure('highlight_unavailable.TCheckbutton', font=(
+            'Helvetica', self.font_small), foreground='red')
+        s.map("highlight_unavailable.TCheckbutton",
+              background=[('selected', '#5dade2'), ('!selected', 'lightgrey')])
         s.configure('Sty2_offline.TButton', font=(
             'Helvetica', self.font_mid), background='#85929e')
         s.configure('Sty2_offline_text_small.TButton', font=(
@@ -918,7 +927,7 @@ class MetadataWindow(Toplevel):
         self.title("Metadata Module")
         self.parent = parent
         items_per_column = 20
-        ttk.Button(self, text='Validate', command=lambda: self.show_attr_value(
+        ttk.Button(self, text='See Value', command=lambda: self.show_attr_value(
             list(self.parent.checked_savable_attributes), self.parent.frame2_buttons['Metadata']), style='Sty1.TButton').grid(column=0, row=0)
         with open(os.path.join(os.path.dirname(__file__), 'list.json')) as jsonfile:
             # self.savable_attributes is a dict with key is attribute name.
@@ -926,35 +935,49 @@ class MetadataWindow(Toplevel):
                 jsonfile)['savable_attributes_list']}
             self.parent.checked_savable_attributes = [
                 i for i in self.parent.checked_savable_attributes if i in self.savable_attributes]
-        for frame_idx in range(len(self.savable_attributes)//items_per_column+1):
-            sub_frame = ttk.Labelframe(
-                self, padding="0 0 10 0", style='Sty1.TLabelframe')
-            sub_frame.grid(column=frame_idx, row=1, sticky="NW")
-            sub_frame.columnconfigure(0, weight=1)
-            sub_frame.columnconfigure(1, weight=1)
-            start = frame_idx*items_per_column
-            end = min((frame_idx+1)*items_per_column,
-                      len(self.savable_attributes))
-            for idx, attr in enumerate(list(self.savable_attributes.keys())[start:end]):
-                # Get device name (a/b part) and construct label display text
+        current_device_availability = {}
+        for idx, attr in enumerate(list(self.savable_attributes.keys())):
+            if not idx % items_per_column:
+                sub_frame = ttk.Labelframe(
+                    self, padding="0 0 10 0", style='Sty1.TLabelframe')
+                sub_frame.grid(column=idx//items_per_column,
+                               row=1, sticky="NW")
                 device_name = attr.rsplit('/', 1)[0]
+            device_name = attr.rsplit('/', 1)[0]
+            display_text = attr
+            new_device_name = '/'.join(attr.split('/')[:-1])
+            short_attr_name = attr.split('/')[-1]
+            attr_availability = False
+            # check device availability and update current_device_availability with the new device.
+            if (not current_device_availability) or (new_device_name not in current_device_availability):
                 try:
-                    attr_proxy = AttributeProxy(attr)
-                    attr_label = attr_proxy.get_config().label
-                    display_text = f"{device_name}/{attr_label}"
+                    device_proxy = tango.DeviceProxy(new_device_name)
+                    device_proxy.ping()
+                    current_device_availability = {new_device_name: True}
                 except:
-                    display_text = attr
+                    current_device_availability = {new_device_name: False}
+            # After updating current_device_availability with the new device check if a DeviceProxy is saved.
+            if current_device_availability[new_device_name]:
+                try:
+                    attr_label = device_proxy.get_attribute_config(
+                        short_attr_name).label
+                    display_text = f"{device_name}/{attr_label}"
+                    attr_availability = True
+                except:
+                    pass
 
-                checkbox_var = BooleanVar(
-                    value=True) if attr in self.parent.checked_savable_attributes else BooleanVar(value=False)
-                checkbox = ttk.Checkbutton(sub_frame, text=display_text, command=lambda to_be_saved_attr=attr, checkbox_var=checkbox_var: self.parent.update_checked_savable_attributes(
-                    to_be_saved_attr, checkbox_var), variable=checkbox_var, style='highlight.TCheckbutton')
-                checkbox.grid(
-                    column=0, row=idx % items_per_column, sticky='W')
-                self.savable_attributes[attr]['label'] = ttk.Label(
-                    sub_frame, text='', foreground="black")
-                self.savable_attributes[attr]['label'].grid(
-                    column=1, row=idx % items_per_column, sticky='E')
+            checkbox_var = BooleanVar(
+                value=True) if attr in self.parent.checked_savable_attributes else BooleanVar(value=False)
+            # Choose style based on attribute availability
+            checkbox_style = 'highlight_available.TCheckbutton' if attr_availability else 'highlight_unavailable.TCheckbutton'
+            checkbox = ttk.Checkbutton(sub_frame, text=display_text, command=lambda to_be_saved_attr=attr, checkbox_var=checkbox_var: self.parent.update_checked_savable_attributes(
+                to_be_saved_attr, checkbox_var), variable=checkbox_var, style=checkbox_style)
+            checkbox.grid(
+                column=0, row=idx % items_per_column, sticky='W')
+            self.savable_attributes[attr]['label'] = ttk.Label(
+                sub_frame, text='', foreground="black")
+            self.savable_attributes[attr]['label'].grid(
+                column=1, row=idx % items_per_column, sticky='E')
 
     def show_attr_value(self, attr_string_list, metadata_button_widget=None):
         '''Button command: show the current value of the attributes'''
