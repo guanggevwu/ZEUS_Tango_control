@@ -797,18 +797,19 @@ class BandwidthWindow(Toplevel):
             column=2, row=0, sticky='W')
         ttk.Button(self.frame, text='Refresh', command=self.update_bandwidth_tree, style='Sty1.TButton').grid(
             column=3, row=0, sticky='W')
-        note1 = "1. Cameras with bandwidth shown as -1 are bandwidth-not-available. Change bandwidth for them in Pylon Viewer if their result fps is much greater than other cameras."
-        note2 = "2. Suggested allowed bandwidth for all bandwidth-available cameras is 80MB/s. Decrease it to make the acquisition more robust in a bad network environment."
-        ttk.Label(self.frame, text=note1, font=(
-            'Helvetica', int(self.parent.font_mid*0.75)), wraplength=550).grid(
-            column=0, row=1, columnspan=4, pady=(5, 5), sticky='W')
+        # note1 = "1. Cameras with bandwidth shown as -1 are bandwidth-not-available. Change bandwidth for them in Pylon Viewer if their result fps is much greater than other cameras."
+        note2 = "Suggested allowed bandwidth for all bandwidth-available cameras is 80MB/s. Decrease the number to make the acquisition more robust when triggering multiple cameras simultaneously."
+        # ttk.Label(self.frame, text=note1, font=(
+        #     'Helvetica', int(self.parent.font_mid*0.75)), wraplength=650).grid(
+        #     column=0, row=1, columnspan=4, pady=(5, 5), sticky='W')
         ttk.Label(self.frame, text=note2, font=(
-            'Helvetica', int(self.parent.font_mid*0.75)), wraplength=550).grid(
+            'Helvetica', int(self.parent.font_mid*0.75), "bold"), wraplength=650).grid(
             column=0, row=2, columnspan=4, pady=(0, 5), sticky='W')
         self.tree = ttk.Treeview(self.frame, style="normal.Treeview")
         self.tree.column("#0", width=150, anchor='center')
         self.tree.heading('#0', text='Name')
-        column_heading = ['Bandwidth', 'Resulting fps']
+        column_heading = ['Bandwidth', 'Resulting fps',
+                          'Frame transmission delay (ns)']
         self.tree['columns'] = column_heading
         self.update_bandwidth_tree()
 
@@ -816,8 +817,10 @@ class BandwidthWindow(Toplevel):
         try:
             for item in self.tree.get_children():
                 self.tree.delete(item)
-            for i in self.tree['columns']:
-                self.tree.column(i, width=150, anchor='center')
+            column_width = [150] * len(self.tree['columns'])
+            column_width[-1] = 250
+            for idx, i in enumerate(self.tree['columns']):
+                self.tree.column(i, width=column_width[idx], anchor='center')
                 self.tree.heading(i, text=i)
             self.frame_size = dict()
             for key, value in self.parent.selected_devices.items():
@@ -825,9 +828,10 @@ class BandwidthWindow(Toplevel):
                     continue
                 bandwidth = value['tango_dp'].bandwidth
                 resulting_fps = value['tango_dp'].resulting_fps
+                frame_transmission_delay = value['tango_dp'].frame_transmission_delay
                 friendly_name = value['tango_dp'].user_defined_name
                 self.tree.insert('', 'end', text=friendly_name,
-                                 values=(bandwidth, resulting_fps))
+                                 values=(bandwidth, resulting_fps, frame_transmission_delay))
                 if bandwidth < 0:
                     continue
                 self.frame_size[key] = bandwidth/resulting_fps
@@ -846,6 +850,9 @@ class BandwidthWindow(Toplevel):
         for key, value in self.frame_size.items():
             self.parent.selected_devices[key]['tango_dp'].bandwidth = self.parent.total_bandwidth / \
                 size_of_total_frames * self.frame_size[key]
+        increament = 1518
+        for idx, key in enumerate(self.parent.selected_devices.keys()):
+            self.parent.selected_devices[key]['tango_dp'].frame_transmission_delay = increament * idx
         self.update_bandwidth_tree()
         self.parent.write_to_init_file()
 

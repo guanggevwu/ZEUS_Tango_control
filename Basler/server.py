@@ -208,19 +208,35 @@ class Basler(Device):
         doc='Bandwidth assigned to this device. For some simple cameras, this parameter is not availabe, shown as -1.'
     )
 
-    bandGevTimestampTickFrequency = attribute(
-        label="GevTimestampTickFrequency",
+    frame_transmission_delay = attribute(
+        label="Frame transmission delay",
         dtype=float,
-        access=AttrWriteType.READ,
+        unit="ns",
+        access=AttrWriteType.READ_WRITE,
     )
 
-    def read_bandGevTimestampTickFrequency(self):
-        try:
-            self._bandGevTimestampTickFrequency = float(
-                self.camera.GetNodeMap().GetNode('GevTimestampTickFrequency').Value)
-        except:
-            self._bandGevTimestampTickFrequency = -1
-        return self._bandGevTimestampTickFrequency
+    def read_frame_transmission_delay(self):
+        self._frame_transmission_delay = self.camera.GevSCFTD.GetValue()
+        return self._frame_transmission_delay
+
+    def write_frame_transmission_delay(self, value):
+        self.camera.GevSCFTD.SetValue(int(value))
+        self._frame_transmission_delay = value
+
+    inner_packet_delay = attribute(
+        label="Inner packet delay",
+        dtype=float,
+        unit="ns",
+        access=AttrWriteType.READ_WRITE,
+    )
+
+    def read_inner_packet_delay(self):
+        self._inner_packet_delay = self.camera.GevSCPD.GetValue()
+        return self._inner_packet_delay
+
+    def write_inner_packet_delay(self, value):
+        self.camera.GevSCPD.SetValue(value)
+        self._inner_packet_delay = value
 
     naming_format = attribute(
         label='naming format',
@@ -414,28 +430,28 @@ class Basler(Device):
             self.logger.info(f'Reading image number: {self._image_number}')
         return self._image_number
 
+    width = attribute(
+        name="width",
+        label="width of the image",
+        dtype=int,
+        access=AttrWriteType.READ_WRITE,
+        memorized=True,
+        hw_memorized=True,
+    )
+
+    height = attribute(
+        name='height',
+        label="height of the image",
+        dtype=int,
+        access=AttrWriteType.READ_WRITE,
+        memorized=True,
+        hw_memorized=True,
+    )
+
     def initialize_dynamic_attributes(self):
         '''To dynamically add attribute. The reason is the min_value and max_value are not available until the camera is open.
         The max width of the image is determined by the camera model and the binning value. So better remove the min max value constrain.
         '''
-
-        width = attribute(
-            name="width",
-            label="width of the image",
-            dtype=int,
-            access=AttrWriteType.READ_WRITE,
-            memorized=True,
-            hw_memorized=True,
-        )
-
-        height = attribute(
-            name='height',
-            label="height of the image",
-            dtype=int,
-            access=AttrWriteType.READ_WRITE,
-            memorized=True,
-            hw_memorized=True,
-        )
 
         binning_horizontal = attribute(
             name='binning_horizontal',
@@ -494,8 +510,6 @@ class Basler(Device):
             self.add_attribute(image_with_MeV_mark)
             self._image_with_MeV_mark = np.zeros(
                 (self.camera.Height.Value, self.camera.Width.Value))
-        self.add_attribute(width)
-        self.add_attribute(height)
         self.add_attribute(trigger_source)
         # self.add_attribute("trigger_source")
         # if self.camera.DeviceModelName() in ['acA640-121gm']:
@@ -548,21 +562,21 @@ class Basler(Device):
             self.camera.GainRaw.Value = int(value)
         self._gain = value
 
-    def read_width(self, attr):
+    def read_width(self):
         self._width = self.camera.Width()
         return self._width
 
     @grabbing_wrap
-    def write_width(self, attr):
-        self.camera.Width.Value = attr.get_write_value()
+    def write_width(self, value):
+        self.camera.Width.Value = value
 
-    def read_height(self, attr):
+    def read_height(self):
         self._height = self.camera.Height()
         return self._height
 
     @grabbing_wrap
-    def write_height(self, attr):
-        self.camera.Height.Value = attr.get_write_value()
+    def write_height(self, value):
+        self.camera.Height.Value = value
 
     def read_binning_horizontal(self, attr):
         self._binning_horizontal = self.camera.BinningHorizontal()
@@ -937,18 +951,23 @@ class Basler(Device):
 
     def read_bandwidth(self):
         try:
-            self._bandwidth = float(self.camera.GetNodeMap().GetNode(
-                'DeviceLinkThroughputLimit').Value)/1e6
+            self._bandwidth = round(float(self.camera.GetNodeMap().GetNode(
+                'DeviceLinkThroughputLimit').Value)/1e6, 2)
         except:
-            self._bandwidth = -1
+            bits = ''.join(
+                [i for i in self.read_format_pixel() if i.isdigit()])
+            self._bandwidth = round(self.read_width()*self.read_height() *
+                                    self.read_resulting_fps()*int(bits)/8/1e6, 2)
         return self._bandwidth
 
     def write_bandwidth(self, value):
         try:
-            self._bandwidth = self.camera.GetNodeMap().GetNode(
+            self.camera.GetNodeMap().GetNode(
                 'DeviceLinkThroughputLimit').SetValue(int(value*1e6))
         except:
-            self._bandwidth = -1
+            self.camera.GevSCPD.SetValue(int((125/value-1)*1500))
+        finally:
+            self.read_bandwidth()
 
     def read_is_new_image(self):
         # self.i, grabbing successfully grabbed image. self._image_number, image counting and can be reset at any time.
