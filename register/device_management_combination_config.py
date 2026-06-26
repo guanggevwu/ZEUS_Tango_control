@@ -7,7 +7,8 @@ container = {
     'motion_control': {'show_name': 'Motion Control', 'class': {
         'ESP301': {'extra_devices': ['TA1_motor_combination', 'TA2_motor_combination', 'TA3_motor_combination']},
         'OwisPS': {'server_code_path': os.path.join(root_path, 'Owis', 'server.py'), 'GUI_code_path': os.path.join(root_path, 'Owis', 'GUI.py')},
-        'NewPortXPS': None
+        'NewPortXPS': None,
+        'ThorlabsKDC101': {'server_code_path': os.path.join(root_path, 'ThorlabsXA', 'server.py'), 'GUI_code_path': os.path.join(root_path, 'ThorlabsXA', 'GUI.py')},
     }},
     'delay_generator': {'show_name': 'Delay Generator', 'class': {
         'DG535': {'server_code_path': os.path.join(root_path, 'DG', 'dg535_server.py'), 'GUI_code_path': os.path.join(root_path, 'DG', 'GUI.py')},

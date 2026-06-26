@@ -75,9 +75,35 @@ class Menu:
                 os.kill(pid, signal.SIGTERM)
                 print(f'Killed {key}:{pid}')
 
+    def _call_tango_shutdown(self, instance_name):
+        try:
+            devices = self.db.get_device_name(
+                f'{self.class_name}/{instance_name}', '*'
+            )
+            for dev_name in devices.value_string:
+                # Skip admin devices (dserver)
+                if dev_name.startswith('dserver/'):
+                    continue
+                try:
+                    dp = tango.DeviceProxy(dev_name)
+                    dp.set_timeout_millis(3000)
+                    dp.command_inout('shutdown')
+                    print(f'Shutdown command sent to {dev_name}')
+                except Exception as exc:
+                    print(f'Could not call shutdown on {dev_name}: {exc}')
+        except Exception as exc:
+            print(f'Could not look up devices for {instance_name}: {exc}')
+
     def terminate(self, key):
         if self.menu_dict[key][2]:
-            for pid in [i[0] for i in self.menu_dict[key][2]]:
+            if 'server' in key:
+                for entry in self.menu_dict[key][2]:
+                    pid, instance_name = entry[0], entry[1]
+                    if psutil.pid_exists(pid):
+                        self._call_tango_shutdown(instance_name)
+                time.sleep(2)
+            for entry in self.menu_dict[key][2]:
+                pid = entry[0]
                 if psutil.pid_exists(pid):
                     os.kill(pid, signal.SIGTERM)
                     print(f'Killed {key} {pid}')

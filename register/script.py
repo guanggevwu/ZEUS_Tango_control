@@ -99,6 +99,7 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "TA1_TSP01B": {'server': 'TSP01B/TA1_TSP01B', '_class': 'TSP01B', 'name': 'TA1/TSP01B/TA1_TSP01B', 'property': {'serial_number': 'M01259104'}},
             "TA2_TSP01B": {'server': 'TSP01B/TA2_TSP01B', '_class': 'TSP01B', 'name': 'TA2/TSP01B/TA2_TSP01B', 'property': {'serial_number': 'M01259102'}},
             "TA3_TSP01B": {'server': 'TSP01B/TA3_TSP01B', '_class': 'TSP01B', 'name': 'TA3/TSP01B/TA3_TSP01B', 'property': {'serial_number': 'M01268079'}},
+            "thorlabs_controller": {'server': 'ThorlabsKDC101/ta1', '_class': 'ThorlabsKDC101', 'name': 'TA1/ThorlabsKDC101/ta1'},
             }
 
 

@@ -4,7 +4,6 @@ from taurus.external.qt import Qt
 from taurus.qt.qtgui.input import TaurusValueLineEdit
 from taurus.qt.qtgui.panel.taurusvalue import UnitLessLineEdit
 from taurus.core.units import Quantity
-import re
 from common.taurus_widget import BoolLedSwitcher
 
 
@@ -31,12 +30,8 @@ class MyMotorExtraWidget(TaurusWidget):
             return
         dev_name, attr_name = parts
 
-        match = re.match(r"^ax(\d+)_position$", attr_name, flags=re.IGNORECASE)
-        if not match:
-            return
-
-        ax_number = match.group(1)
-        self.btn.model = f"{dev_name}/ax{ax_number}_status"
+        if attr_name.lower().endswith("_position"):
+            self.btn.model = f"{dev_name}/{attr_name[:-9]}_status"
 
 
 class MyMotorWriteWidget(TaurusWidget):
@@ -159,7 +154,8 @@ def mymotor_item_factory(model):
     except Exception:
         return None
 
-    if "_position" in model.name.lower() and "ax" in model.name.lower():
+    model_name = model.name.lower()
+    if model_name.endswith("_position"):
         return MyMotorTaurusValue()
     elif dev_class == "ESP301" and model.name.lower() == "ax12_distance":
         return MyGratingTaurusValue()
