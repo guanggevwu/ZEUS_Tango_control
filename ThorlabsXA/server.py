@@ -123,11 +123,6 @@ class ThorlabsKDC101(Device):
         self._connected_product = self._safe_connected_product_name(
             self._device)
 
-    def _require_system_manager(self):
-        if self._system_manager is None:
-            raise RuntimeError("XA SystemManager is not initialized")
-        return self._system_manager
-
     def _ensure_xa_native_dll(self, script_dir: str):
         """Ensure thorlabs_xa can find tlmc_xa_native.dll after clone/install."""
         dll_name = "tlmc_xa_native.dll"
@@ -250,10 +245,9 @@ class ThorlabsKDC101(Device):
         }
 
     def _connect_kdc101(self):
-        xa = self._import_xa_modules()
-        self._xa = xa
-        self._system_manager = xa["SystemManager"].instance()
-        self._system_manager.startup(None)
+        self._xa = self._import_xa_modules()
+        self._system_manager = self._xa["SystemManager"].instance()
+        self._system_manager.startup()
         device_infos = self._select_device_info()
         self._device_infos = {info.device: info for info in device_infos}
         self._devices = {}
@@ -262,10 +256,10 @@ class ThorlabsKDC101(Device):
             device = self._system_manager.open_device_as(
                 info.device,
                 info.transport,
-                xa["TLMC_OperatingMode"].TLMC_OperatingMode_Default,
-                xa["Kdc101"],
+                self._xa["TLMC_OperatingMode"].TLMC_OperatingMode_Default,
+                self._xa["Kdc101"],
             )
-            device.set_enable_state(xa["TLMC_EnableState"].TLMC_Enabled)
+            device.set_enable_state(self._xa["TLMC_EnableState"].TLMC_Enabled)
             self._devices[info.device] = device
 
         self._connected_serials = sorted(self._devices.keys())
@@ -275,15 +269,14 @@ class ThorlabsKDC101(Device):
         self._set_active_serial(self._connected_serials[0])
 
         self._preferred_unit = self._device.get_preferred_physical_unit(
-            xa["TLMC_ScaleType"].TLMC_ScaleType_Distance
+            self._xa["TLMC_ScaleType"].TLMC_ScaleType_Distance
         )
         self._axis_unit = self._unit_to_string(self._preferred_unit)
         self._connected_product = self._safe_connected_product_name(
             self._device)
 
     def _select_device_info(self):
-        system_manager = self._require_system_manager()
-        devices = system_manager.get_device_list()
+        devices = self._system_manager.get_device_list()
         matching = [
             device for device in devices if device.part_number == "KDC101"]
 
