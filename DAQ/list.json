@@ -2,6 +2,7 @@
   "scannable_attributes": [
     "TA1/gx_regulator/TA1_regulator_1/pressure_psi",
     "TA1/gx_regulator/TA1_regulator_2/pressure_psi",
+    "TA1/gx_regulator/TA1_regulator_3/pressure_psi",
     "TA2/esp301/esp302_ta2_1/ax1_position",
     "TA2/esp301/esp302_ta2_1/ax2_position",
     "TA2/esp301/esp302_ta2_1/ax3_position",
@@ -52,6 +53,10 @@
     "TA1/owisps/ta1-owis1/ax9_position",
     "TA1/gx_regulator/TA1_regulator_1/pressure_bar",
     "TA1/gx_regulator/TA1_regulator_2/pressure_bar",
+    "TA1/gx_regulator/TA1_regulator_3/pressure_bar",
+    "TA1/gx_regulator/TA1_regulator_1/pressure_psi",
+    "TA1/gx_regulator/TA1_regulator_2/pressure_psi",
+    "TA1/gx_regulator/TA1_regulator_3/pressure_psi",
     "TA1/esp301/esp302_ta1_1/ax1_position",
     "TA1/esp301/esp302_ta1_1/ax2_position",
     "TA1/esp301/esp302_ta1_1/ax3_position",
