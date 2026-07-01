@@ -62,9 +62,9 @@ class GXRegulator(Device):
         self._pressure_psi = value
         with nidaqmx.Task() as task:
             task.ao_channels.add_ao_voltage_chan(
-                f"Dev1/ao{self.high_voltage_channel}", min_val=0, max_val=10)
+                self.high_voltage_channel, min_val=0, max_val=10)
             task.ao_channels.add_ao_voltage_chan(
-                f"Dev1/ao{self.low_voltage_channel}", min_val=0, max_val=10)
+                self.low_voltage_channel, min_val=0, max_val=10)
             # 10 V, 1000 psi.
             task.write([self._pressure_psi/1000*10, 0])
             self._read_time = datetime.datetime.now().strftime("%Y%m%d.%H:%M:%S.%f")
@@ -201,6 +201,10 @@ class GXRegulator(Device):
         self._read_time = 'N/A'
         self._use_date = False
         self._polling = 1000
+        if 'Dev' not in self.high_voltage_channel:
+            self.high_voltage_channel = 'Dev1/ao' + self.high_voltage_channel
+        if 'Dev' not in self.low_voltage_channel:
+            self.low_voltage_channel = 'Dev1/ao' + self.low_voltage_channel
         super().init_device()
         self.get_logger = logging.getLogger(self.__class__.__name__)
         self.logger = LoggerAdapter(self._user_defined_name, self.get_logger)
