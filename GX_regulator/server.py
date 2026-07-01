@@ -157,20 +157,6 @@ class GXRegulator(Device):
         self._save_path = value
         self.push_change_event("save_path", self.read_save_path())
 
-    is_debug_mode = attribute(
-        label='debug',
-        dtype=bool,
-        memorized=True,
-        hw_memorized=True,
-        access=AttrWriteType.READ_WRITE,
-    )
-
-    def read_is_debug_mode(self):
-        return self._debug
-
-    def write_is_debug_mode(self, value):
-        self._debug = value
-
     polling_period = attribute(
         label='polling interval',
         dtype=int,
@@ -195,7 +181,6 @@ class GXRegulator(Device):
         self._pressure_psi = 0
         self.psi2bar = 0.0689476
         self.path_raw = ''
-        self._debug = False
         self._save_data = False
         self._save_path = ''
         self._read_time = 'N/A'
