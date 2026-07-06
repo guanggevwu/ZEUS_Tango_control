@@ -85,6 +85,7 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "asyncio_device_1": {'server': 'AsyncioDevice/asyncio_device_1', '_class': 'AsyncioDevice', 'name': 'test/asyncio_device/asyncio_device_1'},
             "TA1_regulator_1": {'server': 'GXRegulator/TA1_regulator_1', '_class': 'GXRegulator', 'name': 'TA1/gx_regulator/TA1_regulator_1', 'property': {'high_voltage_channel': '0', 'low_voltage_channel': '1'}},
             "TA1_regulator_2": {'server': 'GXRegulator/TA1_regulator_2', '_class': 'GXRegulator', 'name': 'TA1/gx_regulator/TA1_regulator_2', 'property': {'high_voltage_channel': '2', 'low_voltage_channel': '3'}},
+            "TA1_regulator_3": {'server': 'GXRegulator/TA1_regulator_3', '_class': 'GXRegulator', 'name': 'TA1/gx_regulator/TA1_regulator_3', 'property': {'high_voltage_channel': 'Dev2/ao0', 'low_voltage_channel': 'Dev2/ao1'}},
             "TA3_regulator_1": {'server': 'GXRegulator/TA3_regulator_1', '_class': 'GXRegulator', 'name': 'TA3/gx_regulator/TA3_regulator_1', 'property': {'high_voltage_channel': '0', 'low_voltage_channel': '1'}},
             "TA3_regulator_2": {'server': 'GXRegulator/TA3_regulator_2', '_class': 'GXRegulator', 'name': 'TA3/gx_regulator/TA3_regulator_2', 'property': {'high_voltage_channel': '2', 'low_voltage_channel': '3'}},
             "labview": {'server': 'LabviewProgram/labview', '_class': 'LabviewProgram', 'name': 'laser/labview/labview_program', 'property': {'port': '61557'}},
@@ -100,6 +101,7 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "TA2_TSP01B": {'server': 'TSP01B/TA2_TSP01B', '_class': 'TSP01B', 'name': 'TA2/TSP01B/TA2_TSP01B', 'property': {'serial_number': 'M01259102'}},
             "TA3_TSP01B": {'server': 'TSP01B/TA3_TSP01B', '_class': 'TSP01B', 'name': 'TA3/TSP01B/TA3_TSP01B', 'property': {'serial_number': 'M01268079'}},
             "thorlabs_controller": {'server': 'ThorlabsKDC101/ta1', '_class': 'ThorlabsKDC101', 'name': 'TA1/ThorlabsKDC101/ta1'},
+            "publishboard": {'server': 'PublishBoard/laser_parameters', '_class': 'PublishBoard', 'name': 'Laser/PublishBoard/laser_parameters'},
             }
 
 
