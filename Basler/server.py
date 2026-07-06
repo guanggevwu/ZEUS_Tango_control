@@ -499,11 +499,14 @@ class Basler(Device):
             dtype=((np.uint16,),),
             access=AttrWriteType.READ,
         )
-
-        if self._model not in ['a2A1920-51gcBAS', 'acA2500-20gc']:
+        try:
+            self.read_binning_horizontal(0)
             self.add_attribute(binning_horizontal)
             self.add_attribute(binning_vertical)
-        if self.friendly_name == "3PW_Grating-4_NF" or self.friendly_name == "3PW_Screen" or self.friendly_name == "test":
+        except Exception:
+            self.logger.warning(
+                "binning_horizontal and binning_vertical attributes are not available for this camera model.")
+        if self.device.GetUserDefinedName() == "3PW_Grating-4_NF" or self.device.GetUserDefinedName() == "3PW_Screen" or self.device.GetUserDefinedName() == "test":
             self.add_attribute(filter_option)
             self._filter_option = "1"
         if self._has_MeV_mark:
@@ -530,9 +533,9 @@ class Basler(Device):
                       fill=int(np.max(self._image)), width=5)
 
     def read_exposure(self):
-        if self._model_category == 1:
+        try:
             self._exposure = self.camera.ExposureTime.Value
-        else:
+        except Exception:
             self._exposure = self.camera.ExposureTimeAbs.Value
         return self._exposure
 
@@ -542,23 +545,23 @@ class Basler(Device):
         #     self.poll_attribute('is_new_image', int(self._polling))
         #     self.logger.info(
         #         f'Changed the image retrieve timeout to {self._polling} to match the long exposure time')
-        if self._model_category == 1:
+        try:
             self.camera.ExposureTime.Value = value
-        else:
+        except Exception:
             self.camera.ExposureTimeAbs.Value = value
         self._exposure = value
 
     def read_gain(self):
-        if self._model_category == 1:
+        try:
             self._gain = self.camera.Gain.Value
-        else:
+        except Exception:
             self._gain = self.camera.GainRaw()
         return float(self._gain)
 
     def write_gain(self, value):
-        if self._model_category == 1:
+        try:
             self.camera.Gain.Value = float(value)
-        else:
+        except Exception:
             self.camera.GainRaw.Value = int(value)
         self._gain = value
 
@@ -610,14 +613,14 @@ class Basler(Device):
         # key: self._filter_option. Values: [0]Energy reading from QE195 [1] mean intensity [2]calculated clip coefficient for "3PW_Grating-4_NF" [3] Energy reading from QE195 [4] mean intensity for camera 3PW_Screen.
         if attr.get_write_value() in self.filter_option_details:
             self._filter_option = attr.get_write_value()
-            if self.friendly_name == "3PW_Grating-4_NF" or self.friendly_name == 'test':
+            if self.device.GetUserDefinedName() == "3PW_Grating-4_NF" or self.device.GetUserDefinedName() == 'test':
                 self.QE195_reading = self.filter_option_details[self._filter_option][0]
                 self.mean_intensity_of_calibration_images = self.filter_option_details[
                     self._filter_option][1]
                 self.clip_coe = self.filter_option_details[self._filter_option][2]
                 self.energy_intensity_coefficient = self.QE195_reading / \
                     (self.mean_intensity_of_calibration_images*640*512)
-            elif self.friendly_name == "3PW_Screen":
+            elif self.device.GetUserDefinedName() == "3PW_Screen":
                 self.QE195_reading = self.filter_option_details[self._filter_option][3]
                 self.mean_intensity_of_calibration_images = self.filter_option_details[
                     self._filter_option][4]
@@ -631,8 +634,6 @@ class Basler(Device):
 
     def init_device(self):
         self._host_computer = platform.node()
-        self.model_type = ['a2A1920-51gmBAS',
-                           'a2A2590-22gmBAS', 'a2A5320-7gmPRO']
         self.filter_option_details = {
             "1": [27.53, 26.988, 0.8455, 27.53, 24.540], "2": [23.24, 21.370, 0.827, 23.24, 20.641]}
         self.path_raw = ''
@@ -654,94 +655,112 @@ class Basler(Device):
         self._repetition = 50
         super().init_device()
         self.set_state(DevState.INIT)
+        self._close_camera()
         # force disable polling for "image" in DB
         self.disable_polling('image')
         try:
-            self.device = self.get_camera_device()
+            self._connect_camera()
             logger = logging.getLogger(self.__class__.__name__)
-            self.logger = LoggerAdapter(self.friendly_name, logger)
+            self.logger = LoggerAdapter(
+                self.camera.GetDeviceInfo().GetUserDefinedName(), logger)
             handlers = [logging.StreamHandler()]
             logging.basicConfig(handlers=handlers,
                                 format="%(asctime)s %(message)s", level=logging.INFO)
-            if self.device is not None:
-                instance = pylon.TlFactory.GetInstance()
-                self.camera = pylon.InstantCamera(
-                    instance.CreateDevice(self.device))
-                self.camera.Open()
-                self.read_model()
-                if self._model in self.model_type or self._model.startswith('a2'):
-                    self._model_category = 1
-                else:
-                    self._model_category = 0
-                self.read_exposure()
-                self.read_frames_per_trigger()
-                self._polling = self.get_attribute_poll_period('is_new_image')
-                if self._polling == 0:
-                    self._polling = 200
-                self._timeout_polling_ratio = 0.75
-                self._image = np.zeros(
-                    (self.camera.Height.Value, self.camera.Width.Value))
-                # if the pixel format can be read as rbg8, definitely should use slicing for images. Sometimes the pixel format at device start up is not 'rgb8', but I know for this type of camera (a2A1920-51gcBAS) we probably will change the format to 'rgb8' later, so we include rgb slice at startup.
-                if self.read_format_pixel().lower() == "rgb8" or self._model == 'a2A1920-51gcBAS':
-                    self._image_r = np.zeros(
-                        (self.camera.Height.Value, self.camera.Width.Value))
-                    self._image_g = np.zeros(
-                        (self.camera.Height.Value, self.camera.Width.Value))
-                    self._image_b = np.zeros(
-                        (self.camera.Height.Value, self.camera.Width.Value))
-                self._flux = np.zeros(
-                    (self.camera.Height.Value, self.camera.Width.Value))
-                # always use continuous mode. Although it seems this is the default, still set it here in case.
-                self.camera.AcquisitionMode.SetValue('Continuous')
-                self.camera.AcquisitionFrameRateEnable.SetValue(True)
-                self.set_change_event("image", True, False)
-                self.camera.MaxNumBuffer.SetValue(1000)
-                self.leak_coe = 0.815
-                self._calibration = 1
-                self.clip_coe = 1
-                self.mean_intensity_of_calibration_images = 1
-                self.QE195_reading = 1
-                if self.friendly_name == "3PW_Grating-4_NF":
-                    self.energy_intensity_coefficient = self.QE195_reading / \
-                        (self.mean_intensity_of_calibration_images*640*512)
-                    self.pixel_size = 4.97/107
-                    self.kernel = np.ones([7, 7])/49
-                elif self.friendly_name == "3PW_Screen" or self.friendly_name == 'test':
-                    self.energy_intensity_coefficient = self.QE195_reading / \
-                        (self.mean_intensity_of_calibration_images*640*512)
-                    self.pixel_size = 20/316
-                    self.kernel = np.ones([5, 5])/25
-                else:
-                    self._calibration = 0
-                    self._flux = np.zeros((2, 2))
-                self._has_MeV_mark = 0
-                if self.serial_number in basler_server_config["mev_mark"]["serial_number"]:
-                    self._has_MeV_mark = 1
-                self.q = Queue()
-                print(
-                    f'Camera is connected. {self.device.GetUserDefinedName()}: {self.device.GetSerialNumber()}')
-                self.set_state(DevState.ON)
         except Exception as e:
             self.set_state(DevState.OFF)
             raise e
 
+    def _connect_camera(self):
+        self.device = self.get_camera_device()
+        if self.device is None:
+            raise Exception(
+                f'Basler camera not found. serial_number="{self.serial_number}"')
+        instance = pylon.TlFactory.GetInstance()
+        self.camera = pylon.InstantCamera(
+            instance.CreateDevice(self.device))
+        self.camera.Open()
+        self._configure_camera_after_open()
+        print(
+            f'Camera is connected. {self.device.GetUserDefinedName()}: {self.device.GetSerialNumber()}')
+        self.set_state(DevState.ON)
+
+    def _configure_camera_after_open(self):
+        self.read_model()
+        self.read_exposure()
+        self.read_frames_per_trigger()
+        self._polling = self.get_attribute_poll_period('is_new_image')
+        if self._polling == 0:
+            self._polling = 200
+        self._timeout_polling_ratio = 0.75
+        self._image = np.zeros(
+            (self.camera.Height.Value, self.camera.Width.Value))
+        # if the pixel format can be read as rbg8, definitely should use slicing for images. Sometimes the pixel format at device start up is not 'rgb8', but I know for this type of camera (a2A1920-51gcBAS) we probably will change the format to 'rgb8' later, so we include rgb slice at startup.
+        if self.read_format_pixel().lower() == "rgb8" or self._model == 'a2A1920-51gcBAS':
+            self._image_r = np.zeros(
+                (self.camera.Height.Value, self.camera.Width.Value))
+            self._image_g = np.zeros(
+                (self.camera.Height.Value, self.camera.Width.Value))
+            self._image_b = np.zeros(
+                (self.camera.Height.Value, self.camera.Width.Value))
+        self._flux = np.zeros(
+            (self.camera.Height.Value, self.camera.Width.Value))
+        # always use continuous mode. Although it seems this is the default, still set it here in case.
+        self.camera.AcquisitionMode.SetValue('Continuous')
+        self.camera.AcquisitionFrameRateEnable.SetValue(True)
+        self.set_change_event("image", True, False)
+        self.camera.MaxNumBuffer.SetValue(1000)
+        self.leak_coe = 0.815
+        self._calibration = 1
+        self.clip_coe = 1
+        self.mean_intensity_of_calibration_images = 1
+        self.QE195_reading = 1
+        if self.device.GetUserDefinedName() == "3PW_Grating-4_NF":
+            self.energy_intensity_coefficient = self.QE195_reading / \
+                (self.mean_intensity_of_calibration_images*640*512)
+            self.pixel_size = 4.97/107
+            self.kernel = np.ones([7, 7])/49
+        elif self.device.GetUserDefinedName() == "3PW_Screen" or self.device.GetUserDefinedName() == 'test':
+            self.energy_intensity_coefficient = self.QE195_reading / \
+                (self.mean_intensity_of_calibration_images*640*512)
+            self.pixel_size = 20/316
+            self.kernel = np.ones([5, 5])/25
+        else:
+            self._calibration = 0
+            self._flux = np.zeros((2, 2))
+        self._has_MeV_mark = 0
+        if self.serial_number in basler_server_config["mev_mark"]["serial_number"]:
+            self._has_MeV_mark = 1
+        self.q = Queue()
+
+    def _close_camera(self):
+        if not hasattr(self, 'camera'):
+            return
+        try:
+            if self.camera.IsGrabbing():
+                self.camera.StopGrabbing()
+        except Exception as e:
+            self.logger.warning(
+                f'Unable to stop grabbing while closing camera: {e}')
+        try:
+            if self.camera.IsOpen():
+                self.camera.Close()
+        except Exception as e:
+            self.logger.warning(f'Unable to close camera cleanly: {e}')
+        try:
+            self.camera.DestroyDevice()
+        except Exception as e:
+            self.logger.warning(
+                f'Unable to destroy camera device cleanly: {e}')
+
     def delete_device(self):
-        self.camera.Close()
+        self._close_camera()
         print("Camera is disconnected.")
         super().delete_device()
 
     def get_camera_device(self):
         for device in pylon.TlFactory.GetInstance().EnumerateDevices():
             if device.GetSerialNumber() == self.serial_number:
-                self.friendly_name = device.GetUserDefinedName()
                 return device
-            if self.friendly_name and device.GetUserDefinedName() == self.friendly_name:
-                self.serial_number = device.GetUserDefinedName()
-                return device
-        # factory = pylon.TlFactory.GetInstance()
-        # empty_camera_info = pylon.DeviceInfo()
-        # empty_camera_info.SetPropertyValue('SerialNumber', self.serial_number)
-        # camera_device = factory.CreateDevice(empty_camera_info)
         return None
 
     # def read_serial_number(self):
@@ -899,17 +918,17 @@ class Basler(Device):
         self.get_ready()
 
     def read_frames_per_trigger(self):
-        if self._model_category == 1:
+        try:
             self._frames_per_trigger = self.camera.AcquisitionBurstFrameCount.Value
-        else:
+        except Exception:
             self._frames_per_trigger = self.camera.AcquisitionFrameCount.Value
         return self._frames_per_trigger
 
     @grabbing_wrap
     def write_frames_per_trigger(self, value):
-        if self._model_category == 1:
+        try:
             self.camera.AcquisitionBurstFrameCount.SetValue(value)
-        else:
+        except Exception:
             self.camera.AcquisitionFrameCount.SetValue(value)
         self._frames_per_trigger = value
 
@@ -921,9 +940,9 @@ class Basler(Device):
 
     def read_fps(self):
         if self.camera.AcquisitionFrameRateEnable.Value:
-            if self._model_category == 1:
+            try:
                 self._fps = self.camera.AcquisitionFrameRate.Value
-            else:
+            except Exception:
                 self._fps = self.camera.AcquisitionFrameRateAbs.Value
             return self._fps
         else:
@@ -932,9 +951,9 @@ class Basler(Device):
     def write_fps(self, value):
         if value:
             self.camera.AcquisitionFrameRateEnable.SetValue(True)
-            if self._model_category == 1:
+            try:
                 self.camera.AcquisitionFrameRate.SetValue(value)
-            else:
+            except Exception:
                 self.camera.AcquisitionFrameRateAbs.SetValue(value)
             self._fps = value
         else:
@@ -942,9 +961,9 @@ class Basler(Device):
             self._fps = 0
 
     def read_resulting_fps(self):
-        if self._model_category == 1:
+        try:
             self._resulting_fps = self.camera.BslResultingAcquisitionFrameRate.Value
-        else:
+        except Exception:
             self._resulting_fps = self.camera.ResultingFrameRateAbs.Value
         self._resulting_fps = round(self._resulting_fps, 2)
         return self._resulting_fps

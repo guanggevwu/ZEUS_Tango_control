@@ -600,6 +600,8 @@ class DaqGUI:
         '''Command for the start/stop button in frame3. It toggles the acquisition status. If the acquisition is running, it will stop it. If it is not running, it will start it in a new thread.'''
         if self.acquisition_button['text'] == 'Stop':
             self.my_event.set()
+            if hasattr(self, 'daq'):
+                self.daq.__del__()
             self.acquisition_button['style'] = 'Sty3_start.TButton'
             self.acquisition_button['text'] = 'Start'
             self.insert_to_disabled("Stopped acquisition.")

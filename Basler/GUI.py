@@ -48,7 +48,7 @@ def create_app():
         basler_app.create_image_panel(image_layout, d, **pass_config1)
         if not len(args.device) > 3:
             basler_app.add_command(image_layout, d, command_list=[
-                                   'get_ready', 'relax', 'reset_number', 'send_software_trigger', 'clear_queue'], cmd_parameters=[None, None, [0], None, None])
+                                   'get_ready', 'relax', 'Init', 'reset_number', 'send_software_trigger', 'clear_queue'], cmd_parameters=[None, None, None, [0], None, None])
         # form panel
         form_panel, form_layout = basler_app.create_blank_panel('v')
         basler_app.gui.createPanel(form_panel, f'{friendly_name}_form')

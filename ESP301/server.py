@@ -52,14 +52,13 @@ class ESP301(Device):
         save_data is initialized before save_path during the initialization caused by hw_memorized. self.write_save_data(True) will not set self._save to True because self._save_path is an empty string at that moment. Introducing self._try_save_data will save the intended status and can be used later in write_save_path function.
         '''
         self.get_logger = logging.getLogger(self.__class__.__name__)
-        if not hasattr(self, 'friendly_name'):
-            self.friendly_name = self.__class__.__name__
-        self.logger = LoggerAdapter(self.friendly_name, self.get_logger)
+        self.logger = LoggerAdapter('ESP301', self.get_logger)
         handlers = [logging.StreamHandler()]
         logging.basicConfig(handlers=handlers,
                             format="%(asctime)s %(message)s", level=logging.INFO)
         super().init_device()
         self.set_state(DevState.INIT)
+        self._close_connection()
         try:
             if self.ip:
                 self.logger.info(
@@ -106,6 +105,32 @@ class ESP301(Device):
         except:
             print("Could NOT connect to  ESP device.")
             self.set_state(DevState.OFF)
+
+    def _close_connection(self):
+        if hasattr(self, 'controller_socket'):
+            try:
+                self.controller_socket.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+            try:
+                self.controller_socket.close()
+            except Exception as e:
+                self.logger.warning(
+                    f"Unable to close ESP302 socket cleanly: {e}")
+            del self.controller_socket
+        if hasattr(self, 'dev'):
+            try:
+                if self.dev.is_open:
+                    self.dev.close()
+            except Exception as e:
+                self.logger.warning(
+                    f"Unable to close ESP301 serial connection cleanly: {e}")
+            del self.dev
+
+    def delete_device(self):
+        self._close_connection()
+        print("ESP device is disconnected.")
+        super().delete_device()
 
     user_defined_name = attribute(
         label="name",
@@ -342,8 +367,6 @@ class ESP301(Device):
                     self.add_command(cmd_move_to_positive_limit)
                 except Exception as e:
                     print(f"Error adding attributes for axis {axis}: {e}")
-
-
 
         if hasattr(self, "extra_script"):
             if self.extra_script == "turning_box_3":

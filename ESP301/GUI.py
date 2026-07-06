@@ -55,7 +55,7 @@ def create_app():
             command_with_axis_parameters = [
                 'move_to_negative_limit', 'move_to_positive_limit', 'set_as_zero']
             esp_app.add_command(
-                less_layout, d, command_list=['stop'])
+                less_layout, d, command_list=['Init', 'stop'])
             more_panel, more_layout = esp_app.create_blank_panel('v')
             esp_app.create_form_panel(
                 more_layout, d,  dropdown=dropdown, include=more_list, withButtons=False)

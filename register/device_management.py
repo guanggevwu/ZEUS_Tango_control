@@ -426,8 +426,25 @@ class DeviceUnderCatergoryWindow(Toplevel):
             self.category_container[device_name][
                 'gui_widget']['style'] = 'Sty2_online_text_small.TButton'
 
+    def kill_started_device_servers(self):
+        for device_name, info in self.category_container.items():
+            if 'server_pid' not in info:
+                continue
+            try:
+                os.kill(info['server_pid'], signal.SIGTERM)
+                self.parent.insert_to_disabled(
+                    f'{device_name} device server started from this window is killed.')
+            except OSError:
+                self.parent.insert_to_disabled(
+                    f'{device_name} device server was already killed somewhere else. Ignore.')
+            finally:
+                if 'server_pid' in info:
+                    del info['server_pid']
+                info['server_widget']['style'] = 'Sty2_offline_text_small.TButton'
+
     def on_close(self):
         self.thread_stop_event.set()
+        self.kill_started_device_servers()
         self.destroy()
         self.parent.insert_to_disabled(
             f'{self.parent.container[self.category_name]["show_name"]} window is destroyed.')
