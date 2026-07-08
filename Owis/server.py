@@ -321,7 +321,7 @@ class OwisPS(Device):
 
     @command(dtype_in=int)
     def go_ref_ax(self, axis):
-        result = self.dev.PS90_GoRef(1, axis, 4)
+        result = self.dev.PS90_GoRef(1, axis, 1)
         self.logger.info(f"go ref axis {axis}. Result: {result}")
 
     @command()
