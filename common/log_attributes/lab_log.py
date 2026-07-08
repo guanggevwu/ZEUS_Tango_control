@@ -11,7 +11,23 @@ import json
 import time
 import platform
 import sys
-logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
+
+logger = logging.getLogger(__name__)
+formatter = logging.Formatter("%(asctime)s %(message)s")
+
+# You define the lowest allowed log level on the logger itself. Handlers can’t show logs lower than the defined log level of the logger they’re connected to.
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+ch.setFormatter(formatter)
+log_file_path = os.path.join(os.path.dirname(__file__), 'output.txt')
+fh = logging.FileHandler(log_file_path)
+fh.setLevel(logging.INFO)
+fh.setFormatter(formatter)
+
+logger.addHandler(fh)
+logger.addHandler(ch)
+
 Base = declarative_base()
 
 
@@ -48,7 +64,7 @@ class AttributeLogger:
     def start_threading(self):
         for attr, config in self.attributes_dict.items():
             if not config or 'interval' not in config:
-                config['interval'] = 60  # default to 60 seconds
+                config['interval'] = 300  # default to 300 seconds
             self.log_attribute_value(attr, config)
 
     def get_time(self):
@@ -62,24 +78,36 @@ class AttributeLogger:
             return datetime.datetime.strptime(value, '%Y/%m/%d %H:%M:%S.%f')
 
     def log_attribute_value(self, attr_name, config):
-        current_time = self.get_time()
-        if current_time.time() > self.daytime_start and current_time.time() < self.daytime_end:
-            t = threading.Timer(config['interval'],
-                                self.log_attribute_value, args=[attr_name, config])
-        else:
-            t = threading.Timer(600,
-                                self.log_attribute_value, args=[attr_name, config])
-        t.daemon = True
-        t.start()
-        session = self.Session()
         try:
-            attr_proxy = tango.AttributeProxy(attr_name)
-            value = attr_proxy.read().value
-            new_log = Logs(timestamp=current_time,
-                           attr=attr_name, value=value)
-            session.add(new_log)
-            session.commit()
-            logging.info(f"Logging attribute {attr_name}: {value}")
+            current_time = self.get_time()
+            if current_time.time() > self.daytime_start and current_time.time() < self.daytime_end:
+                t = threading.Timer(config['interval'],
+                                    self.log_attribute_value, args=[attr_name, config])
+            else:
+                t = threading.Timer(600,
+                                    self.log_attribute_value, args=[attr_name, config])
+            t.daemon = True
+            t.start()
+            session = self.Session()
+            try:
+                attr_proxy = tango.AttributeProxy(attr_name)
+                value = attr_proxy.read().value
+                new_log = Logs(timestamp=current_time,
+                               attr=attr_name, value=value)
+                session.add(new_log)
+                session.commit()
+                logger.info(f"Logging attribute {attr_name}: {value}")
+            except tango.DevFailed:
+                pass
+                # logger.info(f"Device failed: {attr_name}")
+            except Exception as e:
+                # logging.error(f"Error getting attribute {attr_name}")
+                if attr_name == "facility/laser_warning_sign/laser_warning_sign_1/clean_room" and not hasattr(self, "expiration_time"):
+                    self.expiration_time = datetime.datetime.now()
+                    logger.info(f"{self.start_time}, {self.expiration_time=}")
+                logger.info(f'Error is {e}')
+            finally:
+                self.Session.remove()
         except Exception as e:
             logging.error(f"Error getting attribute {attr_name}")
         finally:
@@ -94,6 +122,7 @@ if __name__ == "__main__":
     else:
         db_file = '/mnt/coe-zeus1/ZEUS_website_resources/lab_log/lab_log.db'
     attribute_logger = AttributeLogger(db_file)
+    attribute_logger.start_time = datetime.datetime.now()
     attribute_logger.start_threading()
     while True:
         time.sleep(86400)
