@@ -983,8 +983,11 @@ class Basler(Device):
         try:
             self.camera.GetNodeMap().GetNode(
                 'DeviceLinkThroughputLimit').SetValue(int(value*1e6))
-        except:
-            self.camera.GevSCPD.SetValue(int((125/value-1)*1500))
+        except pylon.LogicalErrorException:
+            try:
+                self.camera.GevSCPD.SetValue(int((125/value-1)*1500))
+            except pylon.OutOfRangeException:
+                self.camera.GevSCPD.SetValue(self.camera.GevSCPD.GetMax())
         finally:
             self.read_bandwidth()
 
