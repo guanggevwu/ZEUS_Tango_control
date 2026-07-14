@@ -12,8 +12,6 @@
     "saving_format": "%s_%t.%f",
     "trigger_source": "External",
     "is_polling_periodically": false,
-    "exposure": 100000,
-    "gain": 0,
-    "format_pixel": "Mono12"
+    "exposure": 100000
   }
 }

@@ -849,12 +849,13 @@ class BandwidthWindow(Toplevel):
                 'Please input the total bandwidth!', 'red_text')
             return
         size_of_total_frames = np.sum([v for v in self.frame_size.values()])
+        increament = 1518
+        idx = 0
         for key, value in self.frame_size.items():
             self.parent.selected_devices[key]['tango_dp'].bandwidth = self.parent.total_bandwidth / \
                 size_of_total_frames * self.frame_size[key]
-        increament = 1518
-        for idx, key in enumerate(self.parent.selected_devices.keys()):
             self.parent.selected_devices[key]['tango_dp'].frame_transmission_delay = increament * idx
+            idx += 1
         self.update_bandwidth_tree()
         self.parent.write_to_init_file()
 
