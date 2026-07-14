@@ -40,6 +40,7 @@ dependencies = [
 	# "PyMca5",  # no direct imports found
 	# "pyparsing",  # likely transitive
 	"pypylon",
+	"PyMySQL",
 	"PyQt5",
 	# "PyQt5-Qt5",  # likely transitive (PyQt5)
 	# "PyQt5-sip",  # likely transitive (PyQt5)
