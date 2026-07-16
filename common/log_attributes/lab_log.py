@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session, declarative_base, sessionmaker, scoped_sessi
 import os
 import json
 import time
-import platform
 import sys
 
 logger = logging.getLogger(__name__)
@@ -30,6 +29,14 @@ logger.addHandler(ch)
 
 Base = declarative_base()
 
+DEFAULT_MYSQL_DB_URL = "mysql+pymysql://zeus_user:Electr0n%21@141.211.217.92:3306/lab_logging"
+
+
+def resolve_db_url(db_target):
+    if "://" in db_target:
+        return db_target
+    return f"sqlite:///{db_target}"
+
 
 class Logs(Base):
     __tablename__ = 'logs'
@@ -40,8 +47,8 @@ class Logs(Base):
 
 
 class AttributeLogger:
-    def __init__(self, db_path):
-        self.db_path = db_path
+    def __init__(self, db_target):
+        self.db_url = resolve_db_url(db_target)
         self.attributes_dict = self.read_attributes_dictionary()
         self.time_attr = tango.AttributeProxy("other/Clock/clock/time")
         self.daytime_start = datetime.time(6, 0, 0)  # 6:00 AM
@@ -49,8 +56,7 @@ class AttributeLogger:
         self.connect_db()
 
     def connect_db(self):
-        engine = create_engine(
-            f'sqlite:///{self.db_path}')  # Example for SQLite
+        engine = create_engine(self.db_url, pool_pre_ping=True)
         Base.metadata.create_all(engine)
         SessionLocal = sessionmaker(
             autocommit=False, autoflush=False, bind=engine)
@@ -64,7 +70,7 @@ class AttributeLogger:
     def start_threading(self):
         for attr, config in self.attributes_dict.items():
             if not config or 'interval' not in config:
-                config['interval'] = 300  # default to 300 seconds
+                config['interval'] = 60  # default to 300 seconds
             self.log_attribute_value(attr, config)
 
     def get_time(self):
@@ -116,12 +122,10 @@ class AttributeLogger:
 
 if __name__ == "__main__":
     if sys.argv and len(sys.argv) > 1:
-        db_file = sys.argv[1]
-    elif platform.system() == "Windows":
-        db_file = r'Z:\ZEUS_website_resources\lab_log\lab_log.db'
+        db_target = sys.argv[1]
     else:
-        db_file = '/mnt/coe-zeus1/ZEUS_website_resources/lab_log/lab_log.db'
-    attribute_logger = AttributeLogger(db_file)
+        db_target = os.environ.get("ZEUS_LAB_LOG_DB_URL", DEFAULT_MYSQL_DB_URL)
+    attribute_logger = AttributeLogger(db_target)
     attribute_logger.start_time = datetime.datetime.now()
     attribute_logger.start_threading()
     while True:
