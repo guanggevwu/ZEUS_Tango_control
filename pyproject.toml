@@ -70,7 +70,8 @@ dependencies = [
 	"pyvisa-py",
 	"nidaqmx",
 	"py-thorlabs-tsp @ git+https://gitlab.com/guanggevwu/py-thorlabs-tsp-fork.git",
-	"thorlabs_xa @ git+https://github.com/Thorlabs/Motion_Control_Examples.git@main#subdirectory=Python/XA/xa_source",
+	"thorlabs-xa",
+	"vmbpy",
 ]
 
 [project.entry-points."taurus.form.item_factories"]
