@@ -13,6 +13,7 @@ import numpy as np
 from tango.server import Device, attribute, command, device_property
 from tango import AttrWriteType, DevState, DevFloat, EncodedAttribute
 from common.logger_adapter import LoggerAdapter
+from common.shared_server_side import add_centroid_functions
 
 # -----------------------------
 
@@ -21,9 +22,11 @@ logging.basicConfig(handlers=handlers,
                     format="%(asctime)s %(message)s", level=logging.INFO)
 
 
+@add_centroid_functions
 class FileReader(Device):
 
     file_type = device_property(dtype=str, default_value='')
+    extra_script = device_property(dtype=str, default_value='centroid')
 
     host_computer = attribute(
         label="host computer",
@@ -236,6 +239,7 @@ class FileReader(Device):
                             self._image = np.array(image_PIL)
                             self._format_pixel = str(
                                 self.mode_to_bpp[image_PIL.mode])
+                        self.calculate_centroid()
                         self.push_change_event(
                             "image", self.read_image("placeholder"))
                     elif self._data_structure == 0:
@@ -365,6 +369,8 @@ class FileReader(Device):
 
         if self.file_type == 'image':
             self.add_attribute(image)
+            if self.extra_script == 'centroid':
+                self.initialize_centroid_attributes()
         elif self.file_type == 'xy':
             self.add_attribute(x)
             self.add_attribute(y)

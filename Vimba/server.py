@@ -8,6 +8,7 @@ from queue import Queue
 import platform
 from vmbpy import *
 from common.logger_adapter import LoggerAdapter
+from common.shared_server_side import add_centroid_functions
 # -----------------------------
 
 
@@ -24,6 +25,7 @@ def grabbing_wrap(func):
     return wrapper
 
 
+@add_centroid_functions
 class Vimba(Device):
     '''
     is_polling_periodically attribute. If is_polling_periodically is False, the polling is manually controlled by the acquisition script, else the polling is made by the polling period "polling".
@@ -56,6 +58,7 @@ class Vimba(Device):
         return self._read_time
 
     friendly_name = device_property(dtype=str, default_value='')
+    extra_script = device_property(dtype=str, default_value='centroid')
 
     model = attribute(
         label="model",
@@ -198,6 +201,8 @@ class Vimba(Device):
         self.add_attribute(width)
         self.add_attribute(height)
         self.add_attribute(trigger_source)
+        if self.extra_script == "centroid":
+            self.initialize_centroid_attributes()
 
     def read_exposure(self):
         self._exposure = self.camera.ExposureTimeAbs.get()
@@ -389,6 +394,8 @@ class Vimba(Device):
             self.logger.info('Frame acquired: {}'.format(frame))
             frame_array = np.squeeze(frame.as_numpy_ndarray())
             self.imageq.put(frame_array)
+            self._image = frame_array
+            self.calculate_centroid()
         self.camera.queue_frame(frame)
 
     def handler_last_frame(self, cam: Camera, stream: Stream, frame: Frame):
@@ -396,6 +403,7 @@ class Vimba(Device):
             self.logger.info('Frame acquired: {}'.format(frame))
             frame_array = np.squeeze(frame.as_numpy_ndarray())
             self._image = frame_array
+            self.calculate_centroid()
         self.camera.queue_frame(frame)
 
     @command()

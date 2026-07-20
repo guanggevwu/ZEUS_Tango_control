@@ -47,7 +47,7 @@ class GXRegulator(Device):
         return self._read_time
 
     pressure_psi = attribute(
-        label="pressure",
+        label="pressure (psi)",
         dtype=float,
         unit='psi',
         format='8.2f',
@@ -80,7 +80,7 @@ class GXRegulator(Device):
                     writer.writerow([self._read_time, self._pressure_psi])
 
     pressure_bar = attribute(
-        label="pressure",
+        label="pressure (bar)",
         dtype=float,
         unit='bar',
         format='8.4f',

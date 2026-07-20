@@ -2,16 +2,11 @@ import os
 from common.config import device_name_table, image_panel_config
 from common.TaurusGUI_Argparse import TaurusArgparse
 from common.GUI import GuiBase
-parser = TaurusArgparse(
-    description='GUI for Vimba camera', device_default='TA2/vimba/TA2-1', polling_default=1000)
-parser.add_argument('-s', '--simple', action='store_true',
-                    help="show image without shot number and command")
-args = parser.parse_args()
 
 
 def create_app():
     parser = TaurusArgparse(
-        description='GUI for Vimba camera', device_default='TA2/vimba/TA2-1', polling_default=1000)
+        description='GUI for Vimba camera', device_default='TA2/vimba/TA2-1', polling_default=200)
     parser.add_argument('-s', '--simple', action='store_true',
                         help="show image without shot number and command")
     args = parser.parse_args()

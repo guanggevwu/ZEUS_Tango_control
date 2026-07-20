@@ -52,9 +52,6 @@
     "TA1/owisps/ta1-owis1/ax7_position",
     "TA1/owisps/ta1-owis1/ax8_position",
     "TA1/owisps/ta1-owis1/ax9_position",
-    "TA1/gx_regulator/TA1_regulator_1/pressure_bar",
-    "TA1/gx_regulator/TA1_regulator_2/pressure_bar",
-    "TA1/gx_regulator/TA1_regulator_3/pressure_bar",
     "TA1/gx_regulator/TA1_regulator_1/pressure_psi",
     "TA1/gx_regulator/TA1_regulator_2/pressure_psi",
     "TA1/gx_regulator/TA1_regulator_3/pressure_psi",
@@ -97,8 +94,6 @@
     "TA3/NewPortXPS/TA3_XPS/ax6_position",
     "TA3/NewPortXPS/TA3_XPS/ax7_position",
     "TA3/NewPortXPS/TA3_XPS/ax8_position",
-    "TA3/gx_regulator/TA3_regulator_1/pressure_bar",
-    "TA3/gx_regulator/TA3_regulator_2/pressure_bar",
     "TA3/gx_regulator/TA3_regulator_1/pressure_psi",
     "TA3/gx_regulator/TA3_regulator_2/pressure_psi",
     "laser/TSP01B/laser_1_TSP01B/temperature",
@@ -124,6 +119,10 @@
     "other/dg645/DG645_control_room/E_relative_delay",
     "other/dg645/DG645_control_room/F_relative_delay",
     "other/dg645/DG645_control_room/G_relative_delay",
-    "other/dg645/DG645_control_room/H_relative_delay"
+    "other/dg645/DG645_control_room/H_relative_delay",
+    "other/filereader/image_reader_1/centroid_x",
+    "other/filereader/image_reader_1/centroid_y",
+    "other/filereader/image_reader_1/centroid_threshold",
+    "other/filereader/image_reader_1/threshold_percentile"
   ]
 }

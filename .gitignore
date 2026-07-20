@@ -1,3 +1,4 @@
+Vimba/temp/
 common/log_attributes/output*.txt
 Tango_device_management_log.txt
 DAQ/scan_table.csv

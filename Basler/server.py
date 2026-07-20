@@ -15,9 +15,11 @@ import platform
 from common.config import basler_server_config
 from common.logger_adapter import LoggerAdapter
 from common.other import generate_basename
+from common.shared_server_side import add_centroid_functions
 # -----------------------------
 
 
+@add_centroid_functions
 class Basler(Device):
     '''
     is_polling_periodically attribute. If is_polling_periodically is False, the polling is manually controlled by the acquisition script, else the polling is made by the polling period "polling".
@@ -112,6 +114,7 @@ class Basler(Device):
 
     serial_number = device_property(dtype=str, default_value='')
     friendly_name = device_property(dtype=str, default_value='')
+    extra_script = device_property(dtype=str, default_value='centroid')
 
     # image_encoded = attribute(label='encoded image',
     #            access=AttrWriteType.READ)
@@ -514,6 +517,8 @@ class Basler(Device):
             self._image_with_MeV_mark = np.zeros(
                 (self.camera.Height.Value, self.camera.Width.Value))
         self.add_attribute(trigger_source)
+        if self.extra_script == "centroid":
+            self.initialize_centroid_attributes()
         # self.add_attribute("trigger_source")
         # if self.camera.DeviceModelName() in ['acA640-121gm']:
 
@@ -1022,6 +1027,7 @@ class Basler(Device):
                     self._image = np.flipud(self._image)
                 if self._rotate:
                     self._image = np.rot90(self._image, int(self._rotate/90))
+                self.calculate_centroid()
                 if self._calibration:
                     self._energy = (np.sum(self._image)) * \
                         self.energy_intensity_coefficient
