@@ -153,11 +153,13 @@ class Daq:
                 if info['device_proxy'].info().dev_class.lower() in ['basler', 'vimba']:
                     full_configuration[c] = {key: getattr(
                         info['device_proxy'], key, None) for key in Key_list}
+            full_configuration = {'time': datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S")} | full_configuration
             json_object = json.dumps(full_configuration)
             for p in self.path_list:
                 os.makedirs(p, exist_ok=True)
-                with open(os.path.join(p, "settings.json"), "w+") as settings_File:
-                    settings_File.write(json_object)
+                with open(os.path.join(p, "settings.json"), "a+") as settings_File:
+                    settings_File.write(json_object + "\n")
 
     def get_image(self, bs):
         bits = ''.join([i for i in bs.format_pixel if i.isdigit()])
