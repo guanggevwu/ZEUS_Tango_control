@@ -24,6 +24,8 @@ def add_center_of_mass_functions(cls):
     cls.write_CoM_filter_high = write_CoM_filter_high
     cls.read_CoM_filter_percentile_high = read_CoM_filter_percentile_high
     cls.write_CoM_filter_percentile_high = write_CoM_filter_percentile_high
+    cls.read_remove_small_objects = read_remove_small_objects
+    cls.write_remove_small_objects = write_remove_small_objects
     cls.calculate_center_of_mass = calculate_center_of_mass
     return cls
 
@@ -89,6 +91,16 @@ def initialize_center_of_mass_attributes(self):
         doc='Pixels that have intensity above this percentile will be set as 0 when calculating the center of mass. Default value is 1.0 (100th percentile). CoM_filter_high and CoM_filter_percentile_high are interdependent.',
     )
 
+    remove_small_objects = attribute(
+        name='remove_small_objects',
+        label="remove small objects",
+        dtype=bool,
+        access=AttrWriteType.READ_WRITE,
+        memorized=True,
+        hw_memorized=True,
+        doc='Use erosion and reconstruction to remove small bright objects before calculating the center of mass.',
+    )
+
     self._center_of_mass_x = 0
     self._center_of_mass_y = 0
     self._CoM_filter_low = 0.0
@@ -97,12 +109,14 @@ def initialize_center_of_mass_attributes(self):
     self._CoM_filter_high = 999999.0
     self._CoM_filter_percentile_high = 1.0
     self._CoM_filter_high_source = 'value'
+    self._remove_small_objects = False
     self.add_attribute(center_of_mass_x)
     self.add_attribute(center_of_mass_y)
     self.add_attribute(CoM_filter_low)
     self.add_attribute(CoM_filter_percentile_low)
     self.add_attribute(CoM_filter_high)
     self.add_attribute(CoM_filter_percentile_high)
+    self.add_attribute(remove_small_objects)
 
 
 def read_center_of_mass_x(self, attr=None):
@@ -163,6 +177,16 @@ def write_CoM_filter_percentile_high(self, attr):
     self.calculate_center_of_mass()
 
 
+def read_remove_small_objects(self, attr=None):
+    return self._remove_small_objects
+
+
+def write_remove_small_objects(self, attr):
+    value = attr.get_write_value() if hasattr(attr, 'get_write_value') else attr
+    self._remove_small_objects = bool(value)
+    self.calculate_center_of_mass()
+
+
 def update_CoM_filter_low_from_percentile(self, image):
     self._CoM_filter_low = float(np.percentile(
         image, self._CoM_filter_percentile_low * 100.0))
@@ -218,9 +242,9 @@ def calculate_center_of_mass(self):
             return
 
         masked_image = image * mask
-        seed = erosion(masked_image, square(3))
-        reconstructed_image = reconstruction(seed, masked_image)
-        masked_image = masked_image * (reconstructed_image > 0)
+        if self._remove_small_objects:
+            seed = erosion(masked_image, square(3))
+            masked_image = reconstruction(seed, masked_image)
         total_intensity = np.sum(masked_image)
         if total_intensity <= 0:
             max_index = np.unravel_index(np.argmax(image), image.shape)
