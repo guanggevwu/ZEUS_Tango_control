@@ -22,6 +22,21 @@ class GXRegulator(Device):
     def read_host_computer(self):
         return self._host_computer
 
+    user_defined_name = attribute(
+        label="name",
+        dtype=str,
+        memorized=True,
+        hw_memorized=True,
+        access=AttrWriteType.READ_WRITE,
+    )
+
+    def read_user_defined_name(self):
+        return self._user_defined_name
+
+    def write_user_defined_name(self, value):
+        self._user_defined_name = value
+        self.logger = LoggerAdapter(value, self.get_logger)
+
     read_time = attribute(
         label="read time",
         dtype="str",
@@ -52,21 +67,23 @@ class GXRegulator(Device):
                 self.low_voltage_channel, min_val=self.low_voltage_channel_min, max_val=self.low_voltage_channel_max)
             # 10 V, 1000 psi.
             if self.differential_mode == 'standard':
-                if self.revert_voltage:
+                if self.revert_channel:
                     out_put_array = [0, self._pressure_psi /
                                      self.voltage_to_device_output]
                 else:
                     out_put_array = [self._pressure_psi /
                                      self.voltage_to_device_output, 0]
-                task.write(out_put_array)
             elif self.differential_mode == 'half_half':
-                if self.revert_voltage:
+                if self.revert_channel:
                     out_put_array = [[-self._pressure_psi/(
                         2*self.voltage_to_device_output)], [self._pressure_psi/(2*self.voltage_to_device_output)]]
                 else:
                     out_put_array = [[
                         self._pressure_psi/(2*self.voltage_to_device_output)], [-self._pressure_psi/(2*self.voltage_to_device_output)]]
-                task.write(out_put_array)
+            else:
+                raise ValueError(
+                    f"Invalid differential_mode: {self.differential_mode}. Must be 'standard' or 'half_half'.")
+            task.write(out_put_array)
             self._read_time = datetime.datetime.now().strftime("%Y%m%d.%H:%M:%S.%f")
         if self._save_data:
             if os.path.isfile(self._save_path):
@@ -89,7 +106,7 @@ class GXRegulator(Device):
     # 1 v will generate 100 psi.
     voltage_to_device_output = device_property(dtype=float, default_value=100)
     # high voltage channel will be set to 0V or negative when revert_voltage is true.
-    revert_voltage = device_property(dtype=bool, default_value=False)
+    revert_channel = device_property(dtype=bool, default_value=False)
 
     polling_period = attribute(
         label='polling interval',
@@ -110,6 +127,7 @@ class GXRegulator(Device):
 
     def init_device(self):
         self._host_computer = platform.node()
+        self._user_defined_name = 'GXRegulator_init_name'
         self._pressure_psi = 0
         self._read_time = 'N/A'
         self._polling = 1000
