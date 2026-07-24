@@ -22,21 +22,6 @@ class GXRegulator(Device):
     def read_host_computer(self):
         return self._host_computer
 
-    user_defined_name = attribute(
-        label="name",
-        dtype=str,
-        memorized=True,
-        hw_memorized=True,
-        access=AttrWriteType.READ_WRITE,
-    )
-
-    def read_user_defined_name(self):
-        return self._user_defined_name
-
-    def write_user_defined_name(self, value):
-        self._user_defined_name = value
-        self.logger = LoggerAdapter(value, self.get_logger)
-
     read_time = attribute(
         label="read time",
         dtype="str",
@@ -62,11 +47,26 @@ class GXRegulator(Device):
         self._pressure_psi = value
         with nidaqmx.Task() as task:
             task.ao_channels.add_ao_voltage_chan(
-                self.high_voltage_channel, min_val=0, max_val=10)
+                self.high_voltage_channel, min_val=self.high_voltage_channel_min, max_val=self.high_voltage_channel_max)
             task.ao_channels.add_ao_voltage_chan(
-                self.low_voltage_channel, min_val=0, max_val=10)
+                self.low_voltage_channel, min_val=self.low_voltage_channel_min, max_val=self.low_voltage_channel_max)
             # 10 V, 1000 psi.
-            task.write([self._pressure_psi/1000*10, 0])
+            if self.differential_mode == 'standard':
+                if self.revert_voltage:
+                    out_put_array = [0, self._pressure_psi /
+                                     self.voltage_to_device_output]
+                else:
+                    out_put_array = [self._pressure_psi /
+                                     self.voltage_to_device_output, 0]
+                task.write(out_put_array)
+            elif self.differential_mode == 'half_half':
+                if self.revert_voltage:
+                    out_put_array = [[-self._pressure_psi/(
+                        2*self.voltage_to_device_output)], [self._pressure_psi/(2*self.voltage_to_device_output)]]
+                else:
+                    out_put_array = [[
+                        self._pressure_psi/(2*self.voltage_to_device_output)], [-self._pressure_psi/(2*self.voltage_to_device_output)]]
+                task.write(out_put_array)
             self._read_time = datetime.datetime.now().strftime("%Y%m%d.%H:%M:%S.%f")
         if self._save_data:
             if os.path.isfile(self._save_path):
@@ -79,83 +79,17 @@ class GXRegulator(Device):
                     writer.writerow(['write_time', 'pressure(psi)'])
                     writer.writerow([self._read_time, self._pressure_psi])
 
-    pressure_bar = attribute(
-        label="pressure (bar)",
-        dtype=float,
-        unit='bar',
-        format='8.4f',
-        memorized=True,
-        access=AttrWriteType.READ_WRITE,
-    )
-
-    def read_pressure_bar(self):
-        return self._pressure_psi*self.psi2bar
-
-    def write_pressure_bar(self, value):
-        self.write_pressure_psi(self, value/self.psi2bar)
-
     high_voltage_channel = device_property(dtype=str, default_value='')
+    high_voltage_channel_min = device_property(dtype=float, default_value=0)
+    high_voltage_channel_max = device_property(dtype=float, default_value=10)
     low_voltage_channel = device_property(dtype=str, default_value='')
-
-    save_data = attribute(
-        label="save data",
-        dtype=bool,
-        access=AttrWriteType.READ_WRITE,
-        memorized=True,
-        hw_memorized=True,
-        doc='save the images on the server'
-    )
-
-    def read_save_data(self):
-        return self._save_data
-
-    def write_save_data(self, value):
-        self._try_save_data = value
-        if value:
-            try:
-                os.makedirs(os.path.dirname(self._save_path), exist_ok=True)
-                self._save_data = value
-            except FileNotFoundError:
-                logging.info(
-                    f"Folder creation failed! If you see this at server start-up. It is usually fine since {self._save_path=} is not initialized yet!")
-                return
-        else:
-            self._save_data = value
-        logging.info(f'save status is changed to {value}')
-
-    save_path = attribute(
-        label='save path (folder)',
-        dtype=str,
-        access=AttrWriteType.READ_WRITE,
-        memorized=True,
-        hw_memorized=True,
-        doc='Save data path on the server. Use %date to indicate today; Use ";" to separate multiple paths'
-    )
-
-    def read_save_path(self):
-        if self._use_date and datetime.datetime.today().strftime("%Y%m%d") not in self._save_path:
-            self.write_save_path(self.path_raw)
-        return self._save_path
-
-    def write_save_path(self, value):
-        # if the entered path has %date in it, replace %date with today's date and mark a _use_date flag
-        self.path_raw = value
-        if '%date' in value:
-            self._use_date = True
-            value = value.replace(
-                '%date', datetime.datetime.today().strftime("%Y%m%d"))
-        else:
-            self._use_date = False
-        value_split = value.split(';')
-        if self._save_data:
-            for idx, v in enumerate(value_split):
-                try:
-                    os.makedirs(v, exist_ok=True)
-                except OSError as inst:
-                    logging.error(inst)
-                    raise (f'error on save_path part {idx}')
-        self._save_path = value
-        self.push_change_event("save_path", self.read_save_path())
+    low_voltage_channel_min = device_property(dtype=float, default_value=0)
+    low_voltage_channel_max = device_property(dtype=float, default_value=10)
+    differential_mode = device_property(dtype=str, default_value='standard')
+    # 1 v will generate 100 psi.
+    voltage_to_device_output = device_property(dtype=float, default_value=100)
+    # high voltage channel will be set to 0V or negative when revert_voltage is true.
+    revert_voltage = device_property(dtype=bool, default_value=False)
 
     polling_period = attribute(
         label='polling interval',
@@ -172,24 +106,13 @@ class GXRegulator(Device):
     def write_polling_period(self, value):
         self._polling = value
         if self._is_polling_periodically:
-            self.poll_attribute('pressure_bar', value)
             self.poll_attribute('pressure_psi', value)
 
     def init_device(self):
         self._host_computer = platform.node()
-        self._user_defined_name = 'GXRegulator_init_name'
         self._pressure_psi = 0
-        self.psi2bar = 0.0689476
-        self.path_raw = ''
-        self._save_data = False
-        self._save_path = ''
         self._read_time = 'N/A'
-        self._use_date = False
         self._polling = 1000
-        if 'Dev' not in self.high_voltage_channel:
-            self.high_voltage_channel = 'Dev1/ao' + self.high_voltage_channel
-        if 'Dev' not in self.low_voltage_channel:
-            self.low_voltage_channel = 'Dev1/ao' + self.low_voltage_channel
         super().init_device()
         self.get_logger = logging.getLogger(self.__class__.__name__)
         self.logger = LoggerAdapter(self._user_defined_name, self.get_logger)

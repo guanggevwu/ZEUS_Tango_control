@@ -23,7 +23,7 @@ def create_app():
         form_panel, form_layout = basler_app.create_blank_panel('v')
         basler_app.gui.createPanel(form_panel, f'{d}_form')
         basler_app.create_form_panel(form_layout, d, set_attr_font={key: {
-                                     'font': '"Sans Serif"', 'size': 20} for key in ['pressure_bar', 'pressure_psi']})
+                                     'font': '"Sans Serif"', 'size': 20} for key in ['pressure_psi']})
 
     basler_app.gui.removePanel('Manual')
     basler_app.gui.show()
