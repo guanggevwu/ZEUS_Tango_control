@@ -85,16 +85,6 @@ class GXRegulator(Device):
                     f"Invalid differential_mode: {self.differential_mode}. Must be 'standard' or 'half_half'.")
             task.write(out_put_array)
             self._read_time = datetime.datetime.now().strftime("%Y%m%d.%H:%M:%S.%f")
-        if self._save_data:
-            if os.path.isfile(self._save_path):
-                with open(self._save_path, 'a', newline='') as csvfile:
-                    writer = csv.writer(csvfile)
-                    writer.writerow([self._read_time, self._pressure_psi])
-            else:
-                with open(self._save_path, 'w', newline='') as csvfile:
-                    writer = csv.writer(csvfile)
-                    writer.writerow(['write_time', 'pressure(psi)'])
-                    writer.writerow([self._read_time, self._pressure_psi])
 
     high_voltage_channel = device_property(dtype=str, default_value='')
     high_voltage_channel_min = device_property(dtype=float, default_value=0)
