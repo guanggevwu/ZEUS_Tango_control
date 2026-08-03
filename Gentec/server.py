@@ -521,11 +521,11 @@ class GentecEO(Device):
             self.save_data_to_file()
             self.push_change_event("shot", self.read_shot())
         if self._start_statistics:
-            self._statistics_shots = len(self._historical_data)-1
             self._historical_data.append(
                 [str(self._statistics_shots), self._read_time, f'{self._main_value_adjust} {self._main_value_adjust_unit}'])
             self._historical_data_number.append(
                 self._main_value)
+            self._statistics_shots = len(self._historical_data_number)
             self._average = np.mean(self._historical_data_number)
             self._rsd = np.std(self._historical_data_number)/self._average
             self._max = np.max(self._historical_data_number)

@@ -31,20 +31,31 @@ class OwisPS(Device):
             print("Could NOT connect to PS90!")
             self.set_state(DevState.OFF)
             raise
+        self._axis_units = {int(axis): 'mm' for axis in self.axis.split(',')}
         # load axis parameter file according to the part number
         if self.part_number:
-            self.part_number_list = self.part_number.split(',')
+            self.part_number_list = [pn.strip()
+                                     for pn in self.part_number.split(',')]
             # iterate through all axes and find the part number from the part_number property.
             for idx, axis in enumerate(self.axis.split(',')):
-                if idx < len(self.part_number_list):
-                    pn = self.part_number_list[idx]
-                if os.path.isfile(os.path.join(os.path.dirname(__file__), 'axis_parameter_file', f'{pn}.owd')):
-                    result = self.dev.PS90_LoadTextFile(1, int(axis), os.path.join(
-                        os.path.dirname(__file__), 'axis_parameter_file', f'{pn}.owd').encode('utf-8'))
+                if idx >= len(self.part_number_list):
+                    self.logger.info(
+                        f"No part number provided for axis {axis}; defaulting unit to mm.")
+                    continue
+                pn = self.part_number_list[idx]
+                axis_parameter_file = os.path.join(
+                    os.path.dirname(__file__), 'axis_parameter_file', f'{pn}.owd')
+                self._axis_units[int(axis)] = self.get_unit_from_axis_parameter_file(
+                    axis_parameter_file)
+                if os.path.isfile(axis_parameter_file):
+                    result = self.dev.PS90_LoadTextFile(
+                        1, int(axis), axis_parameter_file.encode('utf-8'))
                     if result == 0:
                         self.logger.info(
-                            f"{pn}.owd is loaded for axis {axis}.")
+                            f"{pn}.owd is loaded for axis {axis}. Unit: {self._axis_units[int(axis)]}.")
                         continue
+                else:
+                    result = "file not found"
                 self.logger.info(
                     f"Could NOT load axis parameter file: {pn}.owd for axis {axis}! Error code: {result}")
 
@@ -56,6 +67,31 @@ class OwisPS(Device):
         self._user_defined_locations = []
         self._saved_location_source = 'client'
         self.set_state(DevState.ON)
+
+    def get_unit_from_axis_parameter_file(self, axis_parameter_file):
+        stage_type_to_unit = {
+            'linear': 'mm',
+            'rotary': 'deg',
+        }
+        try:
+            with open(axis_parameter_file, 'r') as f:
+                for line in f:
+                    key, separator, value = line.strip().partition('=')
+                    if separator and key == 'StageType':
+                        stage_type = value.strip().lower()
+                        unit = stage_type_to_unit.get(stage_type, 'mm')
+                        self.logger.info(
+                            f"StageType={value.strip()} found in {axis_parameter_file}. Unit: {unit}.")
+                        return unit
+        except OSError as e:
+            self.logger.info(
+                f"Could not read axis parameter file {axis_parameter_file}. Defaulting unit to mm. Reason: {e}")
+        self.logger.info(
+            f"StageType is not found in {axis_parameter_file}. Defaulting unit to mm.")
+        return 'mm'
+
+    def get_axis_unit(self, axis):
+        return getattr(self, '_axis_units', {}).get(int(axis), 'mm')
 
     user_defined_name = attribute(
         label="name",
@@ -188,7 +224,7 @@ class OwisPS(Device):
             name=f"ax{axis}_position",
             label=f"axis {axis} position",
             dtype=float,
-            unit='mm',
+            unit=self.get_axis_unit(axis),
             format='6.3f',
             memorized=True,
             access=AttrWriteType.READ_WRITE,
@@ -221,7 +257,7 @@ class OwisPS(Device):
             name=f"ax{axis}_step",
             label=f"axis {axis} step",
             dtype=float,
-            unit='mm',
+            unit=self.get_axis_unit(axis),
             format='6.3f',
             memorized=True,
             hw_memorized=True,
