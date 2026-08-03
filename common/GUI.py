@@ -216,6 +216,144 @@ class GuiBase():
                              'get_ready', 'relax', 'reset_number', 'send_software_trigger', 'clear_queue'],  cmd_parameters=[None, None, [0], None, None])
         self.gui.createPanel(panel3, f'{len(device_list)} devices')
 
+    def tile_panels(self, names=None, orientation='h', sizes=None):
+        """Arrange Taurus panels as docked tiles instead of tabbed panels.
+
+        TaurusGui.createPanel() tabifies new panels by default. This method
+        re-docks selected panels and splits them so they are visible at the
+        same time.
+        """
+        if names is None:
+            names = self.gui.getPanelNames()
+        panels = []
+        for name in names:
+            try:
+                panels.append(self.gui.getPanel(name))
+            except KeyError:
+                pass
+        if len(panels) < 2:
+            return panels
+
+        qt_orientation = (getattr(Qt.Qt, 'Horizontal')
+                          if orientation.lower().startswith('h')
+                          else getattr(Qt.Qt, 'Vertical'))
+        dock_area = getattr(Qt.Qt, 'TopDockWidgetArea')
+        self.gui.setDockNestingEnabled(True)
+        for panel in panels:
+            panel.setFloating(False)
+            panel.show()
+            self.gui.addDockWidget(dock_area, panel)
+
+        anchor = panels[0]
+        for panel in panels[1:]:
+            self.gui.splitDockWidget(anchor, panel, qt_orientation)
+            anchor = panel
+
+        if sizes is None:
+            sizes = [1] * len(panels)
+        self.gui.resizeDocks(panels, sizes, qt_orientation)
+        panels[0].raise_()
+        return panels
+
+    def tile_panels_with_stacked_panels(self, tile_names, stack_names, orientation='h', sizes=None):
+        """Tile image panels in rows and keep another group tab-stacked.
+
+        This is useful for camera GUIs: show image panels in a grid while
+        keeping their parameter forms/manual in a single tabbed dock area on
+        the left.
+        """
+        tile_panels = []
+        for name in tile_names:
+            try:
+                tile_panels.append(self.gui.getPanel(name))
+            except KeyError:
+                pass
+        stack_panels = []
+        for name in stack_names:
+            try:
+                stack_panels.append(self.gui.getPanel(name))
+            except KeyError:
+                pass
+
+        def make_rows(panels):
+            n = len(panels)
+            if n <= 3:
+                row_lengths = [n]
+            elif n == 4:
+                row_lengths = [2, 2]
+            elif n <= 6:
+                row_lengths = [(n + 1) // 2, n // 2]
+            else:
+                row_lengths = [3] * (n // 3)
+                if n % 3:
+                    row_lengths.append(n % 3)
+
+            rows = []
+            start = 0
+            for row_length in row_lengths:
+                rows.append(panels[start:start + row_length])
+                start += row_length
+            return rows
+
+        if not stack_panels:
+            rows = make_rows(tile_panels)
+            if len(rows) <= 1:
+                return self.tile_panels(tile_names, orientation=orientation, sizes=sizes)
+        if not tile_panels:
+            stack_anchor = stack_panels[0]
+            for panel in stack_panels[1:]:
+                self.gui.tabifyDockWidget(stack_anchor, panel)
+            stack_anchor.raise_()
+            return stack_panels
+
+        qt_orientation = (getattr(Qt.Qt, 'Horizontal')
+                          if orientation.lower().startswith('h')
+                          else getattr(Qt.Qt, 'Vertical'))
+        dock_area = getattr(Qt.Qt, 'TopDockWidgetArea')
+        self.gui.setDockNestingEnabled(True)
+        for panel in tile_panels + stack_panels:
+            panel.setFloating(False)
+            panel.show()
+            self.gui.addDockWidget(dock_area, panel)
+
+        rows = make_rows(tile_panels)
+        row_anchors = [row[0] for row in rows]
+        horizontal = getattr(Qt.Qt, 'Horizontal')
+        vertical = getattr(Qt.Qt, 'Vertical')
+
+        if stack_panels:
+            stack_anchor = stack_panels[0]
+            self.gui.splitDockWidget(stack_anchor, tile_panels[0], horizontal)
+            for panel in stack_panels[1:]:
+                self.gui.tabifyDockWidget(stack_anchor, panel)
+        else:
+            stack_anchor = None
+
+        previous_row_anchor = row_anchors[0]
+        for row_anchor in row_anchors[1:]:
+            self.gui.splitDockWidget(previous_row_anchor, row_anchor, vertical)
+            previous_row_anchor = row_anchor
+
+        for row in rows:
+            anchor = row[0]
+            for panel in row[1:]:
+                self.gui.splitDockWidget(anchor, panel, horizontal)
+                anchor = panel
+            if len(row) > 1:
+                self.gui.resizeDocks(row, [1] * len(row), horizontal)
+
+        if len(row_anchors) > 1:
+            self.gui.resizeDocks(row_anchors, [1] * len(row_anchors), vertical)
+        if stack_anchor:
+            if sizes is None:
+                sizes = [1, 3]
+            self.gui.resizeDocks(
+                [stack_anchor, tile_panels[0]], sizes, horizontal)
+        tile_panels[0].raise_()
+        if stack_anchor:
+            stack_anchor.raise_()
+        return tile_panels + stack_panels
+
     def create_blank_panel(self, VorH='V'):
         panel = Qt.QWidget()
         if VorH.lower() == "v":

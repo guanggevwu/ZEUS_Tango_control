@@ -26,6 +26,8 @@ def create_app():
     else:
         serial_number_vs_friendly_name = None
     # get the configuration
+    image_panel_names = []
+    stacked_panel_names = []
     for d in device_list:
         pass_config1 = {}
         if d in image_panel_config:
@@ -45,6 +47,7 @@ def create_app():
         else:
             friendly_name = d
         basler_app.gui.createPanel(image_panel, f'{friendly_name}')
+        image_panel_names.append(f'{friendly_name}')
         basler_app.create_image_panel(image_layout, d, **pass_config1)
         if not len(args.device) > 3:
             basler_app.add_command(image_layout, d, command_list=[
@@ -52,6 +55,7 @@ def create_app():
         # form panel
         form_panel, form_layout = basler_app.create_blank_panel('v')
         basler_app.gui.createPanel(form_panel, f'{friendly_name}_form')
+        stacked_panel_names.append(f'{friendly_name}_form')
         basler_app.create_form_panel(form_layout,
                                      d, exclude=['image', 'image_r', 'image_g', 'image_b', 'flux', 'energy', 'hot_spot'])
     if len(args.device) == 1 and args.device[0] in image_panel_config:
@@ -63,11 +67,16 @@ def create_app():
         pass_config2 = {}
     if 'combination' in args.device[0] or len(args.device) > 1:
         basler_app.combined_panel(device_list, **pass_config2)
+        stacked_panel_names.append(f'{len(device_list)} devices')
     if len(device_list) > 1:
         basler_app.gui.helpManualURI = os.path.join(os.path.dirname(os.path.dirname(
             __file__)), 'DAQ', 'README.html')
+        stacked_panel_names.append('Manual')
     else:
         basler_app.gui.removePanel('Manual')
+    if len(device_list) > 1:
+        basler_app.tile_panels_with_stacked_panels(
+            image_panel_names, stacked_panel_names)
     basler_app.gui.show()
     basler_app.app.exec_()
 
