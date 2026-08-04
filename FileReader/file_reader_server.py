@@ -413,7 +413,7 @@ class FileReader(Device):
         self._host_computer = platform.node()
 
         super().init_device()
-        self._user_defined_name = ''
+        self._user_defined_name = 'Unknown'
         self.logger_base = logging.getLogger(self.__class__.__name__)
         self.logger = LoggerAdapter(self._user_defined_name, self.logger_base)
         self._data_structure = 0
