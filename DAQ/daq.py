@@ -385,7 +385,7 @@ class Daq:
                     warning_message = (
                         'Potential shot number inconsistency was detected.\n\n'
                         f'Current shot numbers:\n{camera_status_message}\n\n'
-                        'Please fix the mismatch and then restart the acquisition. '
+                        'Please STOP acquisition, fix the device that caused the inconsistency, and then START acquisition again. '
                     )
                     self.logger(warning_message, 'red_text')
                     self.shot_number_warning_shown = True

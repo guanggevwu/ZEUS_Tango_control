@@ -125,9 +125,27 @@ class FileReader(Device):
     def read_file_extension(self):
         return self._file_extension
 
+    def _parse_file_extensions(self, value):
+        extensions = []
+        for item in value.split(','):
+            ext = item.strip().lower()
+            if not ext:
+                continue
+            if not ext.startswith('.'):
+                ext = f'.{ext}'
+            extensions.append(ext)
+        return tuple(extensions)
+
     def write_file_extension(self, value):
+        normalized_extensions = self._parse_file_extensions(value)
+        if not normalized_extensions:
+            self.logger.info(
+                "Ignoring file_extension update because no valid extension was provided.")
+            return
+
         if self._file_extension != value:
             self._file_extension = value
+            self._file_extensions = normalized_extensions
             self.change_watching_folder_and_extension()
 
     folder_path = attribute(
@@ -153,7 +171,7 @@ class FileReader(Device):
         # stop_event automatically stops this generator when set()
         for changes in watch(self._folder_path, recursive=False, stop_event=self.stop_event):
             for change_type, file_path in changes:
-                if change_type.name == 'added' and file_path.endswith(tuple(self._file_extension.split(','))) and os.path.isfile(file_path) and os.path.getsize(file_path) > 0:
+                if change_type.name == 'added' and file_path.lower().endswith(self._file_extensions) and os.path.isfile(file_path) and os.path.getsize(file_path) > 0:
                     logging.info(
                         f"New file found in {self._folder_path}: {file_path}")
                     self.new_files_queue.put(file_path)
@@ -403,7 +421,8 @@ class FileReader(Device):
         self._is_polling_periodically = False
         self._polling_period = 199
         self._folder_path = ''
-        self._file_extension = 'tiff'
+        self._file_extension = 'tif,tiff,png,jpg,jpeg,bmp,sif'
+        self._file_extensions = self._parse_file_extensions(self._file_extension)
         self._current_file = ''
         self._read_time = 'N/A'
         self._image = np.zeros([1000, 1000])
