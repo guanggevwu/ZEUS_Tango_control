@@ -315,7 +315,7 @@ class Daq:
                         stitch_local = True
                     elif bs.info().dev_class.lower() == 'filereader' and bs.data_type == "xy":
                         file_name = self.generate_file_name(info, bs)
-                        file_name = file_name.replace('%f', 'csv')
+                        file_name = file_name.replace('%f', bs.current_file.split('.')[-1])
                         source_path = os.path.join(
                             bs.folder_path, bs.current_file)
                         destination_path = os.path.join(
