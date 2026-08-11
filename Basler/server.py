@@ -514,6 +514,7 @@ class Basler(Device):
             self._filter_option = "1"
         if self._has_MeV_mark:
             self.add_attribute(image_with_MeV_mark)
+            self.set_change_event("image_with_MeV_mark", True, False)
             self._image_with_MeV_mark = np.zeros(
                 (self.camera.Height.Value, self.camera.Width.Value))
         self.add_attribute(trigger_source)
@@ -713,6 +714,7 @@ class Basler(Device):
         self.camera.AcquisitionMode.SetValue('Continuous')
         self.camera.AcquisitionFrameRateEnable.SetValue(True)
         self.set_change_event("image", True, False)
+        self.set_change_event("flux", True, False)
         self.camera.MaxNumBuffer.SetValue(1000)
         self.leak_coe = 0.815
         self._calibration = 1

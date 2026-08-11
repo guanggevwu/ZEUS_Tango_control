@@ -39,7 +39,8 @@ if __name__ == "__main__":
         # form panel
         form_panel, form_layout = file_reader_app.create_blank_panel('v')
         file_reader_app.gui.createPanel(form_panel, f'{d}_form')
-        file_reader_app.create_form_panel(form_layout, d)
+        file_reader_app.create_form_panel(
+            form_layout, d, exclude=['image', 'x', 'y'])
 
     file_reader_app.gui.removePanel('Manual')
     file_reader_app.gui.show()

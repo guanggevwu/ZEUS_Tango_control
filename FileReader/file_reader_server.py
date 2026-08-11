@@ -389,11 +389,14 @@ class FileReader(Device):
 
         if self.file_type == 'image':
             self.add_attribute(image)
+            self.set_change_event("image", True, False)
             if self.extra_script == 'center_of_mass':
                 self.initialize_center_of_mass_attributes()
         elif self.file_type == 'xy':
             self.add_attribute(x)
             self.add_attribute(y)
+            self.set_change_event("x", True, False)
+            self.set_change_event("y", True, False)
             self.add_attribute(files_per_shot)
             self.add_attribute(substring_of_display_channel)
             self._files_per_shot = 1
@@ -439,6 +442,8 @@ class FileReader(Device):
         self.new_files_queue = queue.Queue()
         self.stop_event = threading.Event()
         self.monitor_thread = None
+        # force disable polling for "image" in DB
+        self.disable_polling('image')
         logging.info(
             f'FileReader is started.')
         self.set_state(DevState.ON)

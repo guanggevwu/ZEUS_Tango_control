@@ -271,6 +271,10 @@ class Vimba(Device):
         handlers = [logging.StreamHandler()]
         logging.basicConfig(handlers=handlers,
                             format="%(asctime)s %(message)s", level=logging.INFO)
+        # The image attribute is large. It should be delivered by manually
+        # pushed change events instead of Taurus client-side polling.
+        self.disable_polling('image')
+        self.set_change_event("image", True, False)
         self.set_state(DevState.ON)
 
     # def read_save_data(self):
