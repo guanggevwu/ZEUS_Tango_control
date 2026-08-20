@@ -87,6 +87,15 @@ class MyMotorTaurusValue(TaurusValue):
         self.setExtraWidgetClass(MyMotorExtraWidget)
 
 
+class MyMotorReadOnlyTaurusValue(TaurusValue):
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWriteWidgetClass(None)
+        self.setExtraWidgetClass(MyMotorExtraWidget)
+
+
 class _MagnitudeOnlyLineEdit(UnitLessLineEdit):
 
     def setValue(self, v):
@@ -159,4 +168,18 @@ def mymotor_item_factory(model):
         return MyMotorTaurusValue()
     elif dev_class == "ESP301" and model.name.lower() == "ax12_distance":
         return MyGratingTaurusValue()
+    return None
+
+
+def mymotor_read_only_item_factory(model):
+
+    try:
+        dev = model.getParentObj()
+        dev_class = dev.getDeviceProxy().info().dev_class
+    except Exception:
+        return None
+
+    model_name = model.name.lower()
+    if dev_class == "ESP301" and model_name.endswith("_position"):
+        return MyMotorReadOnlyTaurusValue()
     return None

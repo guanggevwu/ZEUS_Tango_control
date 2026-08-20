@@ -137,8 +137,10 @@ class GuiBase():
                 panel_layout.addWidget(panel_w)
         layout.addWidget(panel)
 
-    def create_form_panel(self, layout, device_name, include=None, exclude=None, dropdown=None, withButtons=True, set_attr_font=None):
+    def create_form_panel(self, layout, device_name, include=None, exclude=None, dropdown=None, withButtons=True, set_attr_font=None, item_factories=None):
         panel2_w1 = TaurusForm(withButtons=withButtons)
+        if item_factories is not None:
+            panel2_w1.setItemFactories(include=item_factories)
         form_model = self.attr_list[device_name]['model']
         # re-order. Move trigger to front.
         re_order_list = {'trigger_source': 12, 'filter_option': 4}
@@ -188,6 +190,7 @@ class GuiBase():
                                         1, int(round(row_font.pointSize() * 0.6)))
                                     compact_font.setPointSize(compact_size)
                                     child.setFont(compact_font)
+        return panel2_w1
 
     def combined_panel(self, device_list, combine_form_with_onshot=False):
         panel3, panel3_layout = self.create_blank_panel('v')

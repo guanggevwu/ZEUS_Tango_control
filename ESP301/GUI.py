@@ -1,8 +1,18 @@
 from common.GUI import GuiBase
 from common.TaurusGUI_Argparse import TaurusArgparse
 from common.config import device_name_table
+from common.my_motor_widget import mymotor_read_only_item_factory
 import tango
 import os
+
+
+def get_device_property(device_proxy, property_name, default=''):
+    try:
+        values = device_proxy.get_property(
+            property_name).get(property_name, [])
+    except Exception:
+        return default
+    return values[0] if values else default
 
 
 def create_app():
@@ -17,10 +27,13 @@ def create_app():
     # get the configuration
     for d in device_list:
         esp_app.add_device(d)
-        if tango.DeviceProxy(d).info().dev_class == 'ESP301':
+        device_proxy = tango.DeviceProxy(d)
+        if device_proxy.info().dev_class == 'ESP301':
+            is_grating = get_device_property(
+                device_proxy, 'extra_script') == 'grating'
             less_list = ['user_defined_name', 'error_message', 'message', 'current_location', 'customized_location', 'ax1_position', 'set_ax1_as', 'ax2_position', 'set_ax2_as', 'ax3_position',
                          'set_ax3_as']
-            if 'grating' in d:
+            if is_grating:
                 less_list.append('ax12_distance')
             more_list = ['host_computer', 'saved_location_source', 'user_defined_locations',
                          'raw_command', 'status', 'state']
@@ -51,6 +64,15 @@ def create_app():
             less_panel, less_layout = esp_app.create_blank_panel('v')
             esp_app.create_form_panel(
                 less_layout, d,  dropdown=dropdown, include=less_list, withButtons=False, set_attr_font={key: {'font': '"Sans Serif"', 'size': 20} for key in ['ax1_position', 'ax2_position', 'ax3_position', 'ax12_distance', 'customized_location']})
+            minimum_panel = None
+            if is_grating:
+                minimum_panel, minimum_layout = esp_app.create_blank_panel('v')
+                minimum_list = [attr for attr in less_list
+                                if not attr.startswith('set_ax')]
+                esp_app.create_form_panel(
+                    minimum_layout, d,  dropdown=dropdown, include=minimum_list, withButtons=False, set_attr_font={key: {'font': '"Sans Serif"', 'size': 20} for key in ['ax1_position', 'ax2_position', 'ax3_position', 'ax12_distance', 'customized_location']}, item_factories=[mymotor_read_only_item_factory, ".*"])
+                esp_app.add_command(
+                    minimum_layout, d, command_list=['Init', 'stop'])
             command_list, modified_cmd_name, cmd_parameters = [], [], []
             command_with_axis_parameters = [
                 'move_to_negative_limit', 'move_to_positive_limit', 'set_as_zero']
@@ -80,6 +102,8 @@ def create_app():
                     more_layout, d, command_list=['reset_to_TA1'])
             esp_app.gui.createPanel(more_panel, f'{d}_more')
             esp_app.gui.createPanel(less_panel, f'{d}_less')
+            if minimum_panel is not None:
+                esp_app.gui.createPanel(minimum_panel, f'{d}_minimum')
 
     esp_app.gui.removePanel('Manual')
     esp_app.gui.show()
