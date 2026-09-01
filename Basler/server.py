@@ -114,7 +114,7 @@ class Basler(Device):
 
     serial_number = device_property(dtype=str, default_value='')
     friendly_name = device_property(dtype=str, default_value='')
-    extra_script = device_property(dtype=str, default_value='center_of_mass')
+    extra_script = device_property(dtype=str, default_value='')
 
     # image_encoded = attribute(label='encoded image',
     #            access=AttrWriteType.READ)

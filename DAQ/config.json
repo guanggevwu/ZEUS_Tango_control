@@ -1,15 +1,13 @@
 {
   "_comment": "Default configuration for camera parameters. The keys should match the user defined names of the cameras. The values are dictionaries of parameters to set for each camera. If a parameter is not specified for a camera, it will use the default value from the DAQ class.",
-  "TA1-SideView": { "format_pixel": "RGB8" },
   "test": {
     "format_pixel": "Mono8",
     "exposure": 100000,
-    "saving_format": "%s_%t_%e_%h.%f"
+    "saving_format": "%s_%t_%e_%h%f"
   },
-  "file_reader_1": { "saving_format": "FileReader_%s.%f" },
   "scope": { "saving_format": "%s_%t_%o.%f" },
   "all": {
-    "saving_format": "%s_%t.%f",
+    "saving_format": "%s_%t%f",
     "trigger_source": "External",
     "is_polling_periodically": false,
     "exposure": 100000,

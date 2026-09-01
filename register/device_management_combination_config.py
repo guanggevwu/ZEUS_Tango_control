@@ -3,7 +3,7 @@ root_path = os.path.dirname(os.path.dirname(__file__))
 container = {
     'cameras': {'show_name': 'Cameras', 'class': {'Basler': None,
                                                   'Vimba': None,
-                                                  'FileReader': {'only_these_devices': ['facility/file_reader/andor_1', 'facility/file_reader/sophia']}}, },
+                                                  'FileReader': {'only_these_devices': ['facility/file_reader/andor_1', 'facility/file_reader/sophia','facility/file_reader/image_reader_1','facility/file_reader/image_reader_2']}}, },
     'motion_control': {'show_name': 'Motion Control', 'class': {
         'ESP301': {'extra_devices': ['TA1_motor_combination', 'TA2_motor_combination', 'TA3_motor_combination']},
         'OwisPS': {'server_code_path': os.path.join(root_path, 'Owis', 'server.py'), 'GUI_code_path': os.path.join(root_path, 'Owis', 'GUI.py')},

@@ -14,6 +14,7 @@ from tango.server import Device, attribute, command, device_property
 from tango import AttrWriteType, DevState, DevFloat, EncodedAttribute
 from common.logger_adapter import LoggerAdapter
 from common.shared_server_side import add_center_of_mass_functions
+from parse_content import parse_tracklab_frame_data
 
 # -----------------------------
 
@@ -24,9 +25,11 @@ logging.basicConfig(handlers=handlers,
 
 @add_center_of_mass_functions
 class FileReader(Device):
+    DEFAULT_MAX_WATCHED_FILE_SIZE_BYTES = 100 * 1024 * 1024
+
     # file_type can be 'image' or 'xy'. If it is 'image', then the device will read image files. If it is 'xy', then the device will read xy data files.
     file_type = device_property(dtype=str, default_value='image')
-    extra_script = device_property(dtype=str, default_value='center_of_mass')
+    extra_script = device_property(dtype=str, default_value='')
 
     host_computer = attribute(
         label="host computer",
@@ -68,7 +71,7 @@ class FileReader(Device):
         memorized=True,
         hw_memorized=True,
         access=AttrWriteType.READ_WRITE,
-        doc='0 for VISSpec csv file. 1 for Lecroy scope csv file.'
+        doc='For file_type="image": 0 is a standard image file; 1 is a text-based image stream that is reconstructed into a 2D image but copied as raw text. For file_type="xy": 0 is a generic text table and 1 is a scope-like XY/text structure.'
     )
 
     def read_data_structure(self):
@@ -164,24 +167,73 @@ class FileReader(Device):
             logging.info(
                 f"Watching folder: {self._folder_path} for files containing: {self._contain_sub_string}")
 
+    max_watched_file_size_bytes = attribute(
+        label="maximum watched file size",
+        dtype=int,
+        unit="bytes",
+        memorized=True,
+        hw_memorized=True,
+        access=AttrWriteType.READ_WRITE,
+    )
+
+    def read_max_watched_file_size_bytes(self):
+        return self._max_watched_file_size_bytes
+
+    def write_max_watched_file_size_bytes(self, value):
+        if value <= 0:
+            self.logger.info(
+                "Ignoring maximum watched file size because it must be positive.")
+            return
+        self._max_watched_file_size_bytes = value
+
     def _matches_contain_sub_string(self, file_path):
         file_name = os.path.basename(file_path).lower()
         return any(contain_sub_string in file_name for contain_sub_string in self._contain_sub_strings)
+
+    def _is_candidate_file(self, file_path):
+        if not os.path.isfile(file_path):
+            return False
+
+        file_size = os.path.getsize(file_path)
+        if file_size <= 0:
+            return False
+
+        # Ignore large placeholder files and keep normal-size data files.
+        return file_size <= self._max_watched_file_size_bytes
+
+    def _has_new_file_signature(self, file_path):
+        stat = os.stat(file_path)
+        signature = (stat.st_mtime_ns, stat.st_size)
+        if self._last_seen_file_signatures.get(file_path) == signature:
+            return False
+
+        self._last_seen_file_signatures[file_path] = signature
+        return True
 
     def _watch_loop(self):
         logging.info(f"--- Started watching: {self._folder_path} ---")
         # stop_event automatically stops this generator when set()
         for changes in watch(self._folder_path, recursive=False, stop_event=self.stop_event):
             for change_type, file_path in changes:
-                if change_type.name == 'added' and self._matches_contain_sub_string(file_path) and os.path.isfile(file_path) and os.path.getsize(file_path) > 0:
+                file_name = os.path.basename(file_path)
+                if (
+                    change_type.name in ('added', 'modified')
+                    and self._matches_contain_sub_string(file_path)
+                    and self._is_candidate_file(file_path)
+                    and self._has_new_file_signature(file_path)
+                    and file_name != self._last_queued_file_name
+                ):
+                    self._last_queued_file_name = file_name
                     logging.info(
-                        f"New file found in {self._folder_path}: {file_path}")
+                        f"New/updated file found in {self._folder_path}: {file_path}")
                     self.new_files_queue.put(file_path)
         logging.info(f"--- Stopped watching: {self._folder_path} ---")
 
     def start_watching(self):
         self.stop_event.clear()
         self.new_files_queue.queue.clear()
+        self._last_seen_file_signatures.clear()
+        self._last_queued_file_name = ''
         self.monitor_thread = threading.Thread(
             target=self._watch_loop, daemon=True)
         self.monitor_thread.start()
@@ -246,7 +298,7 @@ class FileReader(Device):
             self._current_file = new_file.split(os.sep)[-1]
             while True:
                 try:
-                    if self.file_type == "image":
+                    if self.file_type == "image" and self._data_structure == 0:
                         if self._current_file.endswith('.sif'):
                             # read file
                             self._image, info = sif_parser.np_open(
@@ -262,6 +314,12 @@ class FileReader(Device):
                         self.calculate_center_of_mass()
                         self.push_change_event(
                             "image", self.read_image("placeholder"))
+                    elif self.file_type == "image" and self._data_structure == 1:
+                        with open(os.path.join(self._folder_path, self._current_file), 'r', encoding='utf-8', errors='replace') as txtfile:
+                            text = txtfile.read()
+                        self._image = parse_tracklab_frame_data(text, width=256, index_offset=0)
+                        if self._image.size:
+                            self.push_change_event("image", self.read_image("placeholder"))
                     elif self._data_structure == 0:
                         with open(os.path.join(self._folder_path, self._current_file), newline='') as csvfile:
                             reader = csv.reader(csvfile)
@@ -346,8 +404,8 @@ class FileReader(Device):
         image = attribute(
             name="image",
             label="image",
-            max_dim_x=10000,
-            max_dim_y=10000,
+            max_dim_x=15000,
+            max_dim_y=15000,
             dtype=((int,),),
             access=AttrWriteType.READ,
         )
@@ -390,6 +448,8 @@ class FileReader(Device):
         if self.file_type == 'image':
             self.add_attribute(image)
             self.set_change_event("image", True, False)
+            self.add_attribute(files_per_shot)
+            self._files_per_shot = 1
             if self.extra_script == 'center_of_mass':
                 self.initialize_center_of_mass_attributes()
         elif self.file_type == 'xy':
@@ -426,6 +486,7 @@ class FileReader(Device):
         self._is_polling_periodically = False
         self._polling_period = 199
         self._folder_path = ''
+        self._max_watched_file_size_bytes = self.DEFAULT_MAX_WATCHED_FILE_SIZE_BYTES
         self._contain_sub_string = '.tif,.tiff,.png,.jpg,.jpeg,.bmp,.sif'
         self._contain_sub_strings = self._parse_contain_sub_strings(self._contain_sub_string)
         self._current_file = ''
@@ -444,6 +505,8 @@ class FileReader(Device):
         self.monitor_thread = None
         # force disable polling for "image" in DB
         self.disable_polling('image')
+        self._last_seen_file_signatures = {}
+        self._last_queued_file_name = ''
         logging.info(
             f'FileReader is started.')
         self.set_state(DevState.ON)

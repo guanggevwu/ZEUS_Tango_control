@@ -18,6 +18,8 @@ import platform
 import shutil
 from constants import SHOT_NUMBER_INCONSISTENCY_THRESHOLD
 
+FILE_READER_TIMEOUT_MS = 10000
+
 logging.basicConfig(
     format="%(asctime)s %(message)s",
     level=logging.INFO)
@@ -53,6 +55,7 @@ class Daq:
             try:
                 bs = tango.DeviceProxy(c)
                 bs.ping()
+                bs.set_timeout_millis(FILE_READER_TIMEOUT_MS)
                 self.cam_info[c] = {}
                 self.cam_info[c]['device_proxy'] = bs
                 self.cam_info[c]['user_defined_name'] = bs.user_defined_name
@@ -74,6 +77,11 @@ class Daq:
         if self.debug:
             tracemalloc.start()
             self.snapshot = tracemalloc.take_snapshot()
+
+    def _to_hidden_save_path(self, save_path):
+        """Map a visible save path into the hidden mirror path robustly."""
+        relative_path = os.path.relpath(save_path, self.dir)
+        return os.path.join(self.hidden_dir, relative_path)
 
     def set_camera_configuration(self, grab_number=None, config_dict=None, load_json=True, saving=True):
         # list of user defined names of the cameras
@@ -176,6 +184,20 @@ class Daq:
             data_array = image.astype(f'uint{bits}')
         return data_PIL, data_array
 
+    def _normalize_for_stitch(self, img):
+        arr = np.asarray(img)
+        if arr.ndim == 0:
+            arr = arr.reshape(1, 1)
+        if arr.ndim == 3 and arr.shape[2] in (3, 4):
+            return arr.astype(np.uint8, copy=False)
+        if arr.dtype == np.float64:
+            return arr.astype(np.float32, copy=False)
+        if arr.dtype.kind in {'i', 'u'} and arr.dtype.itemsize > 2:
+            if arr.size and np.max(arr) <= 255:
+                return arr.astype(np.uint8, copy=False)
+            return arr.astype(np.uint16, copy=False)
+        return arr
+
     def acquisition(self, stitch=True, shot_start=1, shot_end=float('inf'), scan_table=None):
         '''
         Main acquisition function. Use external trigger and save data.
@@ -259,8 +281,7 @@ class Daq:
                     data.save(save_path)
                     self.logger(message)
                     if self.GUI.options['save_copy']:
-                        data.save(save_path.replace(
-                            self.dir, self.hidden_dir, 1))
+                        data.save(self._to_hidden_save_path(save_path))
                 except Exception as e:
                     self.logger(f"Error saving file: {e}", 'red_text')
             else:
@@ -268,8 +289,7 @@ class Daq:
                     shutil.copy(data, save_path)
                     self.logger(message)
                     if self.GUI.options['save_copy']:
-                        shutil.copy(data, save_path.replace(
-                            self.dir, self.hidden_dir, 1))
+                        shutil.copy(data, self._to_hidden_save_path(save_path))
                 except Exception as e:
                     self.logger(f"Error copying file: {e}", 'red_text')
 
@@ -300,10 +320,10 @@ class Daq:
                         except Exception as e:
                             self.logger(
                                 f'Error in accessing plasma mirror stage: {e}', 'red_text')
-                    if (bs.info().dev_class.lower() in ['basler', 'vimba']) or (bs.info().dev_class.lower() == 'filereader' and bs.data_type == "image"):
+                    if (bs.info().dev_class.lower() in ['basler', 'vimba']) or (bs.info().dev_class.lower() == 'filereader' and bs.data_type == "image" and bs.data_structure == 0):
                         data, data_array = self.get_image(bs)
                         file_name = self.generate_file_name(info, bs)
-                        file_name = file_name.replace('%f', 'tiff')
+                        file_name = file_name.replace('%f', '.tiff')
                         # self.logger(
                         #     f"It takes {datetime.now()-t0} to acquire {info['user_defined_name']} {info['shot_num']}.")
                         save_path = os.path.join(info['cam_dir'], file_name)
@@ -315,7 +335,7 @@ class Daq:
                         stitch_local = True
                     elif bs.info().dev_class.lower() == 'filereader' and bs.data_type == "xy":
                         file_name = self.generate_file_name(info, bs)
-                        file_name = file_name.replace('%f', bs.current_file.split('.')[-1])
+                        file_name = file_name.replace('%f', "_"+bs.current_file)
                         source_path = os.path.join(
                             bs.folder_path, bs.current_file)
                         destination_path = os.path.join(
@@ -332,7 +352,20 @@ class Daq:
                         else:
                             add_number = 0
                             stitch_local = False
-                    if stitch and stitch_local:
+                    elif bs.info().dev_class.lower() == 'filereader' and bs.data_type == "image" and bs.data_structure == 1:
+                        file_name = self.generate_file_name(info, bs)
+                        file_name = file_name.replace('%f', "_"+bs.current_file)
+                        source_path = os.path.join(
+                            bs.folder_path, bs.current_file)
+                        destination_path = os.path.join(
+                            info['cam_dir'], file_name)
+                        message = f"Shot {info['shot_num']} for {info['user_defined_name']} is saved."
+                        info["saving_queue"].put(
+                            ("copy_file", source_path, destination_path, message))
+                        add_number = 1
+                        stitch_local = True
+                        data_array = np.array(bs.image, copy=True)
+                    if stitch and stitch_local and data_array is not None:
                         if getattr(bs, 'format_pixel', '').lower() == "rgb8":
                             data_array = 0.299 * \
                                 data_array[:, :, 0] + 0.587 * data_array[:,
@@ -588,7 +621,7 @@ class Daq:
             for i in range(len(ax)):
                 ax[i].axis('off')
             for idx, (c, info) in enumerate(self.cam_info.items()):
-                img = info['images_to_stitch'][image_name]
+                img = self._normalize_for_stitch(info['images_to_stitch'][image_name])
                 limits = self.get_image_stretch_limits(img)
                 cam_name = info['user_defined_name']
                 sub_fig = ax[idx].imshow(
@@ -606,8 +639,8 @@ class Daq:
             message = f"Shot {image_name.replace('shot', '')} for stitching is saved."
             self.logger(message)
             if self.GUI.options['save_copy']:
-                fig.savefig(stitch_save_path.replace(
-                    self.dir, self.hidden_dir, 1), bbox_inches='tight')
+                fig.savefig(self._to_hidden_save_path(
+                    stitch_save_path), bbox_inches='tight')
         except Exception as e:
             self.logger(f"Error saving stitch image: {e}", 'red_text')
         finally:
