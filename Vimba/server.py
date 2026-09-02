@@ -58,7 +58,7 @@ class Vimba(Device):
         return self._read_time
 
     friendly_name = device_property(dtype=str, default_value='')
-    extra_script = device_property(dtype=str, default_value='center_of_mass')
+    enable_center_of_mass = device_property(dtype=bool, default_value=True)
 
     model = attribute(
         label="model",
@@ -201,7 +201,7 @@ class Vimba(Device):
         self.add_attribute(width)
         self.add_attribute(height)
         self.add_attribute(trigger_source)
-        if self.extra_script == "center_of_mass":
+        if self.enable_center_of_mass:
             self.initialize_center_of_mass_attributes()
 
     def read_exposure(self):
@@ -399,7 +399,8 @@ class Vimba(Device):
             frame_array = np.squeeze(frame.as_numpy_ndarray())
             self.imageq.put(frame_array)
             self._image = frame_array
-            self.calculate_center_of_mass()
+            if self.enable_center_of_mass:
+                self.calculate_center_of_mass()
         self.camera.queue_frame(frame)
 
     def handler_last_frame(self, cam: Camera, stream: Stream, frame: Frame):
@@ -407,7 +408,8 @@ class Vimba(Device):
             self.logger.info('Frame acquired: {}'.format(frame))
             frame_array = np.squeeze(frame.as_numpy_ndarray())
             self._image = frame_array
-            self.calculate_center_of_mass()
+            if self.enable_center_of_mass:
+                self.calculate_center_of_mass()
         self.camera.queue_frame(frame)
 
     @command()

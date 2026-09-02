@@ -94,28 +94,10 @@ class Basler(Device):
     def read_read_time(self):
         return self._read_time
 
-    flux = attribute(
-        label="flux",
-        max_dim_x=10000,
-        max_dim_y=10000,
-        dtype=((float,),),
-        unit='J*cm**-2',
-        access=AttrWriteType.READ,
-    )
-
-    hot_spot = attribute(
-        label="hot spot",
-        dtype=float,
-        unit='J*cm**-2',
-        format='8.4f',
-        access=AttrWriteType.READ,
-        doc="Flat kernel is used. The kernel size is 7*7 for 3PW_Grating-4_NF camera and 5*5 for 3PW_Screen camera. The real size is about 0.22*0.22 cm2. The energy per area is to show the read location data, thus the leak coefficient and clip coefficient (only for 3PW_Grating-4_NF) are considered."
-    )
-
     serial_number = device_property(dtype=str, default_value='')
     friendly_name = device_property(dtype=str, default_value='')
-    extra_script = device_property(dtype=str, default_value='')
-
+    enable_center_of_mass = device_property(dtype=bool, default_value=True)
+    show_energy_flux_hotspot = device_property(dtype=bool, default_value=False)
     # image_encoded = attribute(label='encoded image',
     #            access=AttrWriteType.READ)
 
@@ -140,14 +122,6 @@ class Basler(Device):
 
     def read_user_defined_name(self):
         return self.camera.GetDeviceInfo().GetUserDefinedName()
-
-    energy = attribute(
-        label="energy",
-        dtype=float,
-        unit='J',
-        access=AttrWriteType.READ,
-        doc='Calibrated by QE195 E = sum(I)_from_current_image*Energy_reading_from_QE195_during_calibration/sum(I)_during_calibration. The energy value here is to mimic the reading from QE195, thus no clip coefficient and leak coefficient are considered.'
-    )
 
     def read_energy(self):
         return self._energy
@@ -502,6 +476,32 @@ class Basler(Device):
             dtype=((np.uint16,),),
             access=AttrWriteType.READ,
         )
+        energy = attribute(
+            name="energy",
+            label="energy",
+            dtype=float,
+            unit='J',
+            access=AttrWriteType.READ,
+            doc='Calibrated by QE195 E = sum(I)_from_current_image*Energy_reading_from_QE195_during_calibration/sum(I)_during_calibration. The energy value here is to mimic the reading from QE195, thus no clip coefficient and leak coefficient are considered.'
+        )
+        flux = attribute(
+            name="flux",
+            label="flux",
+            max_dim_x=10000,
+            max_dim_y=10000,
+            dtype=((float,),),
+            unit='J*cm**-2',
+            access=AttrWriteType.READ,
+        )
+        hot_spot = attribute(
+            name="hot_spot",
+            label="hot spot",
+            dtype=float,
+            unit='J*cm**-2',
+            format='8.4f',
+            access=AttrWriteType.READ,
+            doc="Flat kernel is used. The kernel size is 7*7 for 3PW_Grating-4_NF camera and 5*5 for 3PW_Screen camera. The real size is about 0.22*0.22 cm2. The energy per area is to show the read location data, thus the leak coefficient and clip coefficient (only for 3PW_Grating-4_NF) are considered."
+        )
         try:
             self.read_binning_horizontal(0)
             self.add_attribute(binning_horizontal)
@@ -509,16 +509,24 @@ class Basler(Device):
         except Exception:
             self.logger.warning(
                 "binning_horizontal and binning_vertical attributes are not available for this camera model.")
-        if self.device.GetUserDefinedName() == "3PW_Grating-4_NF" or self.device.GetUserDefinedName() == "3PW_Screen" or self.device.GetUserDefinedName() == "test":
-            self.add_attribute(filter_option)
-            self._filter_option = "1"
         if self._has_MeV_mark:
             self.add_attribute(image_with_MeV_mark)
             self.set_change_event("image_with_MeV_mark", True, False)
             self._image_with_MeV_mark = np.zeros(
                 (self.camera.Height.Value, self.camera.Width.Value))
+        if self.show_energy_flux_hotspot:
+            self.add_attribute(energy)
+            self.add_attribute(flux)
+            self.add_attribute(hot_spot)
+            self.add_attribute(filter_option)
+            self.filter_option_details = {
+                "1": [27.53, 26.988, 0.8455, 27.53, 24.540], "2": [23.24, 21.370, 0.827, 23.24, 20.641]}
+            self._filter_option = "1"
+            self.set_change_event("flux", True, False)
+            self.set_change_event("energy", True, False)
+            self.set_change_event("hot_spot", True, False)
         self.add_attribute(trigger_source)
-        if self.extra_script == "center_of_mass":
+        if self.enable_center_of_mass:
             self.initialize_center_of_mass_attributes()
         # self.add_attribute("trigger_source")
         # if self.camera.DeviceModelName() in ['acA640-121gm']:
@@ -640,8 +648,6 @@ class Basler(Device):
 
     def init_device(self):
         self._host_computer = platform.node()
-        self.filter_option_details = {
-            "1": [27.53, 26.988, 0.8455, 27.53, 24.540], "2": [23.24, 21.370, 0.827, 23.24, 20.641]}
         self.path_raw = ''
         self._is_polling_periodically = False
         self._debug = False
@@ -650,8 +656,6 @@ class Basler(Device):
         self._naming_format = '%t.%f'
         self._save_interval = 0
         self._image_number = 0
-        self._energy = 0
-        self._hot_spot = 0
         self._read_time = 'N/A'
         self._use_date = False
         self._lr_flip = False
@@ -697,7 +701,7 @@ class Basler(Device):
         self._polling = self.get_attribute_poll_period('is_new_image')
         if self._polling == 0:
             self._polling = 200
-        self._timeout_polling_ratio = 0.75
+        self._timeout_polling_ratio = 0.5
         self._image = np.zeros(
             (self.camera.Height.Value, self.camera.Width.Value))
         # if the pixel format can be read as rbg8, definitely should use slicing for images. Sometimes the pixel format at device start up is not 'rgb8', but I know for this type of camera (a2A1920-51gcBAS) we probably will change the format to 'rgb8' later, so we include rgb slice at startup.
@@ -708,36 +712,42 @@ class Basler(Device):
                 (self.camera.Height.Value, self.camera.Width.Value))
             self._image_b = np.zeros(
                 (self.camera.Height.Value, self.camera.Width.Value))
-        self._flux = np.zeros(
-            (self.camera.Height.Value, self.camera.Width.Value))
         # always use continuous mode. Although it seems this is the default, still set it here in case.
         self.camera.AcquisitionMode.SetValue('Continuous')
         self.camera.AcquisitionFrameRateEnable.SetValue(True)
         self.set_change_event("image", True, False)
-        self.set_change_event("flux", True, False)
+        self.set_change_event("image_number", True, False)
+        self.set_change_event("save_path", True, False)
         self.camera.MaxNumBuffer.SetValue(1000)
-        self.leak_coe = 0.815
-        self._calibration = 1
-        self.clip_coe = 1
-        self.mean_intensity_of_calibration_images = 1
-        self.QE195_reading = 1
+        if self.show_energy_flux_hotspot:
+            self._energy = 0
+            self._hot_spot = 0
+            self._flux = np.zeros(
+                (self.camera.Height.Value, self.camera.Width.Value))
+            self.leak_coe = 0.815
+            self.clip_coe = 1
+            self.mean_intensity_of_calibration_images = 1
+            self.QE195_reading = 1
+            self._cabilibrate_camera()
+        self._has_MeV_mark = 0
+        if self.serial_number in basler_server_config["mev_mark"]["serial_number"]:
+            self._has_MeV_mark = 1
+        self.q = Queue()
+
+    def _cabilibrate_camera(self):
         if self.device.GetUserDefinedName() == "3PW_Grating-4_NF":
             self.energy_intensity_coefficient = self.QE195_reading / \
                 (self.mean_intensity_of_calibration_images*640*512)
             self.pixel_size = 4.97/107
             self.kernel = np.ones([7, 7])/49
-        elif self.device.GetUserDefinedName() == "3PW_Screen" or self.device.GetUserDefinedName() == 'test':
+        elif self.device.GetUserDefinedName() == "3PW_Screen":
             self.energy_intensity_coefficient = self.QE195_reading / \
                 (self.mean_intensity_of_calibration_images*640*512)
             self.pixel_size = 20/316
             self.kernel = np.ones([5, 5])/25
         else:
-            self._calibration = 0
-            self._flux = np.zeros((2, 2))
-        self._has_MeV_mark = 0
-        if self.serial_number in basler_server_config["mev_mark"]["serial_number"]:
-            self._has_MeV_mark = 1
-        self.q = Queue()
+            raise Exception(
+                f'Energy/flux/hot spot calibration is not available for {self.device.GetUserDefinedName()}')
 
     def _close_camera(self):
         if not hasattr(self, 'camera'):
@@ -822,7 +832,7 @@ class Basler(Device):
         self.push_change_event("save_path", self.read_save_path())
 
     def get_settings(self):
-        if self._calibration:
+        if self.show_energy_flux_hotspot:
             self.csv_fieldnames = ['_read_time', '_image_number', '_energy', '_hot_spot', '_exposure', '_gain', '_binning_horizontal', '_binning_vertical', '_width',
                                    '_height', 'QE195_reading', 'mean_intensity_of_calibration_images', 'leak_coe', 'clip_coe', 'pixel_size']
         else:
@@ -897,7 +907,7 @@ class Basler(Device):
         if current_trigger_source != 'Off':
             self.write_trigger_source(current_trigger_source)
 
-    def read_trigger_source(self, attr):
+    def read_trigger_source(self, attr=None):
         # replace 'on' with 'Software' and 'Line1'
         if self.camera.TriggerMode.Value == 'Off':
             return 'Off'
@@ -914,7 +924,6 @@ class Basler(Device):
             value = attr
         if value.lower() == 'off':
             self.camera.TriggerMode.SetValue('Off')
-            self.write_is_polling_periodically(True)
         else:
             self.camera.TriggerMode.SetValue('On')
             if value.lower() == 'external':
@@ -1005,15 +1014,14 @@ class Basler(Device):
             # the retrieve time out may need to be reconsidered.
             time0 = time.perf_counter()
             grabResult = self.camera.RetrieveResult(
-                100, pylon.TimeoutHandling_Return)
-            if self._debug:
-                self.logger.info(f'grab takes {time.perf_counter() - time0}')
+                int(self._polling*self._timeout_polling_ratio), pylon.TimeoutHandling_Return)
+            im_pil = None
+            # if self._debug:
+            #     self.logger.info(f'grab takes {time.perf_counter() - time0}')
             if grabResult and grabResult.GrabSucceeded():
                 if self.read_trigger_source("").lower() != "off":
-                    self.i += 1
                     self._image_number += 1
-                    self.logger.info(
-                        f'{self.i}')
+                self.i += 1
                 self._image = grabResult.Array
                 if len(self._image.shape) == 3:
                     self._image_r = self._image[:, :, 0]
@@ -1029,8 +1037,11 @@ class Basler(Device):
                     self._image = np.flipud(self._image)
                 if self._rotate:
                     self._image = np.rot90(self._image, int(self._rotate/90))
+                center_of_mass_time0 = time.perf_counter()
                 self.calculate_center_of_mass()
-                if self._calibration:
+                print(
+                    f"center_of_mass calculation takes {time.perf_counter() - center_of_mass_time0:.6f} s")
+                if self.show_energy_flux_hotspot:
                     self._energy = (np.sum(self._image)) * \
                         self.energy_intensity_coefficient
                     self._flux = (self._image) * self.energy_intensity_coefficient * self.clip_coe *\
@@ -1071,19 +1082,17 @@ class Basler(Device):
                 grabResult.Release()
                 if self._debug:
                     self.logger.info(
-                        f"{self._image_number} new. mean intensity: {np.mean(self._image)}")
+                        f"Internal #: {self.i}. External #: {self._image_number} new. mean intensity: {np.mean(self._image)}")
 
                 self._is_new_image = True
                 self._read_time = datetime.datetime.now().strftime("%H-%M-%S.%f")
                 # self.push_change_event("image", self._image)
-                self.push_change_event("image", self.read_image())
-                self.push_change_event("flux", self.read_flux())
-                self.push_change_event(
-                    "image_number", self.read_image_number())
-                self.push_change_event(
-                    "energy", self.read_energy())
-                self.push_change_event(
-                    "hot_spot", self.read_hot_spot())
+                self.push_change_event("image", self._image)
+                self.push_change_event("image_number", self._image_number)
+                if self.show_energy_flux_hotspot:
+                    self.push_change_event("flux", self._flux)
+                    self.push_change_event("energy", self._energy)
+                    self.push_change_event("hot_spot", self._hot_spot)
                 # show image count while not in live mode
                 if self._save_data and self._save_path:
                     parse_save_path = self._save_path.split(';')
@@ -1110,7 +1119,7 @@ class Basler(Device):
                                             f"Check the logging file at {os.path.join(path, 'logging.csv')}")
                                     self.logger.info(
                                         f"Removed previous saved image {self.image_basename}")
-                                if self._calibration:
+                                if self.show_energy_flux_hotspot:
                                     if os.path.exists(os.path.join(
                                             path, self.flux_path_string, self.image_basename)):
                                         os.remove(os.path.join(
@@ -1118,18 +1127,30 @@ class Basler(Device):
                                 should_save = False
                     self.time0 = self.time1
                     # generate file name after delete the old file name
+                    basename_lookup = {
+                        '%s': f'ImageNum{self._image_number}',
+                        '%t': f'Time{self._read_time}',
+                        '%f': 'tiff',
+                    }
+                    if self.show_energy_flux_hotspot:
+                        basename_lookup.update({
+                            '%e': f'Energy{self._energy:.3f}J',
+                            '%h': f'HotSpot{self._hot_spot:.4f}Jcm-2',
+                        })
                     self.image_basename = generate_basename(
-                        self._naming_format, {'%s': f'ImageNum{self._image_number}', '%t': f'Time{self._read_time}', '%e': f'Energy{self._energy:.3f}J', '%h': f'HotSpot{self._hot_spot:.4f}Jcm-2', '%f': 'tiff'})
+                        self._naming_format, basename_lookup)
                     if should_save:
                         data = Image.fromarray(self._image)
                         self.q.put(data)
                         self.get_settings()
                         self.q.put(self.data_to_log)
-                        if self._calibration:
+                        if self.show_energy_flux_hotspot:
                             self.q.put(im_pil)
                             # self.q.put(Image.fromarray(convolved_image))
                         Thread(target=self.save_image_to_file,
                                args=[self.q]).start()
+            elif self.read_trigger_source('placeholder').lower() == "off":
+                self.logger.info("grab not successful")
             return self._is_new_image
         # return False if there is no new image
         return self._is_new_image
@@ -1138,7 +1159,8 @@ class Basler(Device):
         parse_save_path = self._save_path.split(';')
         image_to_save = q.get()
         data_to_log = q.get()
-        if self._calibration:
+        flux_to_save = None
+        if self.show_energy_flux_hotspot:
             flux_to_save = q.get()
         for path in parse_save_path:
             os.makedirs(path, exist_ok=True)
@@ -1148,7 +1170,7 @@ class Basler(Device):
             self.logger.info(
                 f"Image is save to {path_to_name}")
             self.save_settings(path, data_to_log)
-            if self._calibration:
+            if self.show_energy_flux_hotspot:
                 os.makedirs(os.path.join(
                     path, self.flux_path_string), exist_ok=True)
                 parts = path_to_name.split(os.sep)
@@ -1207,6 +1229,7 @@ class Basler(Device):
         """
         If trigger mode is Off, then the trigger selector has no effect.
         """
+        self.i = 0
         if self.camera.TriggerMode.Value.lower() == 'off':
             if not self.camera.IsGrabbing():
                 self.camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
@@ -1216,7 +1239,6 @@ class Basler(Device):
                 self.logger.info(
                     'Already in live mode. No need to start grabbing.')
         else:
-            self.i = 0
             # Previous we use a very large number for _grab_number, but it caused some memory problem when we have many camera.
             if not self.camera.IsGrabbing():
                 self._grab_number = max(

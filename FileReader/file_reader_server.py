@@ -29,7 +29,7 @@ class FileReader(Device):
 
     # file_type can be 'image' or 'xy'. If it is 'image', then the device will read image files. If it is 'xy', then the device will read xy data files.
     file_type = device_property(dtype=str, default_value='image')
-    extra_script = device_property(dtype=str, default_value='')
+    enable_center_of_mass = device_property(dtype=bool, default_value=False)
 
     host_computer = attribute(
         label="host computer",
@@ -311,7 +311,8 @@ class FileReader(Device):
                             self._image = np.array(image_PIL)
                             self._format_pixel = str(
                                 self.mode_to_bpp[image_PIL.mode])
-                        self.calculate_center_of_mass()
+                        if self.enable_center_of_mass:
+                            self.calculate_center_of_mass()
                         self.push_change_event(
                             "image", self.read_image("placeholder"))
                     elif self.file_type == "image" and self._data_structure == 1:
@@ -450,7 +451,7 @@ class FileReader(Device):
             self.set_change_event("image", True, False)
             self.add_attribute(files_per_shot)
             self._files_per_shot = 1
-            if self.extra_script == 'center_of_mass':
+            if self.enable_center_of_mass:
                 self.initialize_center_of_mass_attributes()
         elif self.file_type == 'xy':
             self.add_attribute(x)
