@@ -653,7 +653,7 @@ class Basler(Device):
         self._debug = False
         self._save_data = False
         self._save_path = ''
-        self._naming_format = '%t.%f'
+        self._naming_format = '%s_%t%f'
         self._save_interval = 0
         self._image_number = 0
         self._read_time = 'N/A'
@@ -871,7 +871,7 @@ class Basler(Device):
     @grabbing_wrap
     def write_format_pixel(self, value):
         if type(value) == str:
-            self.camera.PixelFormat.Value = value
+            self.camera.PixelFormat.Value = value.capitalize()
         else:
             self.camera.PixelFormat.Value = self.camera.PixelFormat()
 

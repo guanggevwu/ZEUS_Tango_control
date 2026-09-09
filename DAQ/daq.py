@@ -92,30 +92,32 @@ class Daq:
         # the overwrite priority is "specified camera in config_dict" > "all in config_dict" > "specified camera in default_config_dict" > "all in default_config_dict"
         # 2025/02/05 change that if a configuration is passed to config_dict, then use the configuration which is basically just change polling and image number. All other changes are made by GUI. Otherwise, use default in config.py.
         # Although the option that "use default config.py" in the GUI is removed, config_dict is stilled used in the termination function.
-        if load_json:
-            with open(os.path.join(os.path.dirname(__file__), 'config.json'), 'r') as file:
-                default_config_dict = json.load(file)
-        new_config = {}
-        for cam in user_defined_name_list:
+        default_config_dict = {}
+        if config_dict is None and self.GUI.options.get('camera_configurations', True):
+            default_config_dict = self.GUI.camera_configurations
+        for device_name, cam in zip(self.cam_info, user_defined_name_list):
+            new_config = {}
             if grab_number is not None:
                 new_config = {"repetition": grab_number}
             if not config_dict:
                 if "all" in default_config_dict:
                     new_config.update(default_config_dict["all"])
-                if cam in default_config_dict:
-                    new_config.update(default_config_dict.get(cam))
+                if device_name in default_config_dict:
+                    new_config.update(default_config_dict[device_name])
             else:
                 if "all" in config_dict:
                     new_config.update(config_dict["all"])
                 if cam in config_dict:
                     new_config.update(config_dict[cam])
+            if not config_dict and self.GUI.options.get("software_trigger", False):
+                new_config["trigger_source"] = "Software"
             combined_config[cam] = new_config
         for c, info in self.cam_info.items():
             bs = info['device_proxy']
             # if the device name is found in combined_config, use it. if not, use "all" instead. Else, pass an empty dict.
             if bs.user_defined_name in combined_config:
                 info['config_dict'] = combined_config[bs.user_defined_name]
-            elif 'all' in config_dict:
+            elif config_dict and 'all' in config_dict:
                 info['config_dict'] = combined_config['all']
             else:
                 info['config_dict'] = dict()
@@ -148,11 +150,11 @@ class Daq:
                                 self.logger(
                                     f"Failed to change {info['user_defined_name']}/{key} from {getattr(bs, key)} to {value}. Details: {e}", 'red_text')
                             attempt_idx += 1
-            # if the saving_format is not set in the configuration
-            if ('saving_format' not in info['config_dict']):
+            # if the naming_format is not set in the configuration
+            if 'naming_format' not in info['config_dict']:
                 info['file_name'] = '%s'
             else:
-                info['file_name'] = info['config_dict']['saving_format']
+                info['file_name'] = info['config_dict']['naming_format']
         if saving:
             Key_list = ['model', 'format_pixel', "exposure", "gain",
                         "trigger_selector", "trigger_source"]
@@ -222,8 +224,11 @@ class Daq:
                 except Exception as e:
                     self.logger(
                         f"Error setting scan value for {device_attr_name} at shot {shot_start}: {e}", 'red_text')
-        self.scalars = {attr: tango.AttributeProxy(
-            attr) for attr in self.GUI.checked_savable_attributes}
+        if self.GUI.options["save_metadata"]:
+            self.scalars = {attr: tango.AttributeProxy(
+                attr) for attr in self.GUI.checked_savable_attributes}
+        else:
+            self.scalars = {}
         resulting_fps_dict = {}
         if len(self.cam_info) < 2:
             stitch = False
@@ -264,10 +269,46 @@ class Daq:
         for t in threads:
             t.start()
         self.logger('Waiting for a trigger...', 'blue_text')
+        if self.GUI.options.get("software_trigger", False):
+            software_trigger_thread = Thread(
+                target=self.thread_send_software_trigger, args=(), daemon=True)
+            threads.append(software_trigger_thread)
+            software_trigger_thread.start()
         for t in threads:
             t.join()
         self.logger('Acquisition completed.', 'blue_text')
         # acquisition
+
+    def thread_send_software_trigger(self):
+        trigger_interval = float(getattr(self.GUI, "trigger_interval"))
+        number_of_triggers = int(getattr(self.GUI, "number_of_triggers"))
+        self.logger(
+            f'Software trigger starts with interval {trigger_interval} s for {number_of_triggers} triggers.', 'blue_text')
+        failed_devices = set()
+        next_time = time.time()
+        trigger_count = 0
+        while self.thread_event is None or not self.thread_event.is_set():
+            if trigger_count >= number_of_triggers:
+                break
+            if not False in [value['is_completed'] for value in self.cam_info.values()]:
+                break
+            for info in self.cam_info.values():
+                try:
+                    info['device_proxy'].send_software_trigger()
+                except Exception as e:
+                    if info['user_defined_name'] not in failed_devices:
+                        self.logger(
+                            f"Failed to send software trigger to {info['user_defined_name']}: {e}", 'red_text')
+                        failed_devices.add(info['user_defined_name'])
+            trigger_count += 1
+            next_time += trigger_interval
+            sleep_for = next_time - time.time()
+            if sleep_for > 0:
+                time.sleep(sleep_for)
+            else:
+                next_time = time.time()
+        self.logger(
+            f'Software trigger stopped after {trigger_count} triggers.', 'blue_text')
 
     def thread_saving_for_one_camera(self, info):
         while not self.thread_event.is_set():
@@ -335,7 +376,8 @@ class Daq:
                         stitch_local = True
                     elif bs.info().dev_class.lower() == 'filereader' and bs.data_type == "xy":
                         file_name = self.generate_file_name(info, bs)
-                        file_name = file_name.replace('%f', "_"+bs.current_file)
+                        file_name = file_name.replace(
+                            '%f', "_"+bs.current_file)
                         source_path = os.path.join(
                             bs.folder_path, bs.current_file)
                         destination_path = os.path.join(
@@ -354,7 +396,8 @@ class Daq:
                             stitch_local = False
                     elif bs.info().dev_class.lower() == 'filereader' and bs.data_type == "image" and bs.data_structure == 1:
                         file_name = self.generate_file_name(info, bs)
-                        file_name = file_name.replace('%f', "_"+bs.current_file)
+                        file_name = file_name.replace(
+                            '%f', "_"+bs.current_file)
                         source_path = os.path.join(
                             bs.folder_path, bs.current_file)
                         destination_path = os.path.join(
@@ -621,7 +664,8 @@ class Daq:
             for i in range(len(ax)):
                 ax[i].axis('off')
             for idx, (c, info) in enumerate(self.cam_info.items()):
-                img = self._normalize_for_stitch(info['images_to_stitch'][image_name])
+                img = self._normalize_for_stitch(
+                    info['images_to_stitch'][image_name])
                 limits = self.get_image_stretch_limits(img)
                 cam_name = info['user_defined_name']
                 sub_fig = ax[idx].imshow(
@@ -662,5 +706,9 @@ class Daq:
     def __del__(self):
         logging.info("destroying Daq() in daq.py")
         config_dict = {'all': {"is_polling_periodically": True}}
-        self.set_camera_configuration(
-            config_dict=config_dict, saving=False, load_json=False)
+        try:
+            self.set_camera_configuration(
+                config_dict=config_dict, saving=False, load_json=False)
+        except:
+            logging.info(
+                "Error when restore camera is_polling_periodically back to True. This is usually due to the Tango device being already destroyed.")

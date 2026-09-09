@@ -76,6 +76,21 @@ class Vimba(Device):
     def read_user_defined_name(self):
         return self.camera.get_serial()
 
+    naming_format = attribute(
+        label='naming format',
+        dtype=str,
+        access=AttrWriteType.READ_WRITE,
+        memorized=True,
+        hw_memorized=True,
+        doc='Naming format for image files saved by the acquisition system.'
+    )
+
+    def read_naming_format(self):
+        return self._naming_format
+
+    def write_naming_format(self, value):
+        self._naming_format = value
+
     is_polling_periodically = attribute(
         label="polling periodically",
         dtype=bool,
@@ -254,7 +269,7 @@ class Vimba(Device):
         self._debug = False
         self._save_data = False
         self._save_path = ''
-        self._naming_format = '%t.%f'
+        self._naming_format = '%s_%t%f'
         self._save_interval = 0
         self._image_number = 0
         self._read_time = 'N/A'

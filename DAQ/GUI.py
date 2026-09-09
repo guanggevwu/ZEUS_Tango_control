@@ -53,6 +53,18 @@ class DaqGUI:
             self.python_path = os.path.join(
                 self.root_path, 'venv', 'Scripts', 'python.exe')
         self.client_GUI = dict()
+        self.trigger_interval = 0.5
+        self.number_of_triggers = ''
+        self.camera_configurations = {
+            'all': {
+                'naming_format': '%s_%t%f',
+                'trigger_source': 'External',
+                'exposure': 100000,
+                'gain': 0,
+                'format_pixel': 'Mono12',
+                'is_polling_periodically': False,
+            }
+        }
 
         root.title(f"ZEUS DAQ APP")
 
@@ -150,9 +162,18 @@ class DaqGUI:
         self.frame2.grid(column=0, row=1, sticky='nsew')
 
         # half column options first and then full column options with buttons
-        self.frame2_checkbutton_content = {'use_plasma_mirror': {
-            'text': 'Use plasma mirror', 'init_status': True, 'button': 'DamagedZones', 'hover_info': 'A background process monitors the location of the plasma mirror.\n"DamagedZone" red: plasma mirror is in damaged zone and new shot is not allowed. \n"DamagedZone" green: safe.'}, 'save_copy': {
-            'text': 'Save an extra copy of data', 'init_status': True, 'button': None, 'hover_info': "You can retrieve the data even if you accidently deleted them."}, 'stitch': {'text': 'Save an extra image by stitching', 'init_status': True, 'button': None, 'hover_info': "Stitch images from various cameras together to create a larger image. The contrast is enhanced for view purpose thus this image is not for quatitative analysis."}, 'save_metadata': {'text': 'Save metadata', 'init_status': False, 'button': 'Metadata', 'hover_info': 'Selected metadata will be saved in "scalars.csv" in the folder path below.'}, 'scan': {'text': 'Scan over parameters', 'init_status': False, 'button': 'Parameters', 'hover_info': 'Automatically set the conditions before each shot.'}}
+        self.frame2_checkbutton_content = {
+            'camera_configurations': {
+                'text': 'Camera configurations', 'init_status': True, 'button': 'Config', 'hover_info': 'These specified configurations will be set to the cameras when "Start" is clicked.'},
+            'use_plasma_mirror': {
+                'text': 'Use plasma mirror', 'init_status': True, 'button': 'DamagedZones', 'hover_info': 'A background process monitors the location of the plasma mirror.\n"DamagedZone" red: plasma mirror is in damaged zone and new shot is not allowed. \n"DamagedZone" green: safe.'},
+            'save_copy': {
+                'text': 'Save an extra copy of data', 'init_status': True, 'button': None, 'hover_info': "You can retrieve the data even if you accidently deleted them."},
+            'stitch': {'text': 'Save an extra image by stitching', 'init_status': True, 'button': None, 'hover_info': "Stitch images from various cameras together to create a larger image. The contrast is enhanced for view purpose thus this image is not for quatitative analysis."},
+            'save_metadata': {'text': 'Save metadata', 'init_status': False, 'button': 'Metadata', 'hover_info': 'Selected metadata will be saved in "scalars.csv" in the folder path below.'},
+            'scan': {'text': 'Scan over parameters', 'init_status': False, 'button': 'Parameters', 'hover_info': 'Automatically set the conditions before each shot.'},
+            'software_trigger': {'text': 'Software trigger', 'init_status': False, 'button': 'Settings', 'hover_info': 'Using software trigger to trigger the cameras.'}
+        }
         item_per_column = 2
         current_row = 0
         self.frame2_buttons = dict()
@@ -280,6 +301,11 @@ class DaqGUI:
         if not os.path.isfile(self.init_file_path):
             with open(self.init_file_path, 'w') as jsonfile:
                 json.dump({}, jsonfile)
+            self.selected_devices = dict()
+            self.damaged_zones = dict()
+            self.checked_savable_attributes = []
+            self.options = dict()
+            self.total_bandwidth = 80
         else:
             try:
                 with open(self.init_file_path) as jsonfile:
@@ -299,6 +325,13 @@ class DaqGUI:
                     self.path_var.set(
                         self.init_dict['save_path']) if "save_path" in self.init_dict else ''
                     self.total_bandwidth = self.init_dict['total_bandwidth'] if 'total_bandwidth' in self.init_dict else 80
+                    if 'camera_configurations' in self.init_dict:
+                        self.camera_configurations = self.init_dict['camera_configurations']
+                    if 'software_trigger_settings' in self.init_dict:
+                        self.trigger_interval = self.init_dict['software_trigger_settings'].get(
+                            'trigger_interval', self.trigger_interval)
+                        self.number_of_triggers = self.init_dict['software_trigger_settings'].get(
+                            'number_of_triggers', self.number_of_triggers)
                     for key, value in self.options.items():
                         if key in self.frame2_checkbutton_content:
                             self.frame2_checkbutton_content[key]['var'].set(
@@ -315,6 +348,18 @@ class DaqGUI:
                 self.total_bandwidth = 80
                 self.insert_to_disabled(
                     f'Failed to load initialization settings from "init.json" file. Use default settings instead.', 'red_text')
+
+        deleted_devices = []
+        for device_name in list(self.selected_devices.keys()):
+            try:
+                self.db.get_device_info(device_name)
+            except Exception:
+                deleted_devices.append(device_name)
+                del self.selected_devices[device_name]
+        if deleted_devices:
+            self.insert_to_disabled(
+                f'Removed deleted devices from selected device list: {deleted_devices}', 'red_text')
+            self.write_to_init_file()
 
         # only applied to basler cameras
         self.serial_number_vs_friendly_name = dict()
@@ -418,6 +463,22 @@ class DaqGUI:
         self.scan_window.deiconify()
         self.scan_window.attributes('-topmost', True)
         self.scan_window.attributes('-topmost', False)
+
+    def open_settings_window(self):
+        '''Command for the settings button in frame2. It opens a blank settings window.'''
+        if not (hasattr(self, "settings_window") and self.settings_window.winfo_exists()):
+            self.settings_window = SettingsWindow(self)
+        self.settings_window.deiconify()
+        self.settings_window.attributes('-topmost', True)
+        self.settings_window.attributes('-topmost', False)
+
+    def open_config_window(self):
+        '''Open the camera configuration editor.'''
+        if not (hasattr(self, "config_window") and self.config_window.winfo_exists()):
+            self.config_window = CameraConfigurationWindow(self)
+        self.config_window.deiconify()
+        self.config_window.attributes('-topmost', True)
+        self.config_window.attributes('-topmost', False)
 
     def open_bandwidth_window(self):
         '''Command for the Bandwidth button in frame1. It opens a new window with the bandwidth table.'''
@@ -596,6 +657,31 @@ class DaqGUI:
         else:
             self.checked_savable_attributes.remove(attr)
 
+    def update_software_trigger_settings(self):
+        if hasattr(self, 'settings_window'):
+            try:
+                self.trigger_interval = self.settings_window.trigger_interval_var.get()
+                self.number_of_triggers = self.settings_window.number_of_triggers_var.get()
+            except Exception:
+                pass
+
+    def validate_software_trigger_settings(self):
+        if not self.frame2_checkbutton_content['software_trigger']['var'].get():
+            return True
+        self.update_software_trigger_settings()
+        if str(self.number_of_triggers).strip() == '':
+            messagebox.showerror(
+                message='Please enter "Number of triggers" in Settings before starting software trigger.')
+            return False
+        try:
+            if int(self.number_of_triggers) <= 0:
+                raise ValueError
+        except Exception:
+            messagebox.showerror(
+                message='"Number of triggers" must be a positive integer.')
+            return False
+        return True
+
     def toggle_acquisition(self):
         '''Command for the start/stop button in frame3. It toggles the acquisition status. If the acquisition is running, it will stop it. If it is not running, it will start it in a new thread.'''
         if self.acquisition_button['text'] == 'Stop':
@@ -609,6 +695,8 @@ class DaqGUI:
             if self.frame2_checkbutton_content['save_metadata']['var'].get() and self.frame2_buttons['Metadata'].cget('style') == 'Sty3_stop_small.TButton':
                 self.insert_to_disabled(
                     'Please make sure the all the selected metadata are available and then "Start" again.', 'red_text')
+                return
+            if not self.validate_software_trigger_settings():
                 return
             inferred_start_shot_number = self.infer_start_shot_number(
                 self.path_var.get())
@@ -626,9 +714,10 @@ class DaqGUI:
 
     def write_to_init_file(self):
         '''Write the selected devices and options to the init.json file.'''
+        self.update_software_trigger_settings()
         with open(self.init_file_path, 'w') as jsonfile:
             json.dump({"selected_devices": {key: None for key in self.selected_devices}, "total_bandwidth": self.total_bandwidth, "options": self.options, "save_path": self.path_var.get(
-            ), "checked_savable_attributes": self.checked_savable_attributes, "damaged_zones": list(self.damaged_zones.keys())}, jsonfile)
+            ), "checked_savable_attributes": self.checked_savable_attributes, "damaged_zones": list(self.damaged_zones.keys()), "software_trigger_settings": {"trigger_interval": self.trigger_interval, "number_of_triggers": self.number_of_triggers}, "camera_configurations": self.camera_configurations}, jsonfile)
         self.insert_to_disabled(
             f'Saved initialization settings to "init.json" file.')
 
@@ -1015,6 +1104,218 @@ class MetadataWindow(Toplevel):
             metadata_button_widget['style'] = 'Sty3_start_small.TButton'
 
 
+class CameraConfigurationWindow(Toplevel):
+    CONFIGURATION_KEYS = (
+        'naming_format',
+        'trigger_source',
+        'exposure',
+        'gain',
+        'format_pixel',
+        'is_polling_periodically',
+    )
+
+    def __init__(self, parent):
+        super().__init__(master=parent.root)
+        self.title('Camera Configurations')
+        self.parent = parent
+        self.configuration_vars = {}
+        self.individual_frames = []
+        self.individual_configurations_visible = False
+        self.save_flash_after_id = None
+
+        style = ttk.Style(self)
+        style.configure(
+            'Saved.CameraConfiguration.TButton',
+            font=('Helvetica', self.parent.font_mid),
+            foreground='black', background='#57d957')
+        style.map(
+            'Saved.CameraConfiguration.TButton',
+            background=[('active', '#57d957')])
+
+        self.save_button = ttk.Button(
+            self, text='Save configurations',
+            command=self.save_configurations,
+            style='Sty1.TButton')
+        self.save_button.grid(
+            row=0, column=0, sticky='WE', padx=10, pady=10)
+
+        global_frame = ttk.Labelframe(
+            self, text='Global configurations', padding='10 10 10 10',
+            style='Sty1.TLabelframe')
+        global_frame.grid(row=1, column=0, sticky='NSEW', padx=10)
+        self.create_configuration_fields(
+            global_frame, 'all', self.parent.camera_configurations.get('all', {}))
+
+        self.toggle_individual_button = ttk.Button(
+            global_frame,
+            text='Show individual camera configurations (Overwrite Global)',
+            command=self.toggle_individual_configurations,
+            style='Sty1.TButton')
+        self.toggle_individual_button.grid(
+            row=len(self.CONFIGURATION_KEYS), column=0, columnspan=2,
+            sticky='WE', pady=(10, 0))
+
+    def create_configuration_fields(
+            self, frame, configuration_name, values, keys=None):
+        variables = {}
+        if keys is None:
+            keys = self.CONFIGURATION_KEYS
+        for row, key in enumerate(keys):
+            label_text = 'exposure (μs)' if key == 'exposure' else key
+            label = ttk.Label(frame, text=label_text, font=(
+                'Helvetica', int(self.parent.font_mid*0.75)))
+            label.grid(row=row, column=0, sticky='W')
+            if key == 'is_polling_periodically':
+                ToolTip(
+                    label, msg='Set it to false for data acquisition.',
+                    delay=HOVER_DELAY)
+            value = values.get(key, '')
+            if isinstance(value, bool):
+                value = str(value).lower()
+            variable = StringVar(value=value)
+            if key == 'trigger_source':
+                ttk.Combobox(
+                    frame, textvariable=variable,
+                    values=('Software', 'External'), state='readonly',
+                    width=27).grid(row=row, column=1, sticky='W')
+            elif key == 'is_polling_periodically':
+                ttk.Combobox(
+                    frame, textvariable=variable,
+                    values=('true', 'false'), state='readonly',
+                    width=27).grid(row=row, column=1, sticky='W')
+            else:
+                ttk.Entry(frame, textvariable=variable, width=30).grid(
+                    row=row, column=1, sticky='W')
+            variables[key] = variable
+        self.configuration_vars[configuration_name] = variables
+
+    def toggle_individual_configurations(self):
+        if self.individual_configurations_visible:
+            for frame in self.individual_frames:
+                frame.grid_remove()
+            self.toggle_individual_button['text'] = \
+                'Show individual camera configurations (Overwrite Global)'
+            self.individual_configurations_visible = False
+            return
+
+        if self.individual_frames:
+            for frame in self.individual_frames:
+                frame.grid()
+        else:
+            self.show_individual_configurations()
+        self.toggle_individual_button['text'] = \
+            'Hide individual camera configurations (Overwrite Global)'
+        self.individual_configurations_visible = True
+
+    def show_individual_configurations(self):
+        for frame in self.individual_frames:
+            frame.destroy()
+        self.individual_frames = []
+        self.configuration_vars = {
+            'all': self.configuration_vars['all']
+        }
+        for row, device_name in enumerate(self.parent.selected_devices, start=2):
+            frame = ttk.Labelframe(
+                self, text=device_name, padding='10 10 10 10',
+                style='Sty1.TLabelframe')
+            frame.grid(row=row, column=0, sticky='NSEW', padx=10, pady=(10, 0))
+            configuration_keys = self.CONFIGURATION_KEYS
+            try:
+                device_class = self.parent.db.get_device_info(
+                    device_name).class_name.lower()
+                if device_class == 'filereader':
+                    configuration_keys = (
+                        'naming_format', 'is_polling_periodically')
+            except Exception:
+                pass
+            self.create_configuration_fields(
+                frame, device_name,
+                self.parent.camera_configurations.get(device_name, {}),
+                configuration_keys)
+            self.individual_frames.append(frame)
+
+    def convert_value(self, key, value):
+        value = value.strip()
+        if value == '':
+            return None
+        if key == 'is_polling_periodically':
+            normalized = value.lower()
+            if normalized not in ('true', 'false'):
+                raise ValueError(f'{key} must be true or false')
+            return normalized == 'true'
+        if key == 'exposure':
+            return int(value)
+        if key == 'gain':
+            number = float(value)
+            return int(number) if number.is_integer() else number
+        return value
+
+    def get_configurations(self):
+        configurations = {}
+        for name, variables in self.configuration_vars.items():
+            values = {}
+            for key, variable in variables.items():
+                value = self.convert_value(key, variable.get())
+                if value is not None:
+                    values[key] = value
+            if name == 'all' or values:
+                configurations[name] = values
+        return configurations
+
+    def save_configurations(self):
+        try:
+            self.parent.camera_configurations = self.get_configurations()
+            self.parent.write_to_init_file()
+            self.flash_save_button()
+        except ValueError as e:
+            messagebox.showerror(message=f'Invalid camera configuration: {e}')
+
+    def flash_save_button(self, step=0):
+        if step == 0 and self.save_flash_after_id is not None:
+            self.after_cancel(self.save_flash_after_id)
+
+        if step >= 12:
+            self.save_button.configure(style='Sty1.TButton')
+            self.save_flash_after_id = None
+            return
+
+        style = ('Saved.CameraConfiguration.TButton'
+                 if step % 2 == 0 else 'Sty1.TButton')
+        self.save_button.configure(style=style)
+        self.save_flash_after_id = self.after(
+            250, self.flash_save_button, step + 1)
+
+
+class SettingsWindow(Toplevel):
+    def __init__(self, parent):
+        super().__init__(master=parent.root)
+        self.title("Settings")
+        self.parent = parent
+        self.frame = ttk.Frame(self, padding="10 10 10 10")
+        self.frame.grid(column=0, row=0, sticky='nsew')
+
+        self.trigger_interval_var = DoubleVar(
+            value=self.parent.trigger_interval)
+        self.number_of_triggers_var = StringVar(
+            value=self.parent.number_of_triggers)
+
+        ttk.Label(self.frame, text='Trigger interval (s):', font=(
+            'Helvetica', int(self.parent.font_mid*0.75))).grid(
+            column=0, row=0, sticky='W')
+        ttk.Entry(self.frame, textvariable=self.trigger_interval_var, font=(
+            'Helvetica', int(self.parent.font_mid*0.75)), width=20).grid(
+            column=1, row=0, sticky='W')
+
+        ttk.Label(self.frame, text='Number of triggers:', font=(
+            'Helvetica', int(self.parent.font_mid*0.75))).grid(
+            column=0, row=1, sticky='W')
+        ttk.Entry(self.frame, textvariable=self.number_of_triggers_var, font=(
+            'Helvetica', int(self.parent.font_mid*0.75)), width=20).grid(
+            column=1, row=1, sticky='W')
+
+        self.parent.pad_space(self.frame)
+
+
 class ScanWindow(Toplevel):
     def __init__(self, parent):
         super().__init__(master=parent.root)
@@ -1030,10 +1331,10 @@ class ScanWindow(Toplevel):
             self, text='Scan Table', padding=pad_widget, style='Sty1.TLabelframe')
         self.scan_frame2.grid(column=0, row=1, rowspan=2, sticky="WE")
         self.scan_frame3 = ttk.Labelframe(
-            self, text='Scan begins', padding=pad_widget, style='Sty1.TLabelframe')
+            self, text='Input from file', padding=pad_widget, style='Sty1.TLabelframe')
         self.scan_frame3.grid(column=1, row=1, sticky="WENS")
         self.scan_frame4 = ttk.Labelframe(
-            self, text='Input', padding=pad_widget, style='Sty1.TLabelframe')
+            self, text='Input here', padding=pad_widget, style='Sty1.TLabelframe')
         self.scan_frame4.grid(column=1, row=2, sticky="WENS")
         self.item_each_row = 4
         # read scannable attributes from file
@@ -1054,24 +1355,33 @@ class ScanWindow(Toplevel):
                     for h in header:
                         self.scan_table[h].append(row[h])
 
+        self.scannable_checkbox_vars = {}
         for idx, device_attr_name in enumerate(self.scannable_list):
             self.scannable_list_row, col = int(
                 idx/self.item_each_row), idx % self.item_each_row
             checkbox_var = BooleanVar(
                 value=True) if device_attr_name in self.scan_table else BooleanVar(value=False)
+            self.scannable_checkbox_vars[device_attr_name] = checkbox_var
             checkbox = ttk.Checkbutton(self.scan_frame1, text=device_attr_name, command=lambda device_attr_name=device_attr_name, checkbox_var=checkbox_var: self.add_device_to_scan(device_attr_name, checkbox_var),
                                        variable=checkbox_var, style='highlight.TCheckbutton')
             checkbox.grid(
                 column=col, row=self.scannable_list_row, sticky='W')
 
+        ttk.Button(
+            self.scan_frame3, text='Edit scan list from file', command=self.open_scan_table_file, style="Sty1.TButton").grid(
+            row=0, column=0, sticky='W')
+        ttk.Button(
+            self.scan_frame3, text='Refresh', command=self.reload_scan_table_from_file, style="Sty1.TButton").grid(
+            row=0, column=1, sticky='W')
+
         ttk.Label(
-            self.scan_frame3, text='First row in Scan Table as shot number # ', font=('Helvetica', 12)).grid(row=0, column=0)
+            self.scan_frame4, text='First row in Scan Table as shot number # ', font=('Helvetica', 12)).grid(row=0, column=0)
 
         self.firstrow_var = IntVar(value=1)
-        ttk.Entry(self.scan_frame3, textvariable=self.firstrow_var).grid(
+        ttk.Entry(self.scan_frame4, textvariable=self.firstrow_var).grid(
             row=0, column=1)
         ttk.Button(
-            self.scan_frame3, text='Change', command=self.change_row_shotnum, style="Sty3_start.TButton").grid(
+            self.scan_frame4, text='Change', command=self.change_row_shotnum, style="Sty3_start.TButton").grid(
             row=0, column=2)
 
         self.update_tree()
@@ -1170,14 +1480,14 @@ class ScanWindow(Toplevel):
             self.add_section_widget[i]['label'] = ttk.Label(
                 self.scan_frame4, text='/'.join(i.split('/')[-2:]), font=('Helvetica', 12))
             self.add_section_widget[i]['label'].grid(
-                row=idx+1, column=len(self.scannable_list)+1)
+                row=idx+1, column=0, sticky='W')
             self.add_section_widget[i]['label'].grid_configure(
                 pady=[0, 10])
             self.add_section_widget[i]['var'] = StringVar()
             self.add_section_widget[i]['entry'] = ttk.Entry(
                 self.scan_frame4, textvariable=self.add_section_widget[i]['var'])
             self.add_section_widget[i]['entry'].grid(
-                row=idx+1, column=len(self.scannable_list)+2)
+                row=idx+1, column=1, sticky='W')
             self.add_section_widget[i]['entry'].grid_configure(
                 pady=[0, 10])
 
@@ -1185,7 +1495,42 @@ class ScanWindow(Toplevel):
             self.add_button = ttk.Button(
                 self.scan_frame4, text='Add to list', command=self.add_data_to_list, style="Sty3_start.TButton")
         self.add_button.grid(row=self.scannable_list_row+len(self.scan_table) +
-                             1, column=len(self.scannable_list)+1, columnspan=2)
+                             1, column=0, columnspan=2, sticky='WE')
+
+    def open_scan_table_file(self):
+        '''Open the scan table csv file.'''
+        try:
+            if platform.system() == 'Windows':
+                os.startfile(self.scan_table_file)
+            elif platform.system() == 'Darwin':
+                subprocess.Popen(['open', self.scan_table_file])
+            else:
+                subprocess.Popen(['xdg-open', self.scan_table_file])
+        except Exception as e:
+            messagebox.showerror(
+                message=f'Error opening scan table file. Exception: {type(e)}, {e}')
+
+    def reload_scan_table_from_file(self):
+        '''Reload the scan table csv file and refresh the scan table widgets.'''
+        try:
+            self.scan_table = defaultdict(list)
+            with open(self.scan_table_file, 'a+', newline='') as csvfile:
+                csvfile.seek(0)
+                reader = csv.DictReader(csvfile)
+                header = reader.fieldnames
+                self.scan_number = 0
+                if header is not None:
+                    for row in reader:
+                        self.scan_number += 1
+                        for h in header:
+                            self.scan_table[h].append(row[h])
+            for device_attr_name, checkbox_var in self.scannable_checkbox_vars.items():
+                checkbox_var.set(device_attr_name in self.scan_table)
+            self.update_tree()
+            self.update_add_section()
+        except Exception as e:
+            messagebox.showerror(
+                message=f'Error refreshing scan table file. Exception: {type(e)}, {e}')
 
 
 if __name__ == '__main__':
