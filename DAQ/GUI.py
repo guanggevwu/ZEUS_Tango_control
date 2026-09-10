@@ -361,11 +361,7 @@ class DaqGUI:
                 f'Removed deleted devices from selected device list: {deleted_devices}', 'red_text')
             self.write_to_init_file()
 
-        # only applied to basler cameras
-        self.serial_number_vs_friendly_name = dict()
-        for device in pylon.TlFactory.GetInstance().EnumerateDevices():
-            self.serial_number_vs_friendly_name[device.GetSerialNumber(
-            )] = f'{device.GetUserDefinedName()}({device.GetSerialNumber()})'
+        self.refresh_serial_number_vs_friendly_name()
         for key in self.selected_devices:
             self.update_selected_devices(key, BooleanVar(value=True))
 
@@ -431,6 +427,14 @@ class DaqGUI:
     def pad_space(self, frame):
         for child in frame.winfo_children():
             child.grid_configure(padx=[self.font_mid, 0], pady=3)
+
+    def refresh_serial_number_vs_friendly_name(self):
+        '''Refresh the map of locally detected Basler cameras.'''
+        self.serial_number_vs_friendly_name = {}
+        for device in pylon.TlFactory.GetInstance().EnumerateDevices():
+            serial_number = device.GetSerialNumber()
+            self.serial_number_vs_friendly_name[serial_number] = \
+                f'{device.GetUserDefinedName()}({serial_number})'
 
     def open_device_list(self):
         '''Command for the select button in frame1. It opens a new window with a list of devices.'''
@@ -819,14 +823,23 @@ class DaqGUI:
 class DeviceListWindow(Toplevel):
     def __init__(self, parent):
         self.parent = parent
+        parent.refresh_serial_number_vs_friendly_name()
         self.device_names_in_db = []
         self.class_name = ['Basler', 'FileReader', 'Vimba']
         Basler_class_device = []
         for c in self.class_name:
             if c == 'Basler':
-                Basler_class_device = self.parent.db.get_device_name('*', c)
-            self.device_names_in_db.extend(
-                self.parent.db.get_device_name('*', c))
+                registered_basler_devices = self.parent.db.get_device_name(
+                    '*', c)
+                Basler_class_device = [
+                    device_name for device_name in registered_basler_devices
+                    if device_name.split('/')[-1].split('_')[-1]
+                    in self.parent.serial_number_vs_friendly_name
+                ]
+                self.device_names_in_db.extend(Basler_class_device)
+            else:
+                self.device_names_in_db.extend(
+                    self.parent.db.get_device_name('*', c))
         super().__init__(master=parent.root)
         self.title("Device List")
         newframe1 = ttk.Frame(self)
