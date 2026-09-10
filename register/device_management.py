@@ -1,5 +1,5 @@
 import socket
-from tkinter import Tk, messagebox, Toplevel, Text, StringVar, IntVar, DoubleVar, BooleanVar, PhotoImage
+from tkinter import Tk, messagebox, Toplevel, Text, StringVar, IntVar, DoubleVar, BooleanVar, PhotoImage, Listbox, END, MULTIPLE
 from tkinter import ttk
 import tango
 import numpy as np
@@ -21,7 +21,7 @@ import time
 import sys
 import json
 from device_management_combination_config import container
-from common.config import device_name_table, instance_table, image_panel_config
+from device_combinations import device_name_table, save_combination
 logger = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s %(message)s")
 
@@ -134,6 +134,18 @@ class TangoDeviceManagement:
         for child in frame.winfo_children():
             child.grid_configure(padx=[15, 0], pady=3)
 
+    def refresh_serial_number_vs_friendly_name(self):
+        '''Refresh the map of locally detected Basler cameras.'''
+        self.serial_number_vs_friendly_name = {}
+        for device in pylon.TlFactory.GetInstance().EnumerateDevices():
+            serial_number = device.GetSerialNumber()
+            self.serial_number_vs_friendly_name[serial_number] = \
+                f'{device.GetUserDefinedName()}({serial_number})'
+
+    def is_basler_online(self, device_name):
+        serial_number = device_name.split('/')[-1].split('_')[-1]
+        return serial_number in self.serial_number_vs_friendly_name
+
     def insert_to_disabled(self, text, tag_config=None, with_timestamp=True, with_alarm=None):
         if with_alarm is None:
             if tag_config == 'red_text':
@@ -163,12 +175,292 @@ class TangoDeviceManagement:
 
     def open_a_catergory(self, category_name):
         '''Command for the select button in frame1. It opens a new window with a list of devices.'''
+        if category_name == 'cameras':
+            self.refresh_serial_number_vs_friendly_name()
         if not (hasattr(self, category_name) and getattr(self, category_name).winfo_exists()):
             setattr(self, category_name,
                     DeviceUnderCatergoryWindow(self, category_name))
         getattr(self, category_name).deiconify()
         getattr(self, category_name).attributes('-topmost', True)
         getattr(self, category_name).attributes('-topmost', False)
+
+
+class DevicePropertiesWindow(Toplevel):
+    def __init__(self, parent, device_name):
+        super().__init__(master=parent)
+        self.parent = parent
+        self.device_name = device_name
+        self.db = parent.parent.db
+        self.title(f'Properties - {device_name}')
+        self.geometry('700x420')
+
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        table_frame = ttk.Frame(self, padding=10)
+        table_frame.grid(column=0, row=0, sticky='nsew')
+        table_frame.columnconfigure(0, weight=1)
+        table_frame.rowconfigure(0, weight=1)
+
+        self.property_table = ttk.Treeview(
+            table_frame, columns=('name', 'value'), show='headings', selectmode='browse')
+        self.property_table.heading('name', text='Property')
+        self.property_table.heading('value', text='Value')
+        self.property_table.column('name', width=220, minwidth=120)
+        self.property_table.column('value', width=430, minwidth=180)
+        self.property_table.grid(column=0, row=0, sticky='nsew')
+        self.property_table.bind('<<TreeviewSelect>>',
+                                 self.on_property_selected)
+
+        scrollbar = ttk.Scrollbar(
+            table_frame, orient='vertical', command=self.property_table.yview)
+        scrollbar.grid(column=1, row=0, sticky='ns')
+        self.property_table.configure(yscrollcommand=scrollbar.set)
+
+        editor = ttk.Labelframe(self, text='Add or edit property', padding=10)
+        editor.grid(column=0, row=1, padx=10, pady=(0, 10), sticky='ew')
+        editor.columnconfigure(1, weight=1)
+
+        ttk.Label(editor, text='Name').grid(column=0, row=0, sticky='w')
+        self.property_name = StringVar()
+        self.property_name_entry = ttk.Entry(
+            editor, textvariable=self.property_name)
+        self.property_name_entry.grid(
+            column=1, row=0, columnspan=4, padx=(8, 0), sticky='ew')
+
+        ttk.Label(editor, text='Value').grid(
+            column=0, row=1, pady=(8, 0), sticky='nw')
+        self.property_value = Text(editor, height=4, wrap='none')
+        self.property_value.grid(
+            column=1, row=1, columnspan=4, padx=(8, 0), pady=(8, 0), sticky='ew')
+        ttk.Label(editor, text='Use one line per value for array properties.').grid(
+            column=1, row=2, columnspan=4, padx=(8, 0), sticky='w')
+
+        ttk.Button(editor, text='Save', command=self.save_property).grid(
+            column=1, row=3, padx=(8, 4), pady=(10, 0), sticky='ew')
+        ttk.Button(editor, text='New', command=self.clear_editor).grid(
+            column=2, row=3, padx=4, pady=(10, 0), sticky='ew')
+        ttk.Button(editor, text='Remove', command=self.remove_property).grid(
+            column=3, row=3, padx=4, pady=(10, 0), sticky='ew')
+        ttk.Button(editor, text='Refresh', command=self.load_properties).grid(
+            column=4, row=3, padx=(4, 0), pady=(10, 0), sticky='ew')
+
+        self.load_properties()
+        self.transient(parent)
+        self.lift()
+
+    def load_properties(self):
+        try:
+            property_datum = self.db.get_device_property_list(
+                self.device_name, '*')
+            property_names = list(property_datum.value_string)
+            properties = self.db.get_device_property(
+                self.device_name, property_names) if property_names else {}
+        except Exception as e:
+            messagebox.showerror(
+                'Cannot load properties', str(e), parent=self)
+            return
+
+        self.property_table.delete(*self.property_table.get_children())
+        for name in sorted(property_names, key=str.lower):
+            values = properties.get(name, [])
+            if isinstance(values, str):
+                values = [values]
+            else:
+                values = list(values)
+            self.property_table.insert(
+                '', 'end', iid=name, values=(name, '\n'.join(str(value) for value in values)))
+        self.clear_editor()
+
+    def on_property_selected(self, event=None):
+        selection = self.property_table.selection()
+        if not selection:
+            return
+        name = selection[0]
+        values = self.property_table.item(name, 'values')
+        self.property_name.set(name)
+        self.property_value.delete('1.0', 'end')
+        self.property_value.insert('1.0', values[1] if len(values) > 1 else '')
+
+    def clear_editor(self):
+        self.property_table.selection_remove(*self.property_table.selection())
+        self.property_name.set('')
+        self.property_value.delete('1.0', 'end')
+        self.property_name_entry.focus_set()
+
+    def save_property(self):
+        name = self.property_name.get().strip()
+        if not name:
+            messagebox.showwarning(
+                'Missing property name', 'Enter a property name.', parent=self)
+            return
+        values = self.property_value.get('1.0', 'end-1c').splitlines()
+        if not values:
+            values = ['']
+        try:
+            self.db.put_device_property(self.device_name, {name: values})
+        except Exception as e:
+            messagebox.showerror(
+                'Cannot save property', str(e), parent=self)
+            return
+        self.parent.parent.insert_to_disabled(
+            f'Updated property {name} for {self.device_name}.', tag_config='green_text')
+        self.load_properties()
+
+    def remove_property(self):
+        name = self.property_name.get().strip()
+        if not name:
+            messagebox.showwarning(
+                'No property selected', 'Select a property to remove.', parent=self)
+            return
+        if not messagebox.askyesno(
+                'Remove property',
+                f'Remove property "{name}" from {self.device_name}?', parent=self):
+            return
+        try:
+            self.db.delete_device_property(self.device_name, name)
+        except Exception as e:
+            messagebox.showerror(
+                'Cannot remove property', str(e), parent=self)
+            return
+        self.parent.parent.insert_to_disabled(
+            f'Removed property {name} from {self.device_name}.', tag_config='green_text')
+        self.load_properties()
+
+
+class CombinationDevicesWindow(Toplevel):
+    def __init__(self, parent, combination_name, tango_class):
+        super().__init__(master=parent)
+        self.parent = parent
+        self.combination_name = combination_name
+        self.tango_class = tango_class
+        self.db = parent.parent.db
+        self.title(f'Included Devices - {combination_name}')
+        self.geometry('850x430')
+        self.minsize(650, 320)
+        self.transient(parent)
+
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(2, weight=1)
+        self.rowconfigure(1, weight=1)
+
+        ttk.Label(self, text=f'Available {tango_class} devices').grid(
+            column=0, row=0, padx=10, pady=(10, 4), sticky='w')
+        ttk.Label(self, text='Included devices (in launch order)').grid(
+            column=2, row=0, padx=10, pady=(10, 4), sticky='w')
+
+        self.available_devices = Listbox(
+            self, selectmode=MULTIPLE, exportselection=False)
+        self.available_devices.grid(
+            column=0, row=1, padx=(10, 5), sticky='nsew')
+        self.available_devices.bind('<Double-Button-1>', self.add_devices)
+
+        controls = ttk.Frame(self)
+        controls.grid(column=1, row=1, padx=5)
+        ttk.Button(controls, text='Add  >', command=self.add_devices).grid(
+            column=0, row=0, pady=4, sticky='ew')
+        ttk.Button(controls, text='<  Remove', command=self.remove_devices).grid(
+            column=0, row=1, pady=4, sticky='ew')
+        ttk.Separator(controls).grid(
+            column=0, row=2, pady=10, sticky='ew')
+        ttk.Button(controls, text='Move up', command=lambda: self.move_device(-1)).grid(
+            column=0, row=3, pady=4, sticky='ew')
+        ttk.Button(controls, text='Move down', command=lambda: self.move_device(1)).grid(
+            column=0, row=4, pady=4, sticky='ew')
+
+        self.included_devices = Listbox(
+            self, selectmode=MULTIPLE, exportselection=False)
+        self.included_devices.grid(
+            column=2, row=1, padx=(5, 10), sticky='nsew')
+        self.included_devices.bind('<Double-Button-1>', self.remove_devices)
+
+        actions = ttk.Frame(self, padding=10)
+        actions.grid(column=0, row=2, columnspan=3, sticky='e')
+        ttk.Button(actions, text='Reload', command=self.load_devices).grid(
+            column=0, row=0, padx=4)
+        ttk.Button(actions, text='Cancel', command=self.destroy).grid(
+            column=1, row=0, padx=4)
+        ttk.Button(actions, text='Save', command=self.save_devices).grid(
+            column=2, row=0, padx=4)
+
+        self.load_devices()
+        self.lift()
+
+    def load_devices(self):
+        included = list(device_name_table.get(self.combination_name, []))
+        try:
+            registered = list(self.db.get_device_name('*', self.tango_class))
+            if self.tango_class.lower() == 'basler':
+                self.parent.parent.refresh_serial_number_vs_friendly_name()
+                registered = [
+                    device_name for device_name in registered
+                    if self.parent.parent.is_basler_online(device_name)
+                ]
+        except Exception as e:
+            messagebox.showerror(
+                'Cannot load devices', str(e), parent=self)
+            return
+
+        self.available_devices.delete(0, END)
+        self.included_devices.delete(0, END)
+        for device_name in sorted(set(registered) - set(included), key=str.lower):
+            self.available_devices.insert(END, device_name)
+        for device_name in included:
+            self.included_devices.insert(END, device_name)
+
+    def add_devices(self, event=None):
+        selected = [self.available_devices.get(index)
+                    for index in self.available_devices.curselection()]
+        existing = set(self.included_devices.get(0, END))
+        for device_name in selected:
+            if device_name not in existing:
+                self.included_devices.insert(END, device_name)
+        self._remove_selected(self.available_devices)
+
+    def remove_devices(self, event=None):
+        selected = [self.included_devices.get(index)
+                    for index in self.included_devices.curselection()]
+        self._remove_selected(self.included_devices)
+        existing = set(self.available_devices.get(0, END))
+        for device_name in selected:
+            if device_name not in existing:
+                self.available_devices.insert(END, device_name)
+
+    @staticmethod
+    def _remove_selected(listbox):
+        for index in reversed(listbox.curselection()):
+            listbox.delete(index)
+
+    def move_device(self, direction):
+        selection = self.included_devices.curselection()
+        if len(selection) != 1:
+            return
+        old_index = selection[0]
+        new_index = old_index + direction
+        if new_index < 0 or new_index >= self.included_devices.size():
+            return
+        device_name = self.included_devices.get(old_index)
+        self.included_devices.delete(old_index)
+        self.included_devices.insert(new_index, device_name)
+        self.included_devices.selection_set(new_index)
+
+    def save_devices(self):
+        devices = list(self.included_devices.get(0, END))
+        if not devices and not messagebox.askyesno(
+                'Empty combination',
+                f'Save {self.combination_name} without any included devices?',
+                parent=self):
+            return
+        try:
+            save_combination(self.combination_name, devices)
+        except Exception as e:
+            messagebox.showerror(
+                'Cannot save combination', str(e), parent=self)
+            return
+        self.parent.parent.insert_to_disabled(
+            f'Updated included devices for {self.combination_name}: {devices}',
+            tag_config='green_text')
+        self.destroy()
 
 
 class DeviceUnderCatergoryWindow(Toplevel):
@@ -184,30 +476,48 @@ class DeviceUnderCatergoryWindow(Toplevel):
             category_name]['class']]
         # catergory_container is a dict to store the device name and its corresponding tango_class, server_widget (ttk.Button), gui_widget (ttk.Button), gui_pid, combination_device_names (only for device names containing "_combination").
         self.category_container = {}
+        Basler_class_device = []
         for c in self.class_name:
             if c == 'Basler':
-                Basler_class_device = self.parent.db.get_device_name(
-                    '*', c)
+                Basler_class_device = [
+                    device_name
+                    for device_name in self.parent.db.get_device_name('*', c)
+                    if self.parent.is_basler_online(device_name)
+                ]
             class_info = parent.container[category_name]['class'][c]
             if class_info is not None and 'only_these_devices' in class_info:
-                self.category_container.update({device_name: {
-                                               'tango_class': c} for device_name in class_info['only_these_devices']})
+                device_names = class_info['only_these_devices']
             else:
-                self.category_container.update({device_name: {'tango_class': c}
-                                                for device_name in self.parent.db.get_device_name('*', c)})
+                device_names = Basler_class_device if c == 'Basler' else \
+                    self.parent.db.get_device_name('*', c)
+            if c == 'Basler':
+                device_names = [
+                    device_name for device_name in device_names
+                    if self.parent.is_basler_online(device_name)
+                ]
+            self.category_container.update({
+                device_name: {'tango_class': c}
+                for device_name in device_names
+            })
             if class_info is not None and 'extra_devices' in class_info:
-                self.category_container.update(
-                    {device_name: {'tango_class': c} for device_name in class_info['extra_devices']})
+                extra_devices = class_info['extra_devices']
+                if c == 'Basler':
+                    extra_devices = [
+                        device_name for device_name in extra_devices
+                        if '_combination' in device_name
+                        or self.parent.is_basler_online(device_name)
+                    ]
+                self.category_container.update({
+                    device_name: {'tango_class': c}
+                    for device_name in extra_devices
+                })
 
         self.title(category_name)
         newframe1 = ttk.Frame(self)
         newframe1.grid(column=0, row=0, columnspan=1, sticky='nsew')
         if category_name == "cameras":
-            # only applied to basler cameras
-            self.serial_number_vs_friendly_name = dict()
-            for device in pylon.TlFactory.GetInstance().EnumerateDevices():
-                self.serial_number_vs_friendly_name[device.GetSerialNumber(
-                )] = f'{device.GetUserDefinedName()}({device.GetSerialNumber()})'
+            self.serial_number_vs_friendly_name = \
+                self.parent.serial_number_vs_friendly_name
 
             devices_seperated_by_location = defaultdict(list)
             locations = ['laser', 'TA1', 'TA2', 'TA3', 'Others']
@@ -230,7 +540,7 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 devices_seperated_by_location.items(), key=lambda x: locations.index(x[0])))
 
             for col, (location, device_sub_list) in enumerate(devices_seperated_by_location.items()):
-                col = col*2
+                col = col*3
                 sub_frame = ttk.Labelframe(
                     newframe1, text=location, padding="0 0 10 0", style='Sty1.TLabelframe')
                 sub_frame.grid(column=col, row=0, sticky='N')
@@ -250,6 +560,10 @@ class DeviceUnderCatergoryWindow(Toplevel):
                         sub_frame, text='UI', command=lambda device_name=device_name: self.open_close_gui(device_name), style='small_button.TButton')
                     self.category_container[device_name]['gui_widget'].grid(
                         column=col+1, row=row, sticky='NSEW')
+                    self.category_container[device_name]['property_widget'] = ttk.Button(
+                        sub_frame, text='Properties', command=lambda device_name=device_name: self.open_properties(device_name), style='small_button.TButton')
+                    self.category_container[device_name]['property_widget'].grid(
+                        column=col+2, row=row, sticky='NSEW')
 
         else:
             item_per_col = 10
@@ -257,14 +571,19 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 c = self.category_container[device_name]['tango_class']
                 server_widget = ttk.Button(
                     newframe1, text=device_name, command=lambda device_name=device_name: self.start_stop_device_server(device_name))
-                server_widget.grid(column=2*(idx // item_per_col), row=idx %
+                server_widget.grid(column=3*(idx // item_per_col), row=idx %
                                    item_per_col, sticky='NSEW')
                 self.category_container[device_name]['server_widget'] = server_widget
                 gui_widget = ttk.Button(
                     newframe1, text='UI', command=lambda device_name=device_name: self.open_close_gui(device_name), style='small_button.TButton')
-                gui_widget.grid(column=(2*(idx // item_per_col)) + 1,
+                gui_widget.grid(column=(3*(idx // item_per_col)) + 1,
                                 row=idx % item_per_col, sticky='NSEW')
                 self.category_container[device_name]['gui_widget'] = gui_widget
+                property_widget = ttk.Button(
+                    newframe1, text='Properties', command=lambda device_name=device_name: self.open_properties(device_name), style='small_button.TButton')
+                property_widget.grid(column=(3*(idx // item_per_col)) + 2,
+                                     row=idx % item_per_col, sticky='NSEW')
+                self.category_container[device_name]['property_widget'] = property_widget
         self.interval = 0
         self.parent.insert_to_disabled(
             f'Opened {self.parent.container[self.category_name]["show_name"]} category window.')
@@ -345,7 +664,7 @@ class DeviceUnderCatergoryWindow(Toplevel):
     def start_stop_device_server(self, device_name):
         if '_combination' in device_name:
             self.parent.insert_to_disabled(
-                f'{device_name} is a combination device. The included devices are {device_name_table[device_name]}. They can be modified in "/common/config.py". Please start/stop the each device seperately.', tag_config='red_text')
+                f'{device_name} is a combination device. The included devices are {device_name_table[device_name]}. Use its Properties button to modify them. Please start/stop each device separately.', tag_config='red_text')
             return
         idx = list(self.category_container.keys()).index(device_name)
         self.device_status_checking_event_id += 1
@@ -419,12 +738,36 @@ class DeviceUnderCatergoryWindow(Toplevel):
                     class_folder, [i for i in os.listdir(class_folder) if 'GUI' in i][0])
             if '_combination' in device_name:
                 self.parent.insert_to_disabled(
-                    f'{device_name} is a combination device. The included devices are {device_name_table[device_name]}. They can be modified in "/common/config.py".')
+                    f'{device_name} is a combination device. The included devices are {device_name_table[device_name]}. Use its Properties button to modify them.')
             p = subprocess.Popen(
                 [f'{self.parent.python_path}', f'{script_path}', device_name])
             self.category_container[device_name]['gui_pid'] = p.pid
             self.category_container[device_name][
                 'gui_widget']['style'] = 'Sty2_online_text_small.TButton'
+
+    def open_properties(self, device_name):
+        if '_combination' in device_name:
+            window = self.category_container[device_name].get(
+                'property_window')
+            if window is None or not window.winfo_exists():
+                window = CombinationDevicesWindow(
+                    self, device_name,
+                    self.category_container[device_name]['tango_class'])
+                self.category_container[device_name][
+                    'property_window'] = window
+            else:
+                window.load_devices()
+                window.deiconify()
+                window.lift()
+            return
+        window = self.category_container[device_name].get('property_window')
+        if window is None or not window.winfo_exists():
+            window = DevicePropertiesWindow(self, device_name)
+            self.category_container[device_name]['property_window'] = window
+        else:
+            window.load_properties()
+            window.deiconify()
+            window.lift()
 
     def kill_started_device_servers(self):
         for device_name, info in self.category_container.items():

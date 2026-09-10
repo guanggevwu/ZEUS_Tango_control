@@ -1,0 +1,35 @@
+{
+  "TA1_gxregulator_combination": [
+    "TA1/gx_regulator/TA1_regulator_1",
+    "TA1/gx_regulator/TA1_regulator_2",
+    "TA1/gx_regulator/TA1_regulator_3"
+  ],
+  "TA3_gxregulator_combination": [
+    "TA3/gx_regulator/TA3_regulator_1",
+    "TA3/gx_regulator/TA3_regulator_2"
+  ],
+  "3PW_basler_combination": [
+    "laser/basler/3PW_Screen",
+    "laser/basler/3PW_Grating-4_NF",
+    "laser/basler/3PW_Grating-4_FF"
+  ],
+  "testcam_basler_combination": [
+    "other/basler/40222934",
+    "TA3/basler/40330527"
+  ],
+  "MA2_genteceo_combination": [
+    "laser/gentec/MA2",
+    "laser/gentec/MA2_north",
+    "laser/gentec/MA2_south"
+  ],
+  "TA2_motor_combination": [
+    "TA2/esp301/esp302_ta2_2",
+    "TA2/esp301/esp302_ta2_1"
+  ],
+  "TA1_motor_combination": ["test/esp301/esp302_ta1_2"],
+  "TA3_motor_combination": [
+    "TA3/esp301/esp302_ta3_1",
+    "TA3/esp301/esp302_ta3_2",
+    "TA1/esp301/esp302_ta1_7"
+  ]
+}
