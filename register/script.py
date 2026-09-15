@@ -75,6 +75,8 @@ reg_dict = {"power_supply": {'server': 'PowerSupply/testsr', '_class': 'PowerSup
             "esp300_grating": {'server': 'ESP301/esp300_grating', '_class': 'ESP301', 'name': 'laser/esp301/esp300_grating'},
             "esp300_turning_box3": {'server': 'ESP301/esp300_turning_box3', '_class': 'ESP301', 'name': 'laser/esp300/esp300_turning_box3'},
             "esp302_test": {'server': 'ESP301/esp302_test', '_class': 'ESP301', 'name': 'test/esp301/esp302_test', 'property': {'ip': '192.168.131.75'}},
+            "newmark1": {'server': 'Newmark/PW_grating_1', '_class': 'Newmark', 'name': 'test/newmark/PW_grating_1'},
+            "newmark2": {'server': 'Newmark/PW_grating_2', '_class': 'Newmark', 'name': 'test/newmark/PW_grating_2'},
             "esp302_ta2_2": {'server': 'ESP301/esp302_ta2_2', '_class': 'ESP301', 'name': 'TA2/esp301/esp302_ta2_2', 'property': {'ip': '192.168.131.142'}},
             "esp302_ta3_2": {'server': 'ESP301/esp302_ta3_2', '_class': 'ESP301', 'name': 'TA3/esp301/esp302_ta3_2', 'property': {'ip': '192.168.131.196', 'axis_property': '2,3'}},
             "file_reader_1": {'server': 'FileReader/file_reader_1', '_class': 'FileReader', 'name': 'facility/file_reader/file_reader_1'},
