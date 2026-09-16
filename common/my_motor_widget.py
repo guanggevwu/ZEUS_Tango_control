@@ -180,6 +180,6 @@ def mymotor_read_only_item_factory(model):
         return None
 
     model_name = model.name.lower()
-    if dev_class == "ESP301" and model_name.endswith("_position"):
+    if dev_class in ("ESP301", "Newmark") and model_name.endswith("_position"):
         return MyMotorReadOnlyTaurusValue()
     return None

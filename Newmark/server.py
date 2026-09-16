@@ -27,9 +27,12 @@ class Newmark(Device):
     timeout = device_property(dtype=float, default_value=2.0)
     device_number = device_property(dtype=str, default_value="01")
     usb_device_index = device_property(dtype=int, default_value=0)
+    usb_serial_number = device_property(dtype=str, default_value="")
     dll_path = device_property(dtype=str, default_value="")
-    axis_unit = device_property(dtype=str, default_value="steps")
-    steps_per_unit = device_property(dtype=float, default_value=1.0)
+    axis_unit = device_property(dtype=str, default_value="mm")
+    # The NSC-A1 reports raw step counts; convert to mm using the 12500
+    # steps/mm scale that matches the vendor software for this stage.
+    steps_per_unit = device_property(dtype=float, default_value=12500.0)
 
     MOTOR_STATUS_BITS = {
         0: "moving at constant speed",
@@ -82,8 +85,9 @@ class Newmark(Device):
         self._ax1_step = 0.0
         self._ax1_status = False
         self._set_ax1_as = "------------N/A-----------"
-        self._steps_per_unit = 1.0
-        self._axis_unit = "steps"
+        self._steps_per_unit = 12500.0
+        self._axis_unit = "mm"
+        self._usb_serial_number = ""
         self._connection_type = "usb"
         self._performax = None
         self._usb_handle = ctypes.c_void_p()
@@ -95,6 +99,7 @@ class Newmark(Device):
             baudrate = int(cast(Any, self.baudrate))
             timeout = float(cast(Any, self.timeout))
             usb_device_index = int(cast(Any, self.usb_device_index))
+            usb_serial_number = str(cast(Any, self.usb_serial_number)).strip()
             dll_path = str(cast(Any, self.dll_path)).strip()
             self._steps_per_unit = float(cast(Any, self.steps_per_unit))
             self._axis_unit = str(cast(Any, self.axis_unit))
@@ -104,11 +109,16 @@ class Newmark(Device):
                 raise ValueError("steps_per_unit must be greater than zero")
 
             if connection_type == "usb":
-                self._open_usb_connection(
-                    usb_device_index, timeout, dll_path)
-                connection_description = (
-                    f"USB device index {usb_device_index}"
+                selected_index = self._open_usb_connection(
+                    usb_device_index, timeout, dll_path, usb_serial_number
                 )
+                connection_description = (
+                    f"USB device index {selected_index}"
+                )
+                if self._usb_serial_number:
+                    connection_description += (
+                        f" (serial {self._usb_serial_number})"
+                    )
             elif connection_type == "serial":
                 self._open_serial_connection(com, baudrate, timeout)
                 connection_description = f"{com} at {baudrate} baud"
@@ -156,8 +166,19 @@ class Newmark(Device):
         self.dev.reset_output_buffer()
         self._connection_type = "serial"
 
+    @staticmethod
+    def _read_usb_serial(performax, device_index: int) -> str:
+        # Performax product-string option 0 is the USB serial number.
+        buffer = ctypes.create_string_buffer(256)
+        if not performax.fnPerformaxComGetProductString(device_index, buffer, 0):
+            raise RuntimeError(
+                f"Could not read USB serial number at index {device_index}"
+            )
+        return buffer.value.decode("ascii").strip()
+
     def _open_usb_connection(
-        self, device_index: int, timeout: float, configured_dll_path: str
+        self, device_index: int, timeout: float, configured_dll_path: str,
+        usb_serial_number: str = "",
     ):
         # USBXpress keeps its handle table in Windows TLS. A lock alone is
         # insufficient: open, I/O, flush and close must share one OS thread.
@@ -165,16 +186,17 @@ class Newmark(Device):
             max_workers=1, thread_name_prefix="newmark-usb"
         )
         try:
-            self._usb_executor.submit(
+            return self._usb_executor.submit(
                 self._open_usb_on_worker, device_index, timeout,
-                configured_dll_path,
+                configured_dll_path, usb_serial_number,
             ).result()
         except Exception:
             self._close_connection()
             raise
 
     def _open_usb_on_worker(
-        self, device_index: int, timeout: float, configured_dll_path: str
+        self, device_index: int, timeout: float, configured_dll_path: str,
+        usb_serial_number: str = "",
     ):
         if platform.system() != "Windows":
             raise RuntimeError(
@@ -245,6 +267,17 @@ class Newmark(Device):
                 "No Performax USB controller was found. Check the NSC-A1 "
                 "USB driver and cable."
             )
+        usb_serial_number = usb_serial_number.strip()
+        if usb_serial_number:
+            matches = [
+                index for index in range(number_of_devices.value)
+                if self._read_usb_serial(performax, index) == usb_serial_number
+            ]
+            if not matches:
+                raise ValueError(f"USB serial number {usb_serial_number!r} not found")
+            if len(matches) != 1:
+                raise ValueError(f"USB serial number {usb_serial_number!r} is not unique")
+            device_index = matches[0]
         if device_index < 0 or device_index >= number_of_devices.value:
             raise ValueError(
                 f"usb_device_index {device_index} is invalid; "
@@ -271,18 +304,11 @@ class Newmark(Device):
         if not performax.fnPerformaxComFlush(handle):
             raise RuntimeError("PerformaxCom could not flush the USB device")
 
-        # The vendor sample defines PERFORMAX_MAX_DEVICE_STRLEN as 256;
-        # this is separate from the 64-byte command/response packet size.
-        product_buffer = ctypes.create_string_buffer(256)
-        if performax.fnPerformaxComGetProductString(
-            device_index, product_buffer, 0
-        ):
-            product_name = product_buffer.value.decode(
-                "ascii", errors="replace"
-            )
-            self.logger.info(
-                f"Opened Performax USB device {device_index}: {product_name}"
-            )
+        self._usb_serial_number = self._read_usb_serial(performax, device_index)
+        self.logger.info(
+            f"Opened Performax USB device {device_index}: serial {self._usb_serial_number}"
+        )
+        return device_index
 
     @staticmethod
     def _normalize_device_number(value: Any) -> str:

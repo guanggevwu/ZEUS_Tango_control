@@ -18,6 +18,9 @@ class ThreadLocalDLL:
         self.calls = []
         self.fail_send = False
         self.fail_flush = False
+        self.serials = [b"SERIAL-A", b"SERIAL-B"]
+        self.fail_serial = False
+        self.opened_index = None
         self.fnPerformaxComGetNumDevices = Mock(side_effect=self.enumerate)
         self.fnPerformaxComGetProductString = Mock(side_effect=self.product)
         self.fnPerformaxComSetTimeouts = Mock(side_effect=self.timeouts)
@@ -31,13 +34,16 @@ class ThreadLocalDLL:
 
     def enumerate(self, count):
         self.record("enumerate")
-        ctypes.cast(count, ctypes.POINTER(ctypes.c_ulong))[0] = 1
+        ctypes.cast(count, ctypes.POINTER(ctypes.c_ulong))[0] = len(self.serials)
         return 1
 
     def product(self, index, buffer, option):
         self.record("product")
         assert len(buffer) == 256
-        buffer.value = b"SDE01"
+        assert option == 0
+        if self.fail_serial:
+            return 0
+        buffer.value = self.serials[index]
         return 1
 
     def timeouts(self, read, write):
@@ -47,6 +53,7 @@ class ThreadLocalDLL:
 
     def open(self, index, handle):
         self.record("open")
+        self.opened_index = index
         self.local.handle = 123
         ctypes.cast(handle, ctypes.POINTER(ctypes.c_void_p))[0] = 123
         return 1
@@ -88,9 +95,43 @@ class USBThreadTests(unittest.TestCase):
         self.device._message = ""
         self.addCleanup(self.device._close_connection)
 
-    def open(self):
+    def open(self, index=0, serial=""):
         with patch("Newmark.server.ctypes.WinDLL", return_value=self.dll):
-            self.device._open_usb_connection(0, 2.0, "")
+            return self.device._open_usb_connection(index, 2.0, "", serial)
+
+    def test_serial_selects_matching_controller_on_worker(self):
+        self.assertEqual(self.open(index=99, serial="SERIAL-B"), 1)
+        self.assertEqual(self.dll.opened_index, 1)
+        self.assertEqual(self.device._usb_serial_number, "SERIAL-B")
+        self.assertEqual(len({tid for _, tid in self.dll.calls}), 1)
+        self.assertNotEqual(self.dll.calls[0][1], threading.get_ident())
+
+    def test_empty_serial_uses_index(self):
+        self.assertEqual(self.open(index=1), 1)
+        self.assertEqual(self.dll.opened_index, 1)
+        self.assertEqual(self.device._usb_serial_number, "SERIAL-B")
+
+    def test_missing_serial_does_not_open_another_controller(self):
+        with self.assertRaisesRegex(ValueError, "not found"):
+            self.open(serial="MISSING")
+        self.assertIsNone(self.dll.opened_index)
+
+    def test_duplicate_serial_is_rejected(self):
+        self.dll.serials = [b"SAME", b"SAME"]
+        with self.assertRaisesRegex(ValueError, "not unique"):
+            self.open(serial="SAME")
+        self.assertIsNone(self.dll.opened_index)
+
+    def test_serial_read_failure_does_not_fall_back(self):
+        self.dll.fail_serial = True
+        with self.assertRaisesRegex(RuntimeError, "serial number"):
+            self.open(serial="SERIAL-B")
+        self.assertIsNone(self.dll.opened_index)
+
+    def test_invalid_index_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "invalid"):
+            self.open(index=99)
+        self.assertIsNone(self.dll.opened_index)
 
     def test_old_cross_thread_call_reproduces_failure(self):
         self.open()
