@@ -6,7 +6,7 @@ from taurus.qt.qtgui.panel import TaurusForm
 
 from common.GUI import GuiBase
 from common.TaurusGUI_Argparse import TaurusArgparse
-from common.config import device_name_table
+from common.ui_config import device_name_table
 from common.my_motor_widget import mymotor_read_only_item_factory
 
 if __package__:
@@ -78,7 +78,8 @@ def add_minimum_form(layout, devices, control):
     # controller/distance. No set-as, diagnostics, or saved-location rows.
     form = TaurusForm(withButtons=False)
     form.setItemFactories(include=[mymotor_read_only_item_factory, ".*"])
-    models = [f"{device}/{attr}" for device in devices for attr in MINIMUM_ATTRIBUTES]
+    models = [
+        f"{device}/{attr}" for device in devices for attr in MINIMUM_ATTRIBUTES]
     form.setModel(models + [distance_model(devices)])
     for index, model in enumerate(models):
         if model.endswith("/ax1_position"):
@@ -104,7 +105,8 @@ def build_gui(devices, polling):
         }
         pair_control = PairMoveControl(GRATING_DEVICES, newmark_app.gui)
         pair_control.failed.connect(
-            lambda message: Qt.QMessageBox.warning(newmark_app.gui, "MOVE (BOTH) failed", message)
+            lambda message: Qt.QMessageBox.warning(
+                newmark_app.gui, "MOVE (BOTH) failed", message)
         )
 
     for device_name in device_list:
@@ -227,7 +229,8 @@ def build_gui(devices, polling):
 
     for kind, (panel, layout) in grating_panels.items():
         if kind == "less":
-            add_distance_row(layout, distance_model(GRATING_DEVICES), pair_control)
+            add_distance_row(layout, distance_model(
+                GRATING_DEVICES), pair_control)
         elif kind == "minimum":
             add_minimum_form(layout, GRATING_DEVICES, pair_control)
             for index, device_name in enumerate(GRATING_DEVICES, 1):

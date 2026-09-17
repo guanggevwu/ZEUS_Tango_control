@@ -15,7 +15,7 @@ container = {
         'DG535': {'server_code_path': os.path.join(root_path, 'DG', 'dg535_server.py'), 'GUI_code_path': os.path.join(root_path, 'DG', 'GUI.py')},
         'DG645': {'server_code_path': os.path.join(root_path, 'DG', 'dg645_server.py'), 'GUI_code_path': os.path.join(root_path, 'DG', 'GUI.py')}
     }},
-    'energy_meter': {'show_name': 'Energy Meters', 'class': {'GentecEO': None}},
+    'energy_meter': {'show_name': 'Energy Meters', 'class': {'GentecEO': {'server_code_path': os.path.join(root_path, 'GentecEO', 'server.py'), 'GUI_code_path': os.path.join(root_path, 'GentecEO', 'Taurus_GUI.py')}}},
     '1D_devices': {'show_name': '1-D Devices', 'class': {
         'FileReader': {'only_these_devices': ['facility/file_reader/spectrometer', 'other/file_reader/oscilloscope']}
     }},

@@ -12,7 +12,7 @@ from threading import Thread
 from queue import Queue
 import csv
 import platform
-from common.config import basler_server_config
+from common.ui_config import basler_server_config
 from common.logger_adapter import LoggerAdapter
 from common.other import generate_basename
 from common.shared_server_side import add_center_of_mass_functions

@@ -10,7 +10,7 @@ import platform
 
 from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
 from common.TaurusGUI_Argparse import TaurusArgparse
-from common.config import device_name_table
+from common.ui_config import device_name_table
 
 if platform.system() == 'Windows':
     tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(

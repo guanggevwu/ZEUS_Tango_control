@@ -1,6 +1,6 @@
 from common.GUI import GuiBase
 from common.TaurusGUI_Argparse import TaurusArgparse
-from common.config import device_name_table, image_panel_config
+from common.ui_config import device_name_table, image_panel_config
 
 parser = TaurusArgparse(
     description='GUI for File Reader', device_default='test/basler/testcam', nargs_string='+', polling_default=1000)

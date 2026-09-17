@@ -619,8 +619,8 @@ class DeviceUnderCatergoryWindow(Toplevel):
 
     def routine_check_device_status(self):
         i = 0
-        # check all devices every 60 seconds
-        time_interval = max(0.1, 60//len(self.category_container))
+        # check all devices every 20 seconds
+        time_interval = max(0.1, 20//len(self.category_container))
         while True:
             for device_name in list(self.category_container.keys()):
                 if not self.thread_stop_event.is_set():

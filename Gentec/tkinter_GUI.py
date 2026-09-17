@@ -2,7 +2,7 @@ from tkinter import *
 from tkinter import ttk
 import tango
 import sys
-from common.config import device_name_table, image_panel_config
+from common.ui_config import device_name_table, image_panel_config
 
 
 class Gentec:

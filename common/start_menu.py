@@ -5,7 +5,7 @@ import signal
 import tango
 import psutil
 import time
-from .config import device_name_table, instance_table
+from .ui_config import device_name_table
 
 
 class Menu:
@@ -19,14 +19,16 @@ class Menu:
         self.db = tango.Database()
         self.servers = self.db.get_server_list()
         self.device_name_table = device_name_table
-        self.instance_table = instance_table
 
     def get_class_related_info(self):
         self.class_name = type(self).__name__.replace('Menu', '')
         self.device_names = self.db.get_device_name('*', self.class_name)
-        # only get the device names with the correct class name
-        self.device_names = [i for i in list(self.device_name_table) if self.class_name.lower() in i.split("_")] + \
-            list(self.device_names.value_string)
+        # UI combinations are available only to GUI launchers. Server launchers
+        # use self.instances and therefore always start one server at a time.
+        self.device_names = [
+            name for name in self.device_name_table
+            if self.class_name.lower() in name.split('_')
+        ] + list(self.device_names.value_string)
         indexed_sorted_device_names = sorted(
             enumerate([name.split('/')[-1] for name in self.device_names]), key=lambda x: x[1])
         indices1, _ = zip(
@@ -34,8 +36,6 @@ class Menu:
         self.device_names = [self.device_names[i] for i in indices1]
         self.instances = [e.split('/')[-1]
                           for e in self.servers if e.split('/')[0] == self.class_name]
-        self.instances = [i for i in list(
-            self.instance_table) if self.class_name.lower() in i.split("_")]+(self.instances)
         self.instances = sorted(self.instances)
 
     def start_window(self, menu_file_path, key):
@@ -46,28 +46,18 @@ class Menu:
                 menu_file_path)) if self.menu_dict[key][0] in i][0])
         # the input from input text field
         input_txt = getattr(self, self.menu_dict[key][0][:-3]).get()
-        # if this is a combination for start server command, get the real instance from the combination table.
-        if 'server' in key and input_txt in self.instance_table:
-            input_txts = self.instance_table[input_txt]
-        else:
-            if self.class_name == 'Basler':
-                idx = self.menu_dict[key][3].index(input_txt)
-                input_txt = self.menu_dict[key][1][idx]
-            input_txts = [input_txt]
-        i = 0
-        for input_txt in input_txts:
-            if 'server' in key and input_txt in [i[1] for i in self.menu_dict[key][2]]:
-                print(
-                    f'{key} for {input_txt} has run already. Ignore the operation.')
-            else:
-                input_txt = input_txt.split()
-                p = subprocess.Popen(
-                    [f'{self.python_path}', f'{script_path}', *input_txt])
-                self.menu_dict[key][2].append([p.pid, input_txt[0]])
-                print(f'{p.pid} is started for {input_txt[0]}')
-                i += 1
-                if i != len(input_txts):
-                    time.sleep(3)
+        if self.class_name == 'Basler':
+            idx = self.menu_dict[key][3].index(input_txt)
+            input_txt = self.menu_dict[key][1][idx]
+        if 'server' in key and input_txt in [i[1] for i in self.menu_dict[key][2]]:
+            print(
+                f'{key} for {input_txt} has run already. Ignore the operation.')
+            return
+        input_args = input_txt.split()
+        p = subprocess.Popen(
+            [f'{self.python_path}', f'{script_path}', *input_args])
+        self.menu_dict[key][2].append([p.pid, input_args[0]])
+        print(f'{p.pid} is started for {input_args[0]}')
 
     def terminate_all(self):
         for key, value in self.menu_dict.items():

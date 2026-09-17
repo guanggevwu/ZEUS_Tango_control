@@ -1,6 +1,6 @@
 from common.GUI import GuiBase
 from common.TaurusGUI_Argparse import TaurusArgparse
-from common.config import device_name_table
+from common.ui_config import device_name_table
 
 
 parser = TaurusArgparse(
