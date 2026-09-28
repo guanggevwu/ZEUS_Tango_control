@@ -6,13 +6,20 @@ import tango
 import os
 
 
-def get_device_property(device_proxy, property_name, default=''):
+def get_device_property(device_proxy, property_name, default: object = ''):
     try:
         values = device_proxy.get_property(
             property_name).get(property_name, [])
     except Exception:
         return default
     return values[0] if values else default
+
+
+def get_boolean_device_property(device_proxy, property_name, default=False):
+    value = get_device_property(device_proxy, property_name, default)
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ('true', '1', 'yes', 'on')
 
 
 def create_app():
@@ -29,8 +36,8 @@ def create_app():
         esp_app.add_device(d)
         device_proxy = tango.DeviceProxy(d)
         if device_proxy.info().dev_class == 'ESP301':
-            is_grating = get_device_property(
-                device_proxy, 'extra_script') == 'grating'
+            is_grating = get_boolean_device_property(
+                device_proxy, 'use_grating_config')
             less_list = ['user_defined_name', 'error_message', 'message', 'current_location', 'customized_location', 'ax1_position', 'set_ax1_as', 'ax2_position', 'set_ax2_as', 'ax3_position',
                          'set_ax3_as']
             if is_grating:

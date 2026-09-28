@@ -96,7 +96,7 @@ class Basler(Device):
 
     serial_number = device_property(dtype=str, default_value='')
     friendly_name = device_property(dtype=str, default_value='')
-    enable_center_of_mass = device_property(dtype=bool, default_value=True)
+    enable_center_of_mass = device_property(dtype=bool, default_value=False)
     show_energy_flux_hotspot = device_property(dtype=bool, default_value=False)
     # image_encoded = attribute(label='encoded image',
     #            access=AttrWriteType.READ)

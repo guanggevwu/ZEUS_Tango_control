@@ -19,7 +19,8 @@ class ESP301(Device):
 
     com = device_property(dtype=str, default_value='COM1')
     ip = device_property(dtype=str, default_value='')
-    extra_script = device_property(dtype=str, default_value='')
+    use_grating_config = device_property(dtype=bool, default_value=False)
+    use_turning_box_3_config = device_property(dtype=bool, default_value=False)
     axis_property = device_property(dtype=str, default_value='')
 
     @staticmethod
@@ -98,9 +99,6 @@ class ESP301(Device):
                 self.dev_write(f"{axis}ZS00H\r".encode())
             self._error_message = ''
             self._saved_location_source = 'client'
-            # if self.extra_script == "plasma_mirror":
-            #     self.laser_socket = socket.socket(
-            #         socket.AF_INET, socket.SOCK_DGRAM)
             self.set_status("ESP301 device is connected.")
         except:
             print("Could NOT connect to  ESP device.")
@@ -368,42 +366,40 @@ class ESP301(Device):
                 except Exception as e:
                     print(f"Error adding attributes for axis {axis}: {e}")
 
-        if hasattr(self, "extra_script"):
-            if self.extra_script == "turning_box_3":
-                # axis 1: -88 to 14 mm. axis 2: 0 to 135 deg. When axis 1 is in -88 to -46 (limit might be close to -30), axis 2 is free to rotate.
-                self.TA1 = [0, 135]
-                self.TA2 = [89, 0]
-                self.TA3 = [101, 90]
-                self.TA2_to_TA3_intermediate = [41, None]
-                self.add_attribute(customized_location)
-                self.add_command(cmd_reset_to_TA1)
-                self.remove_attribute("current_location")
-            if self.extra_script == "grating":
-                # only for a special case
-                ax12_distance = attribute(
-                    name="ax12_distance",
-                    label="ax12 distance",
-                    dtype=float,
-                    unit=self._axis1_unit,
-                    format='6.3f',
-                    access=AttrWriteType.READ,
-                    doc='ax12_distance = ax1_position - ax2_position. I.e., distance between ax1 and ax2.',
+        if self.use_turning_box_3_config:
+            # axis 1: -88 to 14 mm. axis 2: 0 to 135 deg. When axis 1 is in -88 to -46 (limit might be close to -30), axis 2 is free to rotate.
+            self.TA1 = [0, 135]
+            self.TA2 = [89, 0]
+            self.TA3 = [101, 90]
+            self.TA2_to_TA3_intermediate = [41, None]
+            self.add_attribute(customized_location)
+            self.add_command(cmd_reset_to_TA1)
+            self.remove_attribute("current_location")
+        if self.use_grating_config:
+            ax12_distance = attribute(
+                name="ax12_distance",
+                label="ax12 distance",
+                dtype=float,
+                unit=self._axis1_unit,
+                format='6.3f',
+                access=AttrWriteType.READ,
+                doc='ax12_distance = ax1_position - ax2_position. I.e., distance between ax1 and ax2.',
 
-                )
+            )
 
-                ax12_step = attribute(
-                    name="ax12_step",
-                    label="ax12 step",
-                    dtype=float,
-                    unit=self._axis1_unit,
-                    format='6.3f',
-                    memorized=True,
-                    hw_memorized=True,
-                    access=AttrWriteType.READ_WRITE,
-                    doc='steps for axis 1 and axis 2 are the same, so this attribute is used for both axes.',
-                )
-                self.add_attribute(ax12_distance)
-                self.add_attribute(ax12_step)
+            ax12_step = attribute(
+                name="ax12_step",
+                label="ax12 step",
+                dtype=float,
+                unit=self._axis1_unit,
+                format='6.3f',
+                memorized=True,
+                hw_memorized=True,
+                access=AttrWriteType.READ_WRITE,
+                doc='steps for axis 1 and axis 2 are the same, so this attribute is used for both axes.',
+            )
+            self.add_attribute(ax12_distance)
+            self.add_attribute(ax12_step)
 
     def read_ax12_distance(self, attr):
         return float(f'{(self._ax1_position-self._ax2_position):.3f}')
