@@ -3,6 +3,7 @@ from tango.server import Device, attribute, command, device_property
 import time
 import datetime
 import logging
+import math
 import serial
 import time
 import os
@@ -281,7 +282,44 @@ class ESP301(Device):
                 self, f'_set_ax{axis}_as', f"set {old_position:.3f} to {getattr(self, f'_ax{axis}_position'):.3f}")
         return write_set_as
 
-    # Now the relative motion is achived by setting a absolute position with the current position plus the step, so there is no need to create separate attributes and commands for relative motion. The client can just read the current position, add the step to it, and write it back to the position attribute to achieve relative motion. However, keep the ax_step attributes for recording the step values for user reference and for use in the GUI.
+    def _jog_axes(self, axes, step):
+        if not math.isfinite(step):
+            raise ValueError("Jog step must be finite")
+        if any(axis not in self.axis for axis in axes):
+            raise ValueError("Jog axis is not configured")
+        for axis in axes:
+            self.dev_write(f"{axis}MD?\r".encode())
+            reply = self.dev_read()
+            if reply == "0":
+                return False
+            if reply != "1":
+                raise RuntimeError(f"Invalid motion-done response for axis {axis}: {reply!r}")
+        targets = []
+        for axis in axes:
+            self.dev_write(f"{axis}TP\r".encode())
+            target = float(self.dev_read()) + step
+            if not math.isfinite(target):
+                raise ValueError("Jog target must be finite")
+            targets.append(f"{axis}PA{target:.3f}")
+        self._error_message = ''
+        self.should_stop = False
+        self.dev_write((";".join(targets) + "\r").encode())
+        return True
+
+    @command(dtype_in=(float,), dtype_out=bool)
+    def jog_axis(self, values):
+        """Jog [axis, signed step]; return False without moving when busy."""
+        if len(values) != 2 or values[0] not in self.axis:
+            raise ValueError("Expected [configured axis number, signed step]")
+        return self._jog_axes((int(values[0]),), float(values[1]))
+
+    @command(dtype_in=float, dtype_out=bool)
+    def jog_grating(self, step):
+        """Jog axes 1 and 2 only when both are motion-done."""
+        if not self.use_grating_config:
+            raise ValueError("Grating configuration is not enabled")
+        return self._jog_axes((1, 2), float(step))
+
     def create_ax_step_attribute(self, axis):
         attr = attribute(
             name=f"ax{axis}_step",

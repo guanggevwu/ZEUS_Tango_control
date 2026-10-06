@@ -18,6 +18,7 @@ class Axis:
         self.unit = "mm"
         self.quality = tango.AttrQuality.ATTR_VALID
         self.fail_read = self.fail_write = False
+        self.busy = self.fail_status = self.busy_at_write = False
 
     def set_timeout_millis(self, timeout):
         self.timeout = timeout
@@ -26,6 +27,12 @@ class Axis:
         assert name == "ax1_position"
         return SimpleNamespace(unit=self.unit)
 
+    def is_motion_done(self):
+        self.events.append((self.name, "status"))
+        if self.fail_status:
+            raise RuntimeError("Status read failed")
+        return not self.busy
+
     def read_attribute(self, name):
         assert name == "ax1_position"
         self.events.append((self.name, "read"))
@@ -33,12 +40,14 @@ class Axis:
             raise RuntimeError("Read failed")
         return SimpleNamespace(value=self.position, quality=self.quality)
 
-    def write_attribute(self, name, value):
-        assert name == "ax1_position"
+    def move_absolute_if_idle(self, value):
+        if self.busy_at_write:
+            return False
         self.events.append((self.name, "write"))
         self.position = value  # Failed reply may still mean the move was accepted.
         if self.fail_write:
             raise RuntimeError("Write failed")
+        return True
 
 class PairMoveTests(unittest.TestCase):
     def setUp(self):
@@ -54,7 +63,7 @@ class PairMoveTests(unittest.TestCase):
         move_relative_pair(self.names, 0.1)
         self.assertAlmostEqual(self.axes[0].position, 111.36)
         self.assertAlmostEqual(self.axes[1].position, 108.36)
-        self.assertEqual(self.events, [("first", "read"), ("second", "read"), ("first", "write"), ("second", "write")])
+        self.assertEqual(self.events, [("first", "status"), ("second", "status"), ("first", "read"), ("second", "read"), ("first", "write"), ("second", "write")])
         move_relative_pair(self.names, -0.1)
         self.assertAlmostEqual(self.axes[0].position, 111.26)
         self.assertAlmostEqual(self.axes[1].position, 108.26)
@@ -65,6 +74,43 @@ class PairMoveTests(unittest.TestCase):
         self.axes[1].position = 108260.0
         move_relative_pair(self.names, 0.1)
         self.assertAlmostEqual(self.axes[1].position, 108360.0)
+
+    def test_either_busy_axis_prevents_both_position_reads_and_moves(self):
+        for busy_index in (0, 1):
+            with self.subTest(busy_index=busy_index):
+                self.events.clear()
+                for index, axis in enumerate(self.axes):
+                    axis.busy = index == busy_index
+                self.assertFalse(move_relative_pair(self.names, 0.1))
+                self.assertTrue(all(action == 'status' for _, action in self.events))
+
+    def test_fast_second_click_waits_until_both_axes_are_done(self):
+        self.assertTrue(move_relative_pair(self.names, -0.1))
+        self.axes[1].busy = True
+        self.assertFalse(move_relative_pair(self.names, -0.1))
+        self.assertAlmostEqual(self.axes[0].position, 111.16)
+        self.assertAlmostEqual(self.axes[1].position, 108.16)
+        self.axes[1].busy = False
+        self.assertTrue(move_relative_pair(self.names, -0.1))
+        self.assertAlmostEqual(self.axes[0].position, 111.06)
+        self.assertAlmostEqual(self.axes[1].position, 108.06)
+
+    def test_status_failure_prevents_both_moves(self):
+        self.axes[1].fail_status = True
+        with self.assertRaisesRegex(RuntimeError, 'Status read failed'):
+            move_relative_pair(self.names, 0.1)
+        self.assertTrue(all(action == 'status' for _, action in self.events))
+
+    def test_first_axis_becoming_busy_discards_pair(self):
+        self.axes[0].busy_at_write = True
+        self.assertFalse(move_relative_pair(self.names, 0.1))
+        self.assertFalse(any(action == 'write' for _, action in self.events))
+
+    def test_second_axis_becoming_busy_reports_partial_move(self):
+        self.axes[1].busy_at_write = True
+        with self.assertRaisesRegex(RuntimeError, 'One axis may have moved'):
+            move_relative_pair(self.names, 0.1)
+        self.assertEqual(sum(action == 'write' for _, action in self.events), 1)
 
     def test_invalid_steps_write_neither_axis(self):
         for step in (0, float("nan"), float("inf")):

@@ -9,15 +9,18 @@ from taurus.qt.qtgui.container import TaurusWidget
 
 
 def move_relative_pair(device_names, delta_mm):
-    """Read both positions before writing either; never retry failed moves."""
+    """Discard busy pair moves; read both positions before sending targets."""
     if len(device_names) != 2 or len(set(device_names)) != 2:
         raise ValueError("MOVE (BOTH) requires two distinct controllers")
     if not math.isfinite(delta_mm) or delta_mm == 0:
         raise ValueError("The relative step must be finite and greater than zero")
     devices = [tango.DeviceProxy(name) for name in device_names]
-    targets = []
     for device in devices:
         device.set_timeout_millis(2000)
+        if not device.is_motion_done():
+            return False
+    targets = []
+    for device in devices:
         unit = device.get_attribute_config("ax1_position").unit
         delta = Quantity(delta_mm, "mm").to(unit).magnitude
         position = device.read_attribute("ax1_position")
@@ -31,13 +34,17 @@ def move_relative_pair(device_names, delta_mm):
     try:
         # Separate controllers cannot start atomically. Send back-to-back
         # commands, without waiting for either axis to reach its destination.
-        for device, target in zip(devices, targets):
-            device.write_attribute("ax1_position", target)
+        for index, (device, target) in enumerate(zip(devices, targets)):
+            if not device.move_absolute_if_idle(target):
+                if index == 0:
+                    return False
+                raise RuntimeError("The second controller became busy before its move")
     except Exception as exc:
         raise RuntimeError(
             "Pair move failed. One axis may have moved; separation may have changed. "
             f"Check both positions before retrying. {exc}"
         ) from exc
+    return True
 
 
 class PairMoveControl(Qt.QObject):

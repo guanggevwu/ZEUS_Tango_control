@@ -68,9 +68,18 @@ class MyMotorWriteWidget(TaurusWidget):
         model = self.getModelObj()
         if model is None:
             return
+        try:
+            step = float(self.step.text().strip())
+            device = model.getParentObj().getDeviceProxy()
+            if device.info().dev_class in ("ESP301", "Newmark"):
+                attr_name = model.name.lower().rsplit('/', 1)[-1]
+                axis = int(attr_name.removeprefix('ax').removesuffix('_position'))
+                device.jog_axis([axis, sign * step])
+                return
+        except Exception as exc:
+            self.warning("Could not jog motor: %s", exc)
+            return
         pos = model.read().rvalue
-        step_text = self.step.text().strip()
-        step = float(step_text)
         current = getattr(pos, 'magnitude', pos)
         if current is None:
             return
@@ -136,15 +145,11 @@ class MyGratingWriteWidget(TaurusWidget):
         model = self.getModelObj()
         if model is None:
             return
-        ax1_position_attr = model.getParentObj().getAttribute('ax1_position')
-        ax1_position = ax1_position_attr.read().rvalue.magnitude
-        ax2_position_attr = model.getParentObj().getAttribute('ax2_position')
-        ax2_position = ax2_position_attr.read().rvalue.magnitude
-
-        step_text = self.step.text().strip()
-        step = float(step_text)
-        ax1_position_attr.write(float(ax1_position) + sign * step)
-        ax2_position_attr.write(float(ax2_position) + sign * step)
+        try:
+            step = float(self.step.text().strip())
+            model.getParentObj().getDeviceProxy().jog_grating(sign * step)
+        except Exception as exc:
+            self.warning("Could not jog grating: %s", exc)
 
 
 class MyGratingTaurusValue(TaurusValue):

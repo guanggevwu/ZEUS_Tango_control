@@ -67,6 +67,25 @@ The server exposes `ax1_position`, `ax1_step`, `ax1_status`, `set_ax1_as`, saved
 
 `steps_per_unit` performs the conversion between Tango positions and integer controller steps. Leave it at `1.0` to expose raw motor steps.
 
+### Guarded arrow moves
+
+Single-axis arrows use `jog_axis([1, signed_step])`. The server reads `MST`
+directly, rejecting the click while any of bits 0, 1, or 2 indicates motion
+(constant speed, acceleration, or deceleration). Accepted jogs calculate an
+absolute target from a fresh server-side position. Clicks during motion are
+discarded, not queued. Invalid status replies and controller fault bits prevent
+new jogs. Motor power (`ax1_status`) is not used as a motion-completion signal.
+
+`is_motion_done()` supplies the same live check to the paired GUI.
+`move_absolute_if_idle(target)` rechecks it when submitting each paired target.
+Direct position writes, raw commands, saved locations, and limit moves retain
+their existing behavior; these guards are not a general motion interlock.
+
+Deploy the updated server and GUI together, restarting only when the hardware
+is safe. Older servers missing these commands cause the arrows to report an
+error, with no fallback to unguarded motion. No controller was contacted during
+development. Hardware timing and synchronization remain unverified.
+
 ## Running
 
 ### Combined PW grating GUI
@@ -91,16 +110,30 @@ positions, not a new Tango attribute. Its updates follow the source readings;
 they are not simultaneous hardware samples. Both source attributes must have
 correct length units and calibration (normally `axis_unit=mm` with this stage's
 `steps_per_unit=12500`). The arrows send the same signed relative step in mm
-to both controllers, reading both current positions before writing either
-target. Commands are sent back-to-back with no synchronization or wait for
+to both controllers. A live motion-status check rejects the entire click if
+either controller is busy, before reading either position or sending targets.
+Both positions are then read before either target is sent. Each server rechecks
+its own status before accepting its target. Commands are sent back-to-back with no synchronization or wait for
 arrival. When both axes reach their targets, separation is preserved within
-positioning resolution; it may vary during motion. Wait for both axes to stop
-before the next click. The step is shared between panels and starts at 0.100 mm.
+positioning resolution; it may vary during motion. Clicks while either axis is
+moving are ignored. The step is shared between panels and starts at 0.100 mm.
 A failed write reports that separation may have changed; moves are not retried
 or rolled back automatically. Verify positions after a fault or limit stop.
+The two independent controllers cannot start atomically: if the second becomes
+busy after the initial checks, the first may already have moved and the GUI
+reports a possible separation change. Other clients are not locked out.
 
 Hardware-free tests in [test_grating_gui.py](test_grating_gui.py) cover device
 pairing, signed distance/unit conversion, and the real Taurus/Qt display widgets.
+
+Run the focused jog and paired-motion tests without connecting to hardware:
+
+```powershell
+.\venv\Scripts\python.exe -m unittest tests.test_motor_jog Newmark.test_grating_move -v
+```
+
+These tests use extracted server methods with mock I/O and simulated Tango
+proxies. Do not run the full repository test suite as an offline check.
 
 ### Launchers
 

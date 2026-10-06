@@ -4,6 +4,7 @@ import datetime
 import ctypes
 import functools
 import logging
+import math
 import os
 import platform
 import sys
@@ -569,6 +570,39 @@ class Newmark(Device):
             int(self._send_command("PX"))
         )
         return self._ax1_position
+
+    @command(dtype_out=bool)
+    def is_motion_done(self):
+        """Read live MST; reject invalid replies and controller faults."""
+        status = int(self._send_command("MST"))
+        if status < 0 or status >= (1 << 11):
+            raise RuntimeError(f"Invalid motor status: {status}")
+        if status & ((1 << 6) | (1 << 7) | (1 << 10)):
+            raise RuntimeError(f"Cannot move: controller fault (MST={status})")
+        return not bool(status & 0b111)
+
+    @command(dtype_in=(float,), dtype_out=bool)
+    def jog_axis(self, values):
+        """Jog [1, signed step], discarding requests during motion."""
+        if len(values) != 2 or values[0] != 1:
+            raise ValueError("Expected [1, signed step]")
+        step = float(values[1])
+        if not math.isfinite(step):
+            raise ValueError("Jog step must be finite")
+        if not self.is_motion_done():
+            return False
+        target = self._read_axis_position() + step
+        return self.move_absolute_if_idle(target)
+
+    @command(dtype_in=float, dtype_out=bool)
+    def move_absolute_if_idle(self, target):
+        """Issue an absolute move only if the controller is motion-done."""
+        if not math.isfinite(target):
+            raise ValueError("Move target must be finite")
+        if not self.is_motion_done():
+            return False
+        self._write_axis_position(target)
+        return True
 
     @clear_error_wrap
     def _write_axis_position(self, value: float):
