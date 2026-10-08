@@ -23,6 +23,11 @@ class ESP301(Device):
     use_grating_config = device_property(dtype=bool, default_value=False)
     use_turning_box_3_config = device_property(dtype=bool, default_value=False)
     axis_property = device_property(dtype=str, default_value='')
+    axis_order = device_property(
+        dtype=str, default_value='',
+        doc='GUI axis order, e.g. 3, 1, 2. Include every configured axis exactly once. '
+            'Empty uses numeric order. Restart the GUI after changes.',
+    )
 
     @staticmethod
     def clear_error_wrap(func):

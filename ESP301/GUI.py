@@ -1,4 +1,5 @@
 from common.GUI import GuiBase
+from common.axis_order import get_axis_order
 from common.TaurusGUI_Argparse import TaurusArgparse
 from common.ui_config import device_name_table
 from common.my_motor_widget import mymotor_read_only_item_factory
@@ -38,8 +39,11 @@ def create_app():
         if device_proxy.info().dev_class == 'ESP301':
             is_grating = get_boolean_device_property(
                 device_proxy, 'use_grating_config')
-            less_list = ['user_defined_name', 'error_message', 'message', 'current_location', 'customized_location', 'ax1_position', 'set_ax1_as', 'ax2_position', 'set_ax2_as', 'ax3_position',
-                         'set_ax3_as']
+            axis_order = get_axis_order(device_proxy, esp_app.attr_list[d]['attrs'])
+            less_list = ['user_defined_name', 'error_message', 'message', 'current_location', 'customized_location'] + [
+                attribute_name for axis in axis_order
+                for attribute_name in (f'ax{axis}_position', f'set_ax{axis}_as')
+            ]
             if is_grating:
                 less_list.append('ax12_distance')
             more_list = ['host_computer', 'saved_location_source', 'user_defined_locations',
@@ -89,7 +93,7 @@ def create_app():
             esp_app.create_form_panel(
                 more_layout, d,  dropdown=dropdown, include=more_list, withButtons=False)
 
-            for idx, axis in enumerate([1, 2, 3]):
+            for idx, axis in enumerate(axis_order):
                 if f'ax{axis}_step' in esp_app.attr_list[d]['attrs']:
                     command_list.append([])
                     modified_cmd_name.append([])

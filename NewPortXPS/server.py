@@ -35,6 +35,11 @@ class NewPortXPS(Device):
     password = device_property(dtype=str, default_value="Administrator")
     group_name = device_property(dtype=str, default_value="GROUP1")
     axis_property = device_property(dtype=str, default_value="1,2,3,4,5,6,7,8")
+    axis_order = device_property(
+        dtype=str, default_value="",
+        doc="GUI axis order, e.g. 3, 1, 2. Include every configured axis exactly once. "
+            "Empty uses numeric order. Restart the GUI after changes.",
+    )
     positioner_property = device_property(dtype=str, default_value="")
     axis_unit_property = device_property(dtype=str, default_value="")
     limit_search_distance = device_property(dtype=float, default_value=1000.0)

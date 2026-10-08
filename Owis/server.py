@@ -14,6 +14,12 @@ class OwisPS(Device):
     serial_number = device_property(dtype=int, default_value=1)
     part_number = device_property(dtype=str, default_value='')
     axis = device_property(dtype=str, default_value='1')
+    axis_order = device_property(
+        dtype=str, default_value='',
+        doc='GUI axis order, e.g. 1, 3, 7, 6, 4, 5, 8, 2, 9. '
+            'Include every axis from the axis property exactly once. '
+            'Empty uses configured axes in numeric order. Restart the GUI after changes.',
+    )
 
     def init_device(self):
         super().init_device()  # this loads the device properties

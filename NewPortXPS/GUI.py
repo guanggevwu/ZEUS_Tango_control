@@ -1,4 +1,5 @@
 from common.GUI import GuiBase
+from common.axis_order import get_axis_order
 from common.TaurusGUI_Argparse import TaurusArgparse
 from common.ui_config import device_name_table
 import tango
@@ -18,14 +19,13 @@ def create_app():
     for d in device_list:
         newport_xps_app.add_device(d)
         if tango.DeviceProxy(d).info().dev_class == 'NewPortXPS':
-            available_axis = []
+            available_axis = get_axis_order(
+                newport_xps_app.attr_list[d]['dp'], newport_xps_app.attr_list[d]['attrs'])
             less_list = ['user_defined_name', 'error_message',
                          'message', 'current_location', 'customized_location']
-            for axis in range(1, 9):
-                if hasattr(tango.DeviceProxy(d), f'ax{axis}_position'):
-                    available_axis.append(axis)
-                    less_list.extend(
-                        [f'ax{axis}_position', f'set_ax{axis}_as'])
+            for axis in available_axis:
+                less_list.extend(
+                    [f'ax{axis}_position', f'set_ax{axis}_as'])
             if 'grating' in d:
                 less_list.append('ax12_distance')
             more_list = ['host_computer', 'saved_location_source', 'user_defined_locations',

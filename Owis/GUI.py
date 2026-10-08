@@ -6,6 +6,20 @@ from common.TaurusGUI_Argparse import TaurusArgparse
 from common.GUI import GuiBase
 
 
+def get_axis_order(device):
+    properties = device.get_property(['axis', 'axis_order'])
+    axis_text = ','.join(properties.get('axis', [])).strip() or '1'
+    order_text = ','.join(properties.get('axis_order', [])).strip()
+    try:
+        axes = [int(value.strip()) for value in axis_text.split(',')]
+        order = [int(value.strip()) for value in order_text.split(',')] if order_text else sorted(axes)
+    except ValueError as exc:
+        raise ValueError('axis and axis_order must be comma-separated axis numbers') from exc
+    if len(order) != len(set(order)) or set(order) != set(axes):
+        raise ValueError('axis_order must contain every configured axis exactly once')
+    return order
+
+
 def create_app():
     if 'combination' in args.device[0]:
         device_list = device_name_table[args.device[0]]
@@ -19,7 +33,7 @@ def create_app():
     for d in device_list:
         owis_app.add_device(d)
         if tango.DeviceProxy(d).info().dev_class == 'OwisPS':
-            axis_order = (1, 3, 7, 6, 4, 5, 8, 2, 9) if d.lower() == 'ta1/owisps/ta1-owis1' else range(1, 10)
+            axis_order = get_axis_order(owis_app.attr_list[d]['dp'])
             less_list = ['user_defined_name', 'current_location'] + [
                 attribute_name for axis in axis_order
                 for attribute_name in (f'ax{axis}_position', f'set_ax{axis}_as')
