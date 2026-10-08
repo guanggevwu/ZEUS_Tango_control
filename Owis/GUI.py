@@ -19,8 +19,11 @@ def create_app():
     for d in device_list:
         owis_app.add_device(d)
         if tango.DeviceProxy(d).info().dev_class == 'OwisPS':
-            less_list = ['user_defined_name', 'current_location', 'ax1_position', 'set_ax1_as', 'ax2_position', 'set_ax2_as', 'ax3_position',
-                         'set_ax3_as', 'ax4_position', 'set_ax4_as', 'ax5_position', 'set_ax5_as', 'ax6_position', 'set_ax6_as', 'ax7_position', 'set_ax7_as', 'ax8_position', 'set_ax8_as', 'ax9_position', 'set_ax9_as']
+            axis_order = (1, 3, 7, 6, 4, 5, 8, 2, 9) if d.lower() == 'ta1/owisps/ta1-owis1' else range(1, 10)
+            less_list = ['user_defined_name', 'current_location'] + [
+                attribute_name for axis in axis_order
+                for attribute_name in (f'ax{axis}_position', f'set_ax{axis}_as')
+            ]
             more_list = ['host_computer', 'saved_location_source',
                          'user_defined_locations', 'status', 'state']
             location_file_path = os.path.join(os.path.dirname(
