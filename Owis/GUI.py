@@ -62,7 +62,7 @@ def create_app():
             command_panel, command_layout = owis_app.create_blank_panel('v')
             owis_app.gui.createPanel(command_panel, f'{d}_commands')
 
-            for ax in range(1, 10):
+            for ax in axis_order:
                 if not hasattr(owis_app.attr_list[d]['dp'], f'ax{ax}_position'):
                     continue
                 else:
