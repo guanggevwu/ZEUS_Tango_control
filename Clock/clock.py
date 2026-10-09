@@ -1,8 +1,8 @@
 from tango import AttrWriteType, DevState
-from tango.server import Device, attribute, command, device_property
+from tango.server import Device, attribute
 import datetime
 import logging
-import os
+import socket
 from common.logger_adapter import LoggerAdapter
 # -----------------------------
 
@@ -10,11 +10,12 @@ from common.logger_adapter import LoggerAdapter
 class Clock(Device):
     def init_device(self):
         super().init_device()  # this loads the device properties
-        self.get_logger = logging.getLogger(self.__class__.__name__)
-        self.logger = LoggerAdapter(self.__class__.__name__, self.get_logger)
+        logger = logging.getLogger(self.__class__.__name__)
+        self.logger = LoggerAdapter(self.__class__.__name__, logger)
         handlers = [logging.StreamHandler()]
         logging.basicConfig(handlers=handlers,
                             format="%(asctime)s %(message)s", level=logging.INFO)
+        self._host_computer = socket.gethostname()
         self.set_status("Clock device is connected.")
         self.set_state(DevState.ON)
 

@@ -513,6 +513,7 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 })
 
         self.title(category_name)
+        device_column_gap = 20
         newframe1 = ttk.Frame(self)
         newframe1.grid(column=0, row=0, columnspan=1, sticky='nsew')
         if category_name == "cameras":
@@ -563,7 +564,7 @@ class DeviceUnderCatergoryWindow(Toplevel):
                     self.category_container[device_name]['property_widget'] = ttk.Button(
                         sub_frame, text='Properties', command=lambda device_name=device_name: self.open_properties(device_name), style='small_button.TButton')
                     self.category_container[device_name]['property_widget'].grid(
-                        column=col+2, row=row, sticky='NSEW')
+                        column=col+2, row=row, sticky='NSEW', padx=(0, device_column_gap))
 
         else:
             item_per_col = 10
@@ -582,7 +583,7 @@ class DeviceUnderCatergoryWindow(Toplevel):
                 property_widget = ttk.Button(
                     newframe1, text='Properties', command=lambda device_name=device_name: self.open_properties(device_name), style='small_button.TButton')
                 property_widget.grid(column=(3*(idx // item_per_col)) + 2,
-                                     row=idx % item_per_col, sticky='NSEW')
+                             row=idx % item_per_col, sticky='NSEW', padx=(0, device_column_gap))
                 self.category_container[device_name]['property_widget'] = property_widget
         self.interval = 0
         self.parent.insert_to_disabled(
