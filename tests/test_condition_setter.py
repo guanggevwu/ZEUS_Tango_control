@@ -1,6 +1,7 @@
 """Condition-setter tests using temporary files and mocked Tango (no hardware)."""
 
 import csv
+import gc
 from pathlib import Path
 import tempfile
 import threading
@@ -99,6 +100,56 @@ class StoreTests(unittest.TestCase):
                 self.store.save("second", {B: "true"})
         self.assertEqual(self.store.load()[1], {"first": {A: "1"}})
         self.assertEqual(list(self.path.parent.iterdir()), [self.path])
+
+    def test_delete_prunes_unused_columns_and_preserves_order_and_values(self):
+        self.store.save("remove", {A: "1", B: "true", C: "old"})
+        self.store.save("keep", {A: "0", C: ' text, "quoted"\nnext '})
+        self.store.delete("remove")
+        self.assertEqual(self.store.load(), (
+            [A, C], {"keep": {A: "0", C: ' text, "quoted"\nnext '}}))
+
+    def test_delete_last_condition_leaves_header_and_allows_new_save(self):
+        self.store.save("last", {A: "1"})
+        self.store.delete("last")
+        self.assertEqual(self.store.load(), ([], {}))
+        self.assertEqual(self.path.read_text(encoding="utf-8"), "name_of_condition\n")
+        self.store.save("new", {B: "false"})
+        self.assertEqual(self.store.load(), ([B], {"new": {B: "false"}}))
+
+    def test_delete_reloads_manual_edits_and_removes_preexisting_unused_headers(self):
+        self.store.save("remove", {A: "1", B: "true"})
+        self.path.write_text(
+            f"name_of_condition,{A},{B},{C}\nremove,1,true,\nmanual,,false,\n",
+            encoding="utf-8")
+        self.store.delete("remove")
+        self.assertEqual(self.store.load(), ([B], {"manual": {B: "false"}}))
+
+    def test_delete_missing_condition_does_not_modify_file(self):
+        with self.assertRaises(ValueError):
+            self.store.delete("missing")
+        self.assertFalse(self.path.exists())
+        self.store.save("keep", {A: "1"})
+        original = self.path.read_bytes()
+        with self.assertRaises(ValueError):
+            self.store.delete("missing")
+        self.assertEqual(self.path.read_bytes(), original)
+
+    def test_failed_delete_preserves_original_and_cleans_temporary_file(self):
+        self.store.save("keep", {A: "1"})
+        original = self.path.read_bytes()
+        with patch.object(cs.os, "replace", side_effect=PermissionError("locked")):
+            with self.assertRaises(PermissionError):
+                self.store.delete("keep")
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(list(self.path.parent.iterdir()), [self.path])
+
+    def test_delete_rejects_malformed_file_without_modifying_it(self):
+        self.store.save("keep", {A: "1"})
+        self.path.write_text("wrong,header\nkeep,1\n", encoding="utf-8")
+        original = self.path.read_bytes()
+        with self.assertRaises(ValueError):
+            self.store.delete("keep")
+        self.assertEqual(self.path.read_bytes(), original)
 
     def test_empty_inputs_rejected(self):
         for name, values in (("", {A: "1"}), ("first", {}), ("first", {A: ""})):
@@ -205,6 +256,7 @@ class GuiTests(unittest.TestCase):
     """Real Tk widgets; all attribute access stays mocked."""
 
     def setUp(self):
+        gc.collect()
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         try:
@@ -214,12 +266,22 @@ class GuiTests(unittest.TestCase):
         self.root.withdraw()
         self.app = cs.ConditionSetterApp(self.root, Path(
             self.temporary.name) / "conditions.txt")
-        self.addCleanup(self.app.close)
+        # Drain initial ttk theme events even in tests that never open a child window.
+        self.root.update_idletasks()
+        self.addCleanup(self.close_app)
         self.client = Mock()
         self.client.read.return_value = "12"
         patcher = patch.object(cs, "TangoClient", return_value=self.client)
         patcher.start()
         self.addCleanup(patcher.stop)
+
+    def close_app(self):
+        workers = [window.worker for window in self.app.windows]
+        self.app.close()
+        for worker in workers:
+            worker.thread.join(timeout=3)
+        # Collect Tk reference cycles on the main thread, not a later test's worker.
+        gc.collect()
 
     def window(self, creating=False):
         window = cs.ConditionWindow(self.app, creating=creating)
@@ -230,6 +292,110 @@ class GuiTests(unittest.TestCase):
     def finish_task(self, window):
         callback, result, error = window.worker.results.get(timeout=3)
         callback(result, error)
+
+    def test_default_source_and_root_buttons(self):
+        frame = self.root.winfo_children()[0]
+        self.assertEqual([widget.cget("text") for widget in frame.winfo_children()],
+                         ["Load conditions", "Save conditions", "Select source file"])
+        with patch.object(cs.tk, "Tk") as root, patch.object(cs, "ConditionSetterApp") as app:
+            cs.main([])
+        app.assert_called_once_with(root.return_value, cs.DEFAULT_FILE)
+        self.assertEqual(str(cs.DEFAULT_FILE), r"Z:\software\Condition_setter\condition_list.txt")
+
+    def test_source_picker_cancel_keeps_current_source_and_uses_default_directory(self):
+        original = self.app.store
+        with patch.object(cs.filedialog, "askopenfilename", return_value="") as picker:
+            self.app.select_source_file()
+        self.assertIs(self.app.store, original)
+        self.assertEqual(picker.call_args.kwargs["initialdir"], str(cs.DEFAULT_FILE.parent))
+        self.assertIn(("Text files", "*.txt"), picker.call_args.kwargs["filetypes"])
+
+    def test_switch_source_updates_windows_and_routes_saves_and_deletes(self):
+        original = self.app.store
+        original.save("same", {A: "1"})
+        original_bytes = original.path.read_bytes()
+        selected = cs.ConditionStore(Path(self.temporary.name) / "selected.txt")
+        selected.save("same", {B: "false"})
+        load = self.window()
+        save = self.window(creating=True)
+        load.selection.set("same")
+        load.select_condition()
+        self.finish_task(load)
+        save.columns[0]["name"].set(C)
+        save.columns[0]["request"].set("draft text")
+        save.start_monitoring()
+        self.finish_task(save)
+        with patch.object(cs.filedialog, "askopenfilename", return_value=str(selected.path)):
+            self.app.select_source_file()
+        self.assertEqual(self.app.store.path, selected.path)
+        for window in (load, save, self.window(), self.window(creating=True)):
+            self.assertEqual(window.source_label.cget("text"), f"Source file: {selected.path}")
+        self.assertEqual(load.selection.get(), "")
+        self.assertEqual(load.columns, [])
+        self.assertEqual(load.conditions, {"same": {B: "false"}})
+        self.assertEqual(save.columns[0]["request"].get(), "draft text")
+        self.assertEqual(save.columns[0]["current"].get(), "")
+        self.assertEqual(save.monitor_names, ())
+        with patch.object(cs, "ConditionNameDialog", return_value=SimpleNamespace(result="draft")):
+            save.save_requests()
+        self.assertEqual(selected.load()[1]["draft"], {C: "draft text"})
+        load.selection.set("same")
+        load.select_condition()
+        self.finish_task(load)
+        with patch.object(cs.messagebox, "askyesno", return_value=True):
+            load.delete_condition()
+        self.assertEqual(selected.load(), ([C], {"draft": {C: "draft text"}}))
+        self.assertEqual(original.path.read_bytes(), original_bytes)
+        self.client.write.assert_not_called()
+
+    def test_invalid_source_keeps_existing_source_and_labels(self):
+        window = self.window(creating=True)
+        original = self.app.store
+        bad_file = Path(self.temporary.name) / "bad.txt"
+        bad_file.write_text("wrong,header\n", encoding="utf-8")
+        for path in (bad_file, bad_file.with_name("missing.txt")):
+            with self.subTest(path=path), \
+                    patch.object(cs.filedialog, "askopenfilename", return_value=str(path)), \
+                    patch.object(cs.messagebox, "showerror") as error:
+                self.app.select_source_file()
+            error.assert_called_once()
+            self.assertIs(self.app.store, original)
+            self.assertEqual(window.source_label.cget("text"), f"Source file: {original.path}")
+
+    def test_pending_snapshot_does_not_save_to_new_source(self):
+        window = self.window(creating=True)
+        window.columns[0]["name"].set(A)
+        window.save_current()
+        selected = cs.ConditionStore(Path(self.temporary.name) / "selected.txt")
+        selected.save("existing", {B: "false"})
+        with patch.object(cs.filedialog, "askopenfilename", return_value=str(selected.path)):
+            self.app.select_source_file()
+        with patch.object(cs, "ConditionNameDialog") as dialog:
+            self.finish_task(window)
+        dialog.assert_not_called()
+        self.assertEqual(selected.load()[1], {"existing": {B: "false"}})
+
+    def test_pending_readback_from_previous_source_is_discarded(self):
+        window = self.window(creating=True)
+        window.columns[0]["name"].set(A)
+        window.start_monitoring()
+        selected = Path(self.temporary.name) / "empty.txt"
+        selected.write_text("name_of_condition\n", encoding="utf-8")
+        with patch.object(cs.filedialog, "askopenfilename", return_value=str(selected)):
+            self.app.select_source_file()
+        window.start_monitoring()  # Same attribute, but a different source generation.
+        self.finish_task(window)
+        self.assertEqual(window.columns[0]["current"].get(), "")
+        self.assertFalse(window.read_pending)
+
+    def test_source_change_is_blocked_during_writes(self):
+        window = self.window()
+        window.writing = True
+        with patch.object(cs.filedialog, "askopenfilename") as picker, \
+                patch.object(cs.messagebox, "showwarning") as warning:
+            self.app.select_source_file()
+        picker.assert_not_called()
+        warning.assert_called_once()
 
     def test_load_starts_empty_and_hides_unused_attributes(self):
         self.app.store.save("first", {A: "1", B: "true"})
@@ -276,6 +442,83 @@ class GuiTests(unittest.TestCase):
                             self.assertAlmostEqual(button_center, widget_center, delta=1,
                                                    msg=f"{text}, extra column: {extra_column}")
                 window.close()
+
+    def test_delete_button_is_beside_reload_and_requires_selection(self):
+        window = self.window()
+        button = window.delete_button
+        self.assertEqual(button.cget("text"), "Delete this condition")
+        reload_button = next(widget for widget in button.master.winfo_children()
+                             if widget.cget("text") == "Reload file")
+        window.update_idletasks()
+        self.assertGreater(button.winfo_x(), reload_button.winfo_x())
+        self.assertEqual(button.winfo_y(), reload_button.winfo_y())
+        self.assertTrue(button.instate(["disabled"]))
+        with patch.object(cs.messagebox, "askyesno") as confirm:
+            window.delete_condition()
+        confirm.assert_not_called()
+
+    def test_delete_confirmation_cancel_preserves_file_and_selection(self):
+        self.app.store.save("keep", {A: "1"})
+        window = self.window()
+        window.selection.set("keep")
+        window.select_condition()
+        self.finish_task(window)
+        self.assertFalse(window.delete_button.instate(["disabled"]))
+        original = self.app.store.path.read_bytes()
+        with patch.object(cs.messagebox, "askyesno", return_value=False) as confirm:
+            window.delete_button.invoke()
+        confirm.assert_called_once()
+        self.assertEqual(self.app.store.path.read_bytes(), original)
+        self.assertEqual(window.selection.get(), "keep")
+        self.assertEqual(window.monitor_names, (A,))
+
+    def test_delete_refreshes_load_windows_and_ignores_pending_readbacks(self):
+        self.app.store.save("remove", {A: "1", B: "true"})
+        self.app.store.save("keep", {B: "false"})
+        windows = [self.window(), self.window()]
+        for window in windows:
+            window.selection.set("remove")
+            window.select_condition()
+        with patch.object(cs.messagebox, "askyesno", return_value=True):
+            windows[0].delete_button.invoke()
+        self.assertEqual(self.app.store.load(), ([B], {"keep": {B: "false"}}))
+        for window in windows:
+            self.finish_task(window)
+            self.assertEqual(window.selection.get(), "")
+            self.assertEqual(tuple(window.combo.cget("values")), ("keep",))
+            self.assertEqual(window.columns, [])
+            self.assertEqual(window.monitor_names, ())
+            self.assertIsNone(window.refresh_id)
+            self.assertTrue(window.delete_button.instate(["disabled"]))
+        self.client.write.assert_not_called()
+
+    def test_failed_delete_keeps_selection_and_shows_error(self):
+        self.app.store.save("keep", {A: "1"})
+        window = self.window()
+        window.selection.set("keep")
+        window.select_condition()
+        self.finish_task(window)
+        with patch.object(cs.messagebox, "askyesno", return_value=True), \
+                patch.object(self.app.store, "delete", side_effect=PermissionError("locked")), \
+                patch.object(cs.messagebox, "showerror") as error:
+            window.delete_condition()
+        error.assert_called_once()
+        self.assertEqual(window.selection.get(), "keep")
+        self.assertEqual(self.app.store.load(), ([A], {"keep": {A: "1"}}))
+
+    def test_delete_is_disabled_while_writing(self):
+        self.app.store.save("keep", {A: "1"})
+        window = self.window()
+        window.selection.set("keep")
+        window.select_condition()
+        self.finish_task(window)
+        window.set_values()
+        self.assertTrue(window.delete_button.instate(["disabled"]))
+        with patch.object(cs.messagebox, "askyesno") as confirm:
+            window.delete_condition()
+        confirm.assert_not_called()
+        self.finish_task(window)
+        self.assertFalse(window.delete_button.instate(["disabled"]))
 
     def test_zero_readbacks_are_red_in_both_windows(self):
         for creating in (False, True):

@@ -15,7 +15,7 @@ import queue
 import tempfile
 import threading
 import tkinter as tk
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 
 DEFAULT_FILE = Path(r"Z:\software\Condition_setter\condition_list.txt")
@@ -81,6 +81,24 @@ class ConditionStore:
         attributes.extend(
             attribute for attribute in values if attribute not in attributes)
         conditions[name] = dict(values)
+        self._write(attributes, conditions)
+
+    def delete(self, name):
+        """Remove a condition and headers unused by all remaining conditions."""
+        # Work from the latest file rather than the GUI's cached condition list.
+        attributes, conditions = self.load()
+        if name not in conditions:
+            raise ValueError(
+                f"Condition '{name}' no longer exists. Reload the file.")
+        del conditions[name]
+        used = {attribute for entries in conditions.values()
+                for attribute in entries}
+        attributes = [
+            attribute for attribute in attributes if attribute in used]
+        self._write(attributes, conditions)
+
+    def _write(self, attributes, conditions):
+        """Replace the file only after the complete CSV has been written."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = None
         try:
@@ -274,6 +292,9 @@ class ConditionWindow(tk.Toplevel):
 
         outer = ttk.Frame(self, padding=12)
         outer.pack(fill=tk.BOTH, expand=True)
+        self.source_label = ttk.Label(
+            outer, textvariable=app.source_text, wraplength=800)
+        self.source_label.pack(anchor=tk.W, fill=tk.X, pady=(0, 8))
         self.canvas = tk.Canvas(outer, highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
         scrollbar = ttk.Scrollbar(
@@ -302,8 +323,14 @@ class ConditionWindow(tk.Toplevel):
                                       postcommand=self.reload_conditions)
             self.combo.pack()
             self.combo.bind("<<ComboboxSelected>>", self.select_condition)
-            ttk.Button(chooser, text="Reload file",
-                       command=self.reload_conditions).pack(anchor=tk.W, pady=5)
+            file_actions = ttk.Frame(chooser)
+            file_actions.pack(anchor=tk.W, pady=5)
+            ttk.Button(file_actions, text="Reload file",
+                       command=self.reload_conditions).pack(side=tk.LEFT)
+            self.delete_button = ttk.Button(
+                file_actions, text="Delete this condition", command=self.delete_condition,
+                state=tk.DISABLED)
+            self.delete_button.pack(side=tk.LEFT, padx=(5, 0))
         ttk.Label(self.table, text="Current value").grid(
             row=1, column=0, sticky=tk.W, padx=5, pady=10)
         ttk.Label(self.table, text="Request value").grid(
@@ -366,8 +393,23 @@ class ConditionWindow(tk.Toplevel):
                     max(400, self.winfo_screenwidth() - 100))
         self.canvas.configure(
             width=width, height=self.table.winfo_reqheight() + 10)
+        self.source_label.configure(wraplength=width)
+        self.update_idletasks()
         self.geometry(
-            f"{width + 30}x{max(270, self.table.winfo_reqheight() + 110)}")
+            f"{width + 30}x{max(270, self.table.winfo_reqheight() + 118 + self.source_label.winfo_reqheight())}")
+
+    def source_changed(self):
+        self.stop_monitoring()
+        if self.creating:
+            # Keep offline drafts, but do not carry readbacks across sources.
+            for column in self.columns:
+                self.update_readback(column, "")
+            self.resize_table()
+            self.status.set("Source changed. Draft kept; click See current value to refresh.")
+        else:
+            self.selection.set("")
+            self.reload_conditions()
+            self.status.set("Source changed. Select a condition.")
 
     def names_changed(self, *args):
         self.stop_monitoring()
@@ -386,6 +428,29 @@ class ConditionWindow(tk.Toplevel):
         if self.selection.get() not in self.conditions:
             self.selection.set("")
         self.select_condition()
+
+    def delete_condition(self):
+        name = self.selection.get()
+        if self.writing or name not in self.conditions:
+            return
+        if not messagebox.askyesno(
+                "Delete condition?",
+                f"Delete condition '{name}'?\n"
+                "Attribute columns unused by all remaining conditions will also be removed.",
+                parent=self, default=messagebox.NO):
+            return
+        try:
+            self.app.store.delete(name)
+        except Exception as exc:
+            self.show_error(exc)
+            return
+        # Clear stale selections in every open Load window after the file is updated.
+        self.reload_conditions()
+        for window in list(self.app.windows):
+            if window is not self and not window.creating:
+                window.reload_conditions()
+        self.status.set(
+            f"Deleted condition '{name}' and removed unused attribute columns.")
 
     def select_condition(self, event=None):
         self.stop_monitoring()
@@ -439,11 +504,12 @@ class ConditionWindow(tk.Toplevel):
             self.refresh_id = self.after(REFRESH_MS, self.refresh)
             return
         names = self.monitor_names
+        store = self.app.store
         self.read_pending = True
 
         def finished(result, error):
             self.read_pending = False
-            if names != self.monitor_names:
+            if store is not self.app.store or names != self.monitor_names:
                 return
             if error:
                 self.status.set(str(error))
@@ -501,8 +567,11 @@ class ConditionWindow(tk.Toplevel):
             self.show_error(exc)
             return
         self.status.set("Reading a fresh snapshot to save…")
+        store = self.app.store
 
         def finished(result, error):
+            if store is not self.app.store:
+                return  # A snapshot requested for an old source must not save into the new one.
             if error:
                 self.show_error(error)
                 return
@@ -517,8 +586,9 @@ class ConditionWindow(tk.Toplevel):
         self.worker.submit(lambda: read_values(self.client, names), finished)
 
     def save_named(self, values):
+        store = self.app.store
         dialog = ConditionNameDialog(self, title="Save condition")
-        if dialog.result is None:
+        if dialog.result is None or store is not self.app.store:
             return
         try:
             try:
@@ -534,6 +604,9 @@ class ConditionWindow(tk.Toplevel):
     def update_write_buttons(self):
         if self.creating:
             return
+        self.delete_button.configure(
+            state=tk.DISABLED if self.writing or self.selection.get() not in self.conditions
+            else tk.NORMAL)
         state = tk.DISABLED if self.writing or not self.columns else tk.NORMAL
         self.set_all.configure(state=state)
         for column in self.columns:
@@ -588,6 +661,7 @@ class ConditionSetterApp:
     def __init__(self, root, path=DEFAULT_FILE):
         self.root = root
         self.store = ConditionStore(path)
+        self.source_text = tk.StringVar(master=root, value=f"Source file: {self.store.path}")
         self.windows = set()
         root.title("Condition setter")
         root.resizable(False, False)
@@ -598,6 +672,33 @@ class ConditionSetterApp:
                    command=self.open_load).pack(pady=6)
         ttk.Button(frame, text="Save conditions", width=24,
                    command=self.open_save).pack(pady=6)
+        ttk.Button(frame, text="Select source file", width=24,
+                   command=self.select_source_file).pack(pady=6)
+
+    def select_source_file(self):
+        if any(window.writing for window in self.windows):
+            messagebox.showwarning(
+                "Source file", "Wait for the current writes to finish before changing source files.",
+                parent=self.root)
+            return
+        filename = filedialog.askopenfilename(
+            parent=self.root, title="Select source file",
+            initialdir=str(DEFAULT_FILE.parent),
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+        if not filename:
+            return
+        try:
+            store = ConditionStore(filename)
+            if not store.path.is_file():
+                raise FileNotFoundError(f"Source file not found: {store.path}")
+            store.load()  # Reject unreadable or malformed CSV without changing the source.
+        except Exception as exc:
+            messagebox.showerror("Cannot select source file", str(exc), parent=self.root)
+            return
+        self.store = store
+        self.source_text.set(f"Source file: {store.path}")
+        for window in list(self.windows):
+            window.source_changed()
 
     def open_load(self):
         self.windows.add(ConditionWindow(self))

@@ -27,7 +27,8 @@
       "TA2/esp301/esp302_ta2_1"
     ],
     "TA1_motor_combination": [
-      "test/esp301/esp302_ta1_2"
+      "TA1/esp301/esp302_ta1_1",
+      "TA1/esp301/esp302_ta1_2"
     ],
     "TA3_motor_combination": [
       "TA3/esp301/esp302_ta3_1",

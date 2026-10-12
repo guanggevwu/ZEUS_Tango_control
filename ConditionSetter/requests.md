@@ -6,7 +6,7 @@
 
 ![alt text](image.png)
 
-# When I run the condition_setter.py, a small window pops up. There are only two buttons: "Load conditions" and "Save conditions". When either is clicked, a window pops up.
+# When I run the condition_setter.py, a small window pops up. There are only three buttons: "Load conditions" and "Save conditions" and "Select source file". When either is clicked, a window pops up.
 
 # When Load conditions is click, the pop up window looks like this
 
@@ -14,6 +14,7 @@
 At the start up, since no condition is selected, many of the grids are empty. attribute names, readback values, request values are all empty. When a condition is selected from the dropdown list, the mentioned cells should be filled with data and the number of columns (attributes) is determined and size of pop up window might change.
 The "save current as" button is to save the current value of the attributes to the txt file. Once it is a clicked, a dialog pop up asking for name of the condition. "Please enter the name of this condition"."save" and "cancel" buttons are in the bottom of the dialog.
 Button "set" is to set the value for one attribute. In this way, the users can manually determine which condition to set first. And "set all" is to set the values for all the attributes.
+Add a button "Delete this condition" next to "Reload file". Click this button to delete the condition and remove attributes that are not used anymore.
 
 # When Save conditions is click, the pop up window looks like this
 
@@ -27,6 +28,8 @@ Button “Save request value as” is to save the entered attribute and value to
 # The readback value from both windows should be refreshed every 1 s. The readback value should be highlighted with green color. When the readback value is 0, highlight it with red. This is to alert that this value might comes from a motor power back.
 
 # add a shortcut to shortcut\Windows
+
+# When "Select source file", a browser window pop up and the default location is "Z:\software\Condition_setter\". Then the user can select a txt file and use it as the source file. The source file name should be shown in both the Load Conditions window and Save conditions window.
 
 AI questions:
 A few points need clarification:

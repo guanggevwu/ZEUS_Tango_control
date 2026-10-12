@@ -33,10 +33,29 @@ example2,3.6,false,
 
 ## Using the windows
 
+The root window has **Load conditions**, **Save conditions**, and **Select source
+file** buttons. The file picker opens at `Z:\software\Condition_setter\` and lets
+you choose a `.txt` source. Without a selection (or `--file` override), the source
+is `condition_list.txt` in that folder. The full source path appears at the top
+of both Load and Save windows.
+
+Selecting a valid source updates all open windows and redirects subsequent loads,
+saves, and deletions to that file. Load selections are cleared; Save-window drafts
+are kept, but readback refresh stops until **See current value** is clicked again.
+Pending snapshots from the previous source are discarded. Cancelling the picker
+or choosing an invalid file leaves the current source unchanged. Source changes
+are blocked while device writes are in progress and are not remembered on restart.
+
 **Load conditions:** select a condition to start one-second readback refresh.
 **Set** writes one value; **Set all** writes left to right, stopping on the first
 failure. Earlier writes are not rolled back. Motor completion is not awaited.
 Selecting a condition never writes to a device.
+
+**Delete this condition**, beside **Reload file**, asks for confirmation before
+removing the selected condition. It also removes attribute columns that have no
+value in any remaining condition, preserving the order and values of columns
+still in use. Deleting the last condition leaves only the `name_of_condition`
+header. Open Load windows refresh automatically. Deleting does not write to devices.
 
 **Save conditions:** starts with three attribute columns; **Add an attribute
 column** adds more. Enter full attribute names and request values, then use
