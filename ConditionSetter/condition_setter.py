@@ -405,7 +405,8 @@ class ConditionWindow(tk.Toplevel):
             for column in self.columns:
                 self.update_readback(column, "")
             self.resize_table()
-            self.status.set("Source changed. Draft kept; click See current value to refresh.")
+            self.status.set(
+                "Source changed. Draft kept; click See current value to refresh.")
         else:
             self.selection.set("")
             self.reload_conditions()
@@ -571,7 +572,8 @@ class ConditionWindow(tk.Toplevel):
 
         def finished(result, error):
             if store is not self.app.store:
-                return  # A snapshot requested for an old source must not save into the new one.
+                # A snapshot requested for an old source must not save into the new one.
+                return
             if error:
                 self.show_error(error)
                 return
@@ -661,7 +663,8 @@ class ConditionSetterApp:
     def __init__(self, root, path=DEFAULT_FILE):
         self.root = root
         self.store = ConditionStore(path)
-        self.source_text = tk.StringVar(master=root, value=f"Source file: {self.store.path}")
+        self.source_text = tk.StringVar(
+            master=root, value=f"Source file: {self.store.path}")
         self.windows = set()
         root.title("Condition setter")
         root.resizable(False, False)
@@ -691,9 +694,11 @@ class ConditionSetterApp:
             store = ConditionStore(filename)
             if not store.path.is_file():
                 raise FileNotFoundError(f"Source file not found: {store.path}")
-            store.load()  # Reject unreadable or malformed CSV without changing the source.
+            # Reject unreadable or malformed CSV without changing the source.
+            store.load()
         except Exception as exc:
-            messagebox.showerror("Cannot select source file", str(exc), parent=self.root)
+            messagebox.showerror("Cannot select source file",
+                                 str(exc), parent=self.root)
             return
         self.store = store
         self.source_text.set(f"Source file: {store.path}")

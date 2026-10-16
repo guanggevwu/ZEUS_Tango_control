@@ -112,7 +112,8 @@ class StoreTests(unittest.TestCase):
         self.store.save("last", {A: "1"})
         self.store.delete("last")
         self.assertEqual(self.store.load(), ([], {}))
-        self.assertEqual(self.path.read_text(encoding="utf-8"), "name_of_condition\n")
+        self.assertEqual(self.path.read_text(
+            encoding="utf-8"), "name_of_condition\n")
         self.store.save("new", {B: "false"})
         self.assertEqual(self.store.load(), ([B], {"new": {B: "false"}}))
 
@@ -300,21 +301,25 @@ class GuiTests(unittest.TestCase):
         with patch.object(cs.tk, "Tk") as root, patch.object(cs, "ConditionSetterApp") as app:
             cs.main([])
         app.assert_called_once_with(root.return_value, cs.DEFAULT_FILE)
-        self.assertEqual(str(cs.DEFAULT_FILE), r"Z:\software\Condition_setter\condition_list.txt")
+        self.assertEqual(str(cs.DEFAULT_FILE),
+                         r"Z:\software\Condition_setter\condition_list.txt")
 
     def test_source_picker_cancel_keeps_current_source_and_uses_default_directory(self):
         original = self.app.store
         with patch.object(cs.filedialog, "askopenfilename", return_value="") as picker:
             self.app.select_source_file()
         self.assertIs(self.app.store, original)
-        self.assertEqual(picker.call_args.kwargs["initialdir"], str(cs.DEFAULT_FILE.parent))
-        self.assertIn(("Text files", "*.txt"), picker.call_args.kwargs["filetypes"])
+        self.assertEqual(picker.call_args.kwargs["initialdir"], str(
+            cs.DEFAULT_FILE.parent))
+        self.assertIn(("Text files", "*.txt"),
+                      picker.call_args.kwargs["filetypes"])
 
     def test_switch_source_updates_windows_and_routes_saves_and_deletes(self):
         original = self.app.store
         original.save("same", {A: "1"})
         original_bytes = original.path.read_bytes()
-        selected = cs.ConditionStore(Path(self.temporary.name) / "selected.txt")
+        selected = cs.ConditionStore(
+            Path(self.temporary.name) / "selected.txt")
         selected.save("same", {B: "false"})
         load = self.window()
         save = self.window(creating=True)
@@ -329,7 +334,8 @@ class GuiTests(unittest.TestCase):
             self.app.select_source_file()
         self.assertEqual(self.app.store.path, selected.path)
         for window in (load, save, self.window(), self.window(creating=True)):
-            self.assertEqual(window.source_label.cget("text"), f"Source file: {selected.path}")
+            self.assertEqual(window.source_label.cget("text"),
+                             f"Source file: {selected.path}")
         self.assertEqual(load.selection.get(), "")
         self.assertEqual(load.columns, [])
         self.assertEqual(load.conditions, {"same": {B: "false"}})
@@ -360,13 +366,15 @@ class GuiTests(unittest.TestCase):
                 self.app.select_source_file()
             error.assert_called_once()
             self.assertIs(self.app.store, original)
-            self.assertEqual(window.source_label.cget("text"), f"Source file: {original.path}")
+            self.assertEqual(window.source_label.cget("text"),
+                             f"Source file: {original.path}")
 
     def test_pending_snapshot_does_not_save_to_new_source(self):
         window = self.window(creating=True)
         window.columns[0]["name"].set(A)
         window.save_current()
-        selected = cs.ConditionStore(Path(self.temporary.name) / "selected.txt")
+        selected = cs.ConditionStore(
+            Path(self.temporary.name) / "selected.txt")
         selected.save("existing", {B: "false"})
         with patch.object(cs.filedialog, "askopenfilename", return_value=str(selected.path)):
             self.app.select_source_file()
@@ -383,7 +391,8 @@ class GuiTests(unittest.TestCase):
         selected.write_text("name_of_condition\n", encoding="utf-8")
         with patch.object(cs.filedialog, "askopenfilename", return_value=str(selected)):
             self.app.select_source_file()
-        window.start_monitoring()  # Same attribute, but a different source generation.
+        # Same attribute, but a different source generation.
+        window.start_monitoring()
         self.finish_task(window)
         self.assertEqual(window.columns[0]["current"].get(), "")
         self.assertFalse(window.read_pending)

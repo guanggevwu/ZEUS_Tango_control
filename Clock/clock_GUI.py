@@ -32,7 +32,7 @@ def create_app(args):
 def main(argv=None):
     parser = TaurusArgparse(
         description='GUI for Clock',
-        device_default='other/Clock/clock',
+        device_default='facility/Clock/clock',
         nargs_string='*',
         polling_default=100,
     )

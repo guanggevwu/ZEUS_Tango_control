@@ -349,19 +349,31 @@ class DaqGUI:
                 self.insert_to_disabled(
                     f'Failed to load initialization settings from "init.json" file. Use default settings instead.', 'red_text')
 
+        self.refresh_serial_number_vs_friendly_name()
         deleted_devices = []
+        offline_basler_devices = []
         for device_name in list(self.selected_devices.keys()):
             try:
-                self.db.get_device_info(device_name)
+                device_info = self.db.get_device_info(device_name)
             except Exception:
                 deleted_devices.append(device_name)
                 del self.selected_devices[device_name]
+                continue
+            # Match the locally detected Basler cameras shown in DeviceListWindow.
+            if device_info.class_name.lower() == 'basler':
+                serial_number = device_name.split('/')[-1].split('_')[-1]
+                if serial_number not in self.serial_number_vs_friendly_name:
+                    offline_basler_devices.append(device_name)
+                    del self.selected_devices[device_name]
         if deleted_devices:
             self.insert_to_disabled(
                 f'Removed deleted devices from selected device list: {deleted_devices}', 'red_text')
+        if offline_basler_devices:
+            self.insert_to_disabled(
+                f'Removed Basler cameras not detected locally from selected device list: {offline_basler_devices}', 'red_text')
+        if deleted_devices or offline_basler_devices:
             self.write_to_init_file()
 
-        self.refresh_serial_number_vs_friendly_name()
         for key in self.selected_devices:
             self.update_selected_devices(key, BooleanVar(value=True))
 
