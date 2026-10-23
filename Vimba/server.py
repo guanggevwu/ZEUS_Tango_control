@@ -5,8 +5,9 @@ import datetime
 import logging
 import sys
 from queue import Empty, Queue
+from time import monotonic, sleep
 import platform
-from vmbpy import *
+from vmbpy import Camera, Frame, FrameStatus, PixelFormat, Stream, VmbSystem
 from common.logger_adapter import LoggerAdapter
 from common.shared_server_side import add_center_of_mass_functions
 # -----------------------------
@@ -132,6 +133,37 @@ class Vimba(Device):
         access=AttrWriteType.READ_WRITE,
         memorized=True,
     )
+
+    packet_size = attribute(
+        label="stream packet size",
+        dtype=int,
+        unit="bytes",
+        access=AttrWriteType.READ_WRITE,
+        doc='Configured GigE packet size of the first image stream (GVSPPacketSize), '
+            'not the NIC MTU. Streaming is paused while writing; '
+            'use adjust_packet_size for on-demand automatic adjustment. '
+            'Unavailable on transports without GVSPPacketSize.'
+    )
+
+    def read_packet_size(self):
+        streams = self.camera.get_streams()
+        if streams:
+            feature = getattr(streams[0], 'GVSPPacketSize', None)
+            if feature is not None:
+                return feature.get()
+        raise RuntimeError(
+            'Stream packet size is unavailable on this camera transport')
+
+    @grabbing_wrap
+    def write_packet_size(self, value):
+        streams = self.camera.get_streams()
+        if streams:
+            feature = getattr(streams[0], 'GVSPPacketSize', None)
+            if feature is not None:
+                feature.set(value)
+                return
+        raise RuntimeError(
+            'Stream packet size is unavailable on this camera transport')
 
     is_new_image = attribute(
         label='new',
@@ -409,32 +441,67 @@ class Vimba(Device):
                 f'polling period of {attr} is set to {self._polling}')
 
     def handler_one_by_one(self, cam: Camera, stream: Stream, frame: Frame):
-        if frame.get_status() == FrameStatus.Complete:
-            self.logger.info('Frame acquired: {}'.format(frame))
-            # The SDK may reuse the frame buffer as soon as it is requeued.
-            frame_array = np.squeeze(frame.as_numpy_ndarray()).copy()
-            self.imageq.put(frame_array)
-            self._image = frame_array
-            if self.enable_center_of_mass:
-                self.calculate_center_of_mass()
-        self.camera.queue_frame(frame)
+        try:
+            status = frame.get_status()
+            if status == FrameStatus.Complete:
+                self.logger.info('Frame acquired: {}'.format(frame))
+                # The SDK may reuse the frame buffer as soon as it is requeued.
+                frame_array = np.squeeze(frame.as_numpy_ndarray()).copy()
+                self.imageq.put(frame_array)
+                self._image = frame_array
+                if self.enable_center_of_mass:
+                    self.calculate_center_of_mass()
+            else:
+                self.logger.warning(
+                    f'Frame discarded: {status}. Check transport packet size and network settings.')
+        finally:
+            cam.queue_frame(frame)
 
     def handler_last_frame(self, cam: Camera, stream: Stream, frame: Frame):
-        if frame.get_status() == FrameStatus.Complete:
-            self.logger.info('Frame acquired: {}'.format(frame))
-            frame_array = np.squeeze(frame.as_numpy_ndarray()).copy()
-            # Live mode keeps only the latest pending frame. The polling
-            # reader consumes this queue to publish image change events.
-            while True:
-                try:
-                    self.imageq.get_nowait()
-                except Empty:
-                    break
-            self.imageq.put(frame_array)
-            self._image = frame_array
-            if self.enable_center_of_mass:
-                self.calculate_center_of_mass()
-        self.camera.queue_frame(frame)
+        try:
+            status = frame.get_status()
+            if status == FrameStatus.Complete:
+                self.logger.info('Frame acquired: {}'.format(frame))
+                frame_array = np.squeeze(frame.as_numpy_ndarray()).copy()
+                # Live mode keeps only the latest pending frame. The polling
+                # reader consumes this queue to publish image change events.
+                while True:
+                    try:
+                        self.imageq.get_nowait()
+                    except Empty:
+                        break
+                self.imageq.put(frame_array)
+                self._image = frame_array
+                if self.enable_center_of_mass:
+                    self.calculate_center_of_mass()
+            else:
+                self.logger.warning(
+                    f'Frame discarded: {status}. Check transport packet size and network settings.')
+        finally:
+            cam.queue_frame(frame)
+
+    @command()
+    def adjust_packet_size(self):
+        """Negotiate the first GigE stream's packet size on demand."""
+        streams = self.camera.get_streams()
+        adjust = getattr(
+            streams[0], 'GVSPAdjustPacketSize', None) if streams else None
+        if adjust is None:
+            raise RuntimeError(
+                'Packet-size adjustment is unavailable on this camera transport')
+        was_streaming = self.camera.is_streaming()
+        if was_streaming:
+            self.camera.stop_streaming()
+        adjust.run()
+        deadline = monotonic() + 10.0
+        while not adjust.is_done():
+            if monotonic() >= deadline:
+                raise TimeoutError('GigE packet-size adjustment timed out')
+            sleep(0.01)
+        self.logger.info(
+            f'GigE stream packet size: {self.read_packet_size()} bytes')
+        if was_streaming:
+            self.get_ready()
 
     @command()
     def get_ready(self):

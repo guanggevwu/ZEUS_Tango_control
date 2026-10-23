@@ -53,7 +53,7 @@ class GuiBase():
         panel1_shot_layout = Qt.QHBoxLayout()
         panel1_shot.setLayout(panel1_shot_layout)
         if image_number:
-            if 'basler' in device_name:
+            if 'basler' in device_name or 'vimba' in device_name:
                 self.add_label_widget(
                     panel1_shot_layout, device_name, 'image_number')
             elif 'file_reader' in device_name:
