@@ -4,7 +4,7 @@ import numpy as np
 import datetime
 import logging
 import sys
-from queue import Queue
+from queue import Empty, Queue
 import platform
 from vmbpy import *
 from common.logger_adapter import LoggerAdapter
@@ -58,7 +58,7 @@ class Vimba(Device):
         return self._read_time
 
     friendly_name = device_property(dtype=str, default_value='')
-    enable_center_of_mass = device_property(dtype=bool, default_value=True)
+    enable_center_of_mass = device_property(dtype=bool, default_value=False)
 
     model = attribute(
         label="model",
@@ -383,14 +383,14 @@ class Vimba(Device):
     def read_is_new_image(self):
         # self.i, grabbing successfully grabbed image. self._image_number, image counting and can be reset at any time.
         self._is_new_image = False
-        if self.imageq.qsize():
-            self._image = self.imageq.get()
-            self.push_change_event("image", self.read_image())
-            self._image_number += 1
-            self._read_time = datetime.datetime.now().strftime("%H-%M-%S.%f")
-            return True
-        else:
+        try:
+            self._image = self.imageq.get_nowait()
+        except Empty:
             return False
+        self.push_change_event("image", self.read_image())
+        self._image_number += 1
+        self._read_time = datetime.datetime.now().strftime("%H-%M-%S.%f")
+        return True
 
     def read_image(self):
         return self._image
@@ -411,7 +411,8 @@ class Vimba(Device):
     def handler_one_by_one(self, cam: Camera, stream: Stream, frame: Frame):
         if frame.get_status() == FrameStatus.Complete:
             self.logger.info('Frame acquired: {}'.format(frame))
-            frame_array = np.squeeze(frame.as_numpy_ndarray())
+            # The SDK may reuse the frame buffer as soon as it is requeued.
+            frame_array = np.squeeze(frame.as_numpy_ndarray()).copy()
             self.imageq.put(frame_array)
             self._image = frame_array
             if self.enable_center_of_mass:
@@ -421,7 +422,15 @@ class Vimba(Device):
     def handler_last_frame(self, cam: Camera, stream: Stream, frame: Frame):
         if frame.get_status() == FrameStatus.Complete:
             self.logger.info('Frame acquired: {}'.format(frame))
-            frame_array = np.squeeze(frame.as_numpy_ndarray())
+            frame_array = np.squeeze(frame.as_numpy_ndarray()).copy()
+            # Live mode keeps only the latest pending frame. The polling
+            # reader consumes this queue to publish image change events.
+            while True:
+                try:
+                    self.imageq.get_nowait()
+                except Empty:
+                    break
+            self.imageq.put(frame_array)
             self._image = frame_array
             if self.enable_center_of_mass:
                 self.calculate_center_of_mass()
