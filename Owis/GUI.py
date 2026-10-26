@@ -12,11 +12,14 @@ def get_axis_order(device):
     order_text = ','.join(properties.get('axis_order', [])).strip()
     try:
         axes = [int(value.strip()) for value in axis_text.split(',')]
-        order = [int(value.strip()) for value in order_text.split(',')] if order_text else sorted(axes)
+        order = [int(value.strip()) for value in order_text.split(
+            ',')] if order_text else sorted(axes)
     except ValueError as exc:
-        raise ValueError('axis and axis_order must be comma-separated axis numbers') from exc
+        raise ValueError(
+            'axis and axis_order must be comma-separated axis numbers') from exc
     if len(order) != len(set(order)) or set(order) != set(axes):
-        raise ValueError('axis_order must contain every configured axis exactly once')
+        raise ValueError(
+            'axis_order must contain every configured axis exactly once')
     return order
 
 
@@ -34,42 +37,17 @@ def create_app():
         owis_app.add_device(d)
         if tango.DeviceProxy(d).info().dev_class == 'OwisPS':
             axis_order = get_axis_order(owis_app.attr_list[d]['dp'])
-            less_list = ['user_defined_name', 'current_location'] + [
+            less_list = ['user_defined_name'] + [
                 attribute_name for axis in axis_order
                 for attribute_name in (f'ax{axis}_position', f'set_ax{axis}_as')
             ]
-            more_list = ['host_computer', 'saved_location_source',
-                         'user_defined_locations', 'status', 'state']
-            location_file_path = os.path.join(os.path.dirname(
-                __file__), f'{d.replace("/", "_")}_client_locations.txt')
-            if not os.path.isfile(location_file_path):
-                with open(location_file_path, 'w', newline='') as f:
-                    f.write(
-                        "name positions\n")
-            with open(location_file_path, 'r',) as f:
-                tmp = []
-                next(f)
-                for line in f:
-                    if line.strip():
-                        name, positions = [e for e in line.replace(
-                            '\t', ' ').strip().replace('"', '').split(' ') if e]
-                        tmp.append(f"{name}: ({positions})")
-            # somehow Taurus.Device does not update the attribute
-            if tmp and tango.DeviceProxy(d).saved_location_source == 'client':
-                tango.DeviceProxy(d).user_defined_locations = tmp
-            else:
-                tango.DeviceProxy(d).load_server_side_list()
-            dropdown = {}
-            dropdown['current_location'] = (
-                (locations, locations.split(':')[0]) for locations in owis_app.attr_list[d]['dp'].user_defined_locations)
-            dropdown['saved_location_source'] = (
-                ('server', 'server'),  ('client', 'client'))
+            more_list = ['host_computer', 'status', 'state']
             form_panel, form_layout = owis_app.create_blank_panel('v')
             owis_app.gui.createPanel(form_panel, f'{d}_form')
             exclude_list = [f'ax{i}_step' for i in range(
                 1, 10)] + [f'set_ax{i}_as' for i in range(1, 10)]
             owis_app.create_form_panel(
-                form_layout, d,  dropdown=dropdown, include=less_list, withButtons=False, set_attr_font={key: {'font': '"Sans Serif"', 'size': 20} for key in [f'ax{ax}_position' for ax in range(1, 10)]})
+                form_layout, d, include=less_list, withButtons=False, set_attr_font={key: {'font': '"Sans Serif"', 'size': 20} for key in [f'ax{ax}_position' for ax in range(1, 10)]})
             owis_app.add_command(
                 form_layout, d, command_list=['stop_all_axis'])
 
@@ -88,6 +66,7 @@ def create_app():
         __file__), 'README.html')
     owis_app.gui.onShowManual()
     owis_app.gui.show()
+    owis_app.tile_device_panels()
     owis_app.app.exec_()
 
 

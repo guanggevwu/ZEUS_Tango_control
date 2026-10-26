@@ -11,6 +11,7 @@ import platform
 from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
 from common.TaurusGUI_Argparse import TaurusArgparse
 from common.ui_config import device_name_table
+from common.taurus_widget import preserve_form_row_heights
 
 if platform.system() == 'Windows':
     tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(
@@ -103,6 +104,8 @@ for device_name in device_list:
 
         panel3.compact = is_form_compact
 
+        preserve_form_row_heights(panel1_w1)
+        preserve_form_row_heights(panel3)
         gui.createPanel(panel1, f'{device_name.split("/")[-1]}_parameters')
         gui.createPanel(
             panel3, f'{device_name.split("/")[-1]}statistics_numbers')

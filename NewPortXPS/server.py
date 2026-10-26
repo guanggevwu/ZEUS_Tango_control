@@ -3,10 +3,8 @@ from __future__ import annotations
 import datetime
 import functools
 import logging
-import os
 import platform
 import threading
-import sys
 from typing import Any
 
 from tango import AttrWriteType, DevState
@@ -76,10 +74,8 @@ class NewPortXPS(Device):
         self._message = ""
         self._error_message = ""
         self._raw_command_return = ""
-        self._user_defined_locations = []
         self._user_defined_name = "newport_xps"
         self._host_computer = platform.node()
-        self._saved_location_source = "client"
         self._position_offset: dict[int, float] = {}
         self._axis_steps: dict[int, float] = {}
         self._axis_status: dict[int, bool] = {}
@@ -373,77 +369,6 @@ class NewPortXPS(Device):
     def read_host_computer(self):
         return self._host_computer
 
-    saved_location_source = attribute(
-        label="saved location source",
-        dtype="str",
-        memorized=True,
-        hw_memorized=True,
-        access=AttrWriteType.READ_WRITE,
-        doc='Require restart client GUI to take effect in the GUI. If set to "server", use the "...server_locations.txt" on the server computer. If set to "client", use "...client_locations.txt" on the client computer.',
-    )
-
-    def read_saved_location_source(self):
-        return self._saved_location_source
-
-    def write_saved_location_source(self, value):
-        if value == "server":
-            self.load_server_side_list()
-        self._saved_location_source = value
-
-    user_defined_locations = attribute(
-        label="user defined locations",
-        dtype=(str,),
-        max_dim_x=1000,
-        access=AttrWriteType.READ_WRITE,
-    )
-
-    def read_user_defined_locations(self):
-        return self._user_defined_locations
-
-    def write_user_defined_locations(self, value):
-        self.logger.info(f"Write user_defined_locations: {value}")
-        self._user_defined_locations = value
-
-    current_location = attribute(
-        label="current location",
-        dtype=str,
-        memorized=True,
-        access=AttrWriteType.READ_WRITE,
-        doc='Use dev.current_location = "location_name" to move to the predefined location',
-    )
-
-    def is_position_close(self, a: list[float], b: list[float], tol=1e-3):
-        return all(abs(x - y) < tol for x, y in zip(a, b))
-
-    def read_current_location(self):
-        self._current_location = "Undefined"
-        try:
-            current_positions = [
-                getattr(self, f"_ax{axis}_position") for axis in self.axis]
-            for loc in self._user_defined_locations:
-                name, positions = loc.split(": ")
-                p = [float(i) for i in positions.strip("()").split(",")]
-                if self.is_position_close(current_positions, p):
-                    self._current_location = loc
-                    break
-        except Exception:
-            pass
-        return self._current_location
-
-    def write_current_location(self, value):
-        target_positions = None
-        for loc in self._user_defined_locations:
-            name, positions = loc.split(": ")
-            if name == value:
-                target_positions = [float(i)
-                                    for i in positions.strip("()").split(",")]
-                break
-        if target_positions is None:
-            raise ValueError(f"Location not found: {value}")
-
-        for axis, target in zip(self.axis, target_positions):
-            self._write_axis_position(axis, target)
-
     def create_position_attribute(self, axis):
         self.logger.info(f"created axis{axis} position.")
         return attribute(
@@ -722,45 +647,6 @@ class NewPortXPS(Device):
         if axis not in self.axis:
             raise ValueError(f"Axis {axis} is not configured")
         self._set_axis_user_coordinate(axis, 0.0)
-
-    @command
-    def load_server_side_list(self):
-        """Load server-side saved user-defined location list."""
-        try:
-            server_list_path = os.path.join(
-                os.path.dirname(
-                    __file__), f"{sys.argv[1]}_server_locations.txt"
-            )
-            if not os.path.isfile(server_list_path):
-                with open(server_list_path, "w", newline="") as f:
-                    f.write("name positions\n")
-
-            with open(server_list_path, "r") as f:
-                tmp = []
-                next(f)
-                for line in f:
-                    if line.strip():
-                        name, positions = [
-                            e
-                            for e in line.replace("\t", " ")
-                            .strip()
-                            .replace('"', "")
-                            .split(" ")
-                            if e
-                        ]
-                        tmp.append(f"{name}: ({positions})")
-
-            if tmp:
-                self._user_defined_locations = tmp
-                self.logger.info(
-                    f"Loaded server side saved user defined locations: {tmp}")
-            else:
-                self.logger.info(
-                    "No server side saved user defined locations found.")
-        except Exception as exc:
-            self.logger.info(
-                f"Server side saved user defined locations file not loaded successfully. Reason: {exc}"
-            )
 
 
 if __name__ == "__main__":

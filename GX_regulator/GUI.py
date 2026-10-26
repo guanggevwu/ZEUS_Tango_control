@@ -27,6 +27,7 @@ def create_app():
 
     basler_app.gui.removePanel('Manual')
     basler_app.gui.show()
+    basler_app.tile_device_panels()
     basler_app.app.exec_()
 
 

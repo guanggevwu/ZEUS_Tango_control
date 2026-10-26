@@ -12,6 +12,7 @@ if platform.system() == 'Windows':
     tauruscustomsettings.ORGANIZATION_LOGO = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'zeus.png')
 from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
+from common.taurus_widget import preserve_form_row_heights
 
 device_name = sys.argv[1] if len(
     sys.argv) > 1 else 'facility/lecroy/wavesurfer_3034z_1'
@@ -43,6 +44,7 @@ for i in form_model:
         idx = form_model.index(i)
         panel1_w1[idx].writeWidgetClass = MyTaurusValueCheckBox
 
+preserve_form_row_heights(panel1_w1)
 gui.createPanel(panel1, 'parameters')
 gui.removePanel('Manual')
 

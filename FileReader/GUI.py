@@ -44,4 +44,5 @@ if __name__ == "__main__":
 
     file_reader_app.gui.removePanel('Manual')
     file_reader_app.gui.show()
+    file_reader_app.tile_device_panels()
     file_reader_app.app.exec_()

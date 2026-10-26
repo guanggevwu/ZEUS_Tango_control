@@ -13,6 +13,7 @@ if platform.system() == 'Windows':
         os.path.dirname(os.path.dirname(__file__)), 'common', 'img', 'zeus.png')
 from common.taurus_widget import MyTaurusValueCheckBox, create_my_dropdown_list_class
 from common.TaurusGUI_Argparse import TaurusArgparse
+from common.taurus_widget import preserve_form_row_heights
 
 parser = TaurusArgparse(
     description='GUI for Gentec-EO devices', device_default='test/dg535/1', polling_default=3000)
@@ -69,6 +70,8 @@ for idx, full_attr in enumerate(form_model):
     if full_attr.split('/')[-1] in dropdown:
         panel1_w1[idx].writeWidgetClass = create_my_dropdown_list_class(
             full_attr.split('/')[-1], dropdown[full_attr.split('/')[-1]])
+
+preserve_form_row_heights(panel1_w1)
 
 panel1_command = Qt.QWidget()
 panel1_command_layout = Qt.QHBoxLayout()

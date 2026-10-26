@@ -3,7 +3,6 @@ from common.axis_order import get_axis_order
 from common.TaurusGUI_Argparse import TaurusArgparse
 from common.ui_config import device_name_table
 import tango
-import os
 
 
 def create_app():
@@ -22,41 +21,17 @@ def create_app():
             available_axis = get_axis_order(
                 newport_xps_app.attr_list[d]['dp'], newport_xps_app.attr_list[d]['attrs'])
             less_list = ['user_defined_name', 'error_message',
-                         'message', 'current_location', 'customized_location']
+                         'message', 'customized_location']
             for axis in available_axis:
                 less_list.extend(
                     [f'ax{axis}_position', f'set_ax{axis}_as'])
             if 'grating' in d:
                 less_list.append('ax12_distance')
-            more_list = ['host_computer', 'saved_location_source', 'user_defined_locations',
+            more_list = ['host_computer',
                          'raw_command', 'status', 'state']
-            location_file_path = os.path.join(os.path.dirname(
-                __file__), f'{d.replace("/", "_")}_client_locations.txt')
-            if not os.path.isfile(location_file_path):
-                with open(location_file_path, 'w', newline='') as f:
-                    f.write(
-                        "name positions\n")
-            with open(location_file_path, 'r',) as f:
-                tmp = []
-                next(f)
-                for line in f:
-                    if line.strip():
-                        name, positions = [e for e in line.replace(
-                            '\t', ' ').strip().replace('"', '').split(' ') if e]
-                        tmp.append(f"{name}: ({positions})")
-            # somehow Taurus.Device does not update the attribute
-            if tmp and tango.DeviceProxy(d).saved_location_source == 'client':
-                tango.DeviceProxy(d).user_defined_locations = tmp
-            else:
-                tango.DeviceProxy(d).load_server_side_list()
-            dropdown = {}
-            dropdown['current_location'] = (
-                (locations, locations.split(':')[0]) for locations in newport_xps_app.attr_list[d]['dp'].user_defined_locations)
-            dropdown['saved_location_source'] = (
-                ('server', 'server'),  ('client', 'client'))
             less_panel, less_layout = newport_xps_app.create_blank_panel('v')
             newport_xps_app.create_form_panel(
-                less_layout, d,  dropdown=dropdown, include=less_list, withButtons=False, set_attr_font={key: {'font': '"Sans Serif"', 'size': 20} for key in [*[f'ax{axis}_position' for axis in available_axis], 'customized_location']})
+                less_layout, d, include=less_list, withButtons=False, set_attr_font={key: {'font': '"Sans Serif"', 'size': 20} for key in [*[f'ax{axis}_position' for axis in available_axis], 'customized_location']})
             command_list, modified_cmd_name, cmd_parameters = [], [], []
             command_with_axis_parameters = [
                 'move_to_negative_limit', 'move_to_positive_limit', 'set_as_zero']
@@ -64,7 +39,7 @@ def create_app():
                 less_layout, d, command_list=['stop'])
             more_panel, more_layout = newport_xps_app.create_blank_panel('v')
             newport_xps_app.create_form_panel(
-                more_layout, d,  dropdown=dropdown, include=more_list, withButtons=False)
+                more_layout, d, include=more_list, withButtons=False)
 
             for idx, axis in enumerate(available_axis):
                 if f'ax{axis}_step' in newport_xps_app.attr_list[d]['attrs']:
@@ -86,6 +61,7 @@ def create_app():
 
     newport_xps_app.gui.removePanel('Manual')
     newport_xps_app.gui.show()
+    newport_xps_app.tile_device_panels()
     newport_xps_app.app.exec_()
 
 

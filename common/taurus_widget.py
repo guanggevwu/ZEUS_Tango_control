@@ -70,6 +70,42 @@ class BoolLedSwitcher(TaurusReadWriteSwitcher):
             self.writeWidget.blockSignals(False)
 
 
+def preserve_form_row_heights(form):
+    """Keep row contents readable while allowing the form viewport to shrink.
+
+    Call after setting models, widget classes, compact mode, and fonts.
+    Only vertical minimum sizes are changed; column widths remain flexible.
+    """
+    for row in form:
+        for accessor in ('labelWidget', 'readWidget', 'writeWidget',
+                         'unitsWidget', 'extraWidget'):
+            getter = getattr(row, accessor, None)
+            if getter is None:
+                # Third-party item factories need not expose every column.
+                continue
+            widget = getter()
+            if widget is None:
+                continue
+            # Children first: composite editors must include their enlarged
+            # controls and layout margins in their own size hints.
+            widgets = list(
+                reversed(widget.findChildren(Qt.QWidget))) + [widget]
+            for child in widgets:
+                if child.isHidden():
+                    continue
+                child.ensurePolished()
+                if child.layout() is not None:
+                    child.layout().invalidate()
+                child.setMinimumHeight(max(child.minimumHeight(),
+                                           child.minimumSizeHint().height(),
+                                           child.sizeHint().height()))
+                child.updateGeometry()
+    # Constrain the contents, not the scroll area or dock. Smaller viewports
+    # then scroll instead of squeezing Taurus's default 20-pixel rows.
+    form.scrollArea.widget().layout().setSizeConstraint(
+        Qt.QLayout.SizeConstraint.SetMinimumSize)
+
+
 def add_value_pairs(values, autoApply=True):
     def constructor(self):
         TaurusValueComboBox.__init__(self)

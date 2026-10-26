@@ -140,6 +140,7 @@ def create_app():
     if created_panels > 0:
         xa_app.gui.removePanel("Manual")
     xa_app.gui.show()
+    xa_app.tile_device_panels()
     xa_app.app.exec_()
 
 

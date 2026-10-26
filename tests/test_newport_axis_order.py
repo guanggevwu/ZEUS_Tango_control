@@ -12,7 +12,8 @@ class TestNewportAxisOrder(unittest.TestCase):
         device = Mock()
         device.get_property.return_value = properties
         result = get_axis_order(device, attributes)
-        device.get_property.assert_called_once_with(['axis_property', 'axis_order'])
+        device.get_property.assert_called_once_with(
+            ['axis_property', 'axis_order'])
         return result
 
     def test_custom_order(self):
@@ -31,7 +32,8 @@ class TestNewportAxisOrder(unittest.TestCase):
         self.assertEqual(self.get_order({'axis_property': ['3,1']}), [1, 3])
 
     def test_detected_axes_used_when_axis_property_is_empty(self):
-        attributes = ['ax3_position', 'ax1_position', 'ax1_step', 'ax12_distance', 'set_ax1_as']
+        attributes = ['ax3_position', 'ax1_position',
+                      'ax1_step', 'ax12_distance', 'set_ax1_as']
         self.assertEqual(self.get_order({}, attributes), [1, 3])
         self.assertEqual(self.get_order({
             'axis_property': [''], 'axis_order': ['3, 1'],
@@ -46,7 +48,8 @@ class TestNewportAxisOrder(unittest.TestCase):
         for order in ('1,1,2', '1,2', '1,2,4', '1,2,three', '1,2,3,'):
             with self.subTest(order=order):
                 with self.assertRaises(ValueError):
-                    self.get_order({'axis_property': ['1,2,3'], 'axis_order': [order]})
+                    self.get_order(
+                        {'axis_property': ['1,2,3'], 'axis_order': [order]})
 
     def test_gui_forms_and_command_parameters_follow_order(self):
         root = Path(__file__).resolve().parents[1]
@@ -85,12 +88,19 @@ class TestNewportAxisOrder(unittest.TestCase):
                     'd': 'test/device/1', app_name: app,
                     'command_list': [], 'modified_cmd_name': [], 'cmd_parameters': [],
                 }
-                exec(compile(ast.Module(body=statements, type_ignores=[]), str(path), 'exec'), values)
-                self.assertEqual(values['less_list'][5::2], ['ax3_position', 'ax1_position', 'ax2_position'])
-                self.assertEqual(values['less_list'][6::2], ['set_ax3_as', 'set_ax1_as', 'set_ax2_as'])
-                self.assertEqual(values['cmd_parameters'], [[[3]] * 3, [[1]] * 3, [[2]] * 3])
+                exec(compile(ast.Module(body=statements, type_ignores=[]),
+                     str(path), 'exec'), values)
+                self.assertEqual([name for name in values['less_list']
+                                  if name.startswith('ax') and name.endswith('_position')],
+                                 ['ax3_position', 'ax1_position', 'ax2_position'])
+                self.assertEqual([name for name in values['less_list']
+                                  if name.startswith('set_ax')],
+                                 ['set_ax3_as', 'set_ax1_as', 'set_ax2_as'])
+                self.assertEqual(values['cmd_parameters'], [
+                                 [[3]] * 3, [[1]] * 3, [[2]] * 3])
                 self.assertEqual(values['command_list'], [
-                    ['move_to_negative_limit', 'move_to_positive_limit', 'set_as_zero'],
+                    ['move_to_negative_limit',
+                        'move_to_positive_limit', 'set_as_zero'],
                 ] * 3)
 
 

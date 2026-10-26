@@ -1,4 +1,63 @@
-# Guarded Arrow-Button Moves
+# ESP301 / ESP302
+
+## GUI panels
+
+Each device has one combined control panel named by its Tango device name,
+replacing the former `_less` and `_more` panels. It includes axis controls,
+diagnostics, raw commands, Init/stop, and per-axis limit/coordinate commands.
+Turning-box reset controls remain available. Grating devices also retain their
+separate `_minimum` panel. Restart the GUI to use the new layout.
+
+Combination windows start with different devices tiled side by side (a grid
+for larger combinations). Panels belonging to the same device remain tabbed
+together, with the main controls selected. Single-device layouts are unchanged.
+
+Both forms preserve their font-sized row minimum heights (including composite
+motor editors). Reducing panel height scrolls the form contents rather than
+compressing large-font text. The outer panel remains resizable.
+
+## Presets use ConditionSetter
+
+Generic saved locations are managed by [ConditionSetter](../ConditionSetter/README.md),
+not by the ESP301 device server or GUI. Use full Tango axis attribute names
+(for example, `TA2/esp301/esp302_ta2_1/ax1_position`) in condition files.
+The server no longer exposes `current_location`, `saved_location_source`,
+`user_defined_locations`, or `load_server_side_list`. It no longer reports a
+matching generic preset name. The GUI neither reads/creates location files nor
+uploads preset lists to the server.
+
+The removed location files' saved data is preserved in
+[the legacy preset archive](legacy_presets.md). Before migrating any other
+server/client copies, verify the device name and map each tuple using the
+server's configured `axis` order, **not** the GUI's `axis_order` display order.
+The archived values have not been applied to hardware or automatically imported
+into a live ConditionSetter file.
+
+### Turning box and ordinary motion
+
+Turning-box `customized_location`, TA1/TA2/TA3 transition sequences, intermediate
+positions, waits, and `reset_to_TA1` remain unchanged. These ordered motion
+routines are not generic presets. Do not replace them with a ConditionSetter
+row of independent axis targets: **Set all does not wait for motion completion**.
+
+Axis positioning, guarded jogging, stop, limit moves, coordinate setting, and
+grating controls also remain unchanged. ConditionSetter's direct axis writes
+do not inherit the arrow buttons' busy guards.
+
+### Deployment
+
+- Update the ESP301 server and GUI together, and restart when the hardware is
+  safe. The old GUI requires the removed preset API.
+- Update external scripts, saved Taurus panels, and condition files that use
+  the removed attributes/command. Archive useful location files on other
+  computers before deleting them.
+- Review the Tango database for obsolete memorized values, attribute settings,
+  and polling entries for the removed ESP301 attributes. Remove only those
+  obsolete entries; preserve axis configuration and turning-box settings.
+  Repository changes do not modify the live Tango database.
+- Other motion-device servers and shared GUI widgets are unaffected.
+
+## Guarded Arrow-Button Moves
 
 The shared motor widgets use `jog_axis([axis, signed_step])` and
 `jog_grating(signed_step)` for the `ESP301` Tango class, which also serves ESP302
@@ -40,11 +99,15 @@ ESP301 arrow buttons to log an error; they do not fall back to unguarded moves.
 From the repository root:
 
 ```powershell
-.\venv\Scripts\python.exe -m unittest tests.test_motor_jog -v
+.\venv\Scripts\python.exe -m unittest tests.test_motor_jog tests.test_newport_axis_order tests.test_esp301_presets_removed tests.test_esp301_form_layout -v
 ```
 
-These tests extract only the methods under test and use mocked controller I/O
-and device proxies. They do not import device modules, connect to Tango, or
+These tests extract only the code under test and use mocked controller I/O,
+GUI components, and device proxies. Preset-removal tests cover startup without
+preset attributes or files and preservation of turning-box sequencing.
+Layout tests use real Qt/Taurus widgets with local `eval:` models to check
+scrollbars and row heights at small and large viewport sizes, without hardware.
+They do not import device modules, connect to Tango, or
 start hardware servers. Do not use the full test suite as an offline check:
 other tests may require live devices. Physical controller timing and motion
 have not been tested by this change.

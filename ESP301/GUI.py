@@ -4,7 +4,6 @@ from common.TaurusGUI_Argparse import TaurusArgparse
 from common.ui_config import device_name_table
 from common.my_motor_widget import mymotor_read_only_item_factory
 import tango
-import os
 
 
 def get_device_property(device_proxy, property_name, default: object = ''):
@@ -39,59 +38,32 @@ def create_app():
         if device_proxy.info().dev_class == 'ESP301':
             is_grating = get_boolean_device_property(
                 device_proxy, 'use_grating_config')
-            axis_order = get_axis_order(device_proxy, esp_app.attr_list[d]['attrs'])
-            less_list = ['user_defined_name', 'error_message', 'message', 'current_location', 'customized_location'] + [
+            axis_order = get_axis_order(
+                device_proxy, esp_app.attr_list[d]['attrs'])
+            less_list = [
                 attribute_name for axis in axis_order
                 for attribute_name in (f'ax{axis}_position', f'set_ax{axis}_as')
-            ]
+            ] + ['user_defined_name', 'error_message', 'message', 'customized_location']
             if is_grating:
                 less_list.append('ax12_distance')
-            more_list = ['host_computer', 'saved_location_source', 'user_defined_locations',
-                         'raw_command', 'status', 'state']
-            location_file_path = os.path.join(os.path.dirname(
-                __file__), f'{d.replace("/", "_")}_client_locations.txt')
-            if not os.path.isfile(location_file_path):
-                with open(location_file_path, 'w', newline='') as f:
-                    f.write(
-                        "name positions\n")
-            with open(location_file_path, 'r',) as f:
-                tmp = []
-                next(f)
-                for line in f:
-                    if line.strip():
-                        name, positions = [e for e in line.replace(
-                            '\t', ' ').strip().replace('"', '').split(' ') if e]
-                        tmp.append(f"{name}: ({positions})")
-            # somehow Taurus.Device does not update the attribute
-            if tmp and tango.DeviceProxy(d).saved_location_source == 'client':
-                tango.DeviceProxy(d).user_defined_locations = tmp
-            else:
-                tango.DeviceProxy(d).load_server_side_list()
-            dropdown = {}
-            dropdown['current_location'] = (
-                (locations, locations.split(':')[0]) for locations in esp_app.attr_list[d]['dp'].user_defined_locations)
-            dropdown['saved_location_source'] = (
-                ('server', 'server'),  ('client', 'client'))
-            less_panel, less_layout = esp_app.create_blank_panel('v')
+            more_list = ['host_computer', 'raw_command', 'status', 'state']
+            main_panel, main_layout = esp_app.create_blank_panel('v')
             esp_app.create_form_panel(
-                less_layout, d,  dropdown=dropdown, include=less_list, withButtons=False, set_attr_font={key: {'font': '"Sans Serif"', 'size': 20} for key in ['ax1_position', 'ax2_position', 'ax3_position', 'ax12_distance', 'customized_location']})
+                main_layout, d, include=less_list + more_list, withButtons=False, set_attr_font={key: {'font': '"Sans Serif"', 'size': 20} for key in ['ax1_position', 'ax2_position', 'ax3_position', 'ax12_distance', 'customized_location']})
             minimum_panel = None
             if is_grating:
                 minimum_panel, minimum_layout = esp_app.create_blank_panel('v')
                 minimum_list = [attr for attr in less_list
                                 if not attr.startswith('set_ax')]
                 esp_app.create_form_panel(
-                    minimum_layout, d,  dropdown=dropdown, include=minimum_list, withButtons=False, set_attr_font={key: {'font': '"Sans Serif"', 'size': 20} for key in ['ax1_position', 'ax2_position', 'ax3_position', 'ax12_distance', 'customized_location']}, item_factories=[mymotor_read_only_item_factory, ".*"])
+                    minimum_layout, d, include=minimum_list, withButtons=False, set_attr_font={key: {'font': '"Sans Serif"', 'size': 20} for key in ['ax1_position', 'ax2_position', 'ax3_position', 'ax12_distance', 'customized_location']}, item_factories=[mymotor_read_only_item_factory, ".*"])
                 esp_app.add_command(
                     minimum_layout, d, command_list=['Init', 'stop'])
             command_list, modified_cmd_name, cmd_parameters = [], [], []
             command_with_axis_parameters = [
                 'move_to_negative_limit', 'move_to_positive_limit', 'set_as_zero']
             esp_app.add_command(
-                less_layout, d, command_list=['Init', 'stop'])
-            more_panel, more_layout = esp_app.create_blank_panel('v')
-            esp_app.create_form_panel(
-                more_layout, d,  dropdown=dropdown, include=more_list, withButtons=False)
+                main_layout, d, command_list=['Init', 'stop'])
 
             for idx, axis in enumerate(axis_order):
                 if f'ax{axis}_step' in esp_app.attr_list[d]['attrs']:
@@ -105,19 +77,17 @@ def create_app():
 
             for axis in range(len(command_list)):
                 esp_app.add_command(
-                    more_layout, d, command_list=command_list[axis], modified_cmd_name=modified_cmd_name[axis], cmd_parameters=cmd_parameters[axis])
-            esp_app.add_command(
-                more_layout, d, command_list=['stop'])
+                    main_layout, d, command_list=command_list[axis], modified_cmd_name=modified_cmd_name[axis], cmd_parameters=cmd_parameters[axis])
             if 'turning_box3' in d:
                 esp_app.add_command(
-                    more_layout, d, command_list=['reset_to_TA1'])
-            esp_app.gui.createPanel(more_panel, f'{d}_more')
-            esp_app.gui.createPanel(less_panel, f'{d}_less')
+                    main_layout, d, command_list=['reset_to_TA1'])
+            esp_app.gui.createPanel(main_panel, d)
             if minimum_panel is not None:
                 esp_app.gui.createPanel(minimum_panel, f'{d}_minimum')
 
     esp_app.gui.removePanel('Manual')
     esp_app.gui.show()
+    esp_app.tile_device_panels()
     esp_app.app.exec_()
 
 

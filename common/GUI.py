@@ -18,6 +18,7 @@ if platform.system() == 'Windows':
 
 
 from common.taurus_widget import create_my_dropdown_list_class, BoolLedSwitcher
+from common.taurus_widget import preserve_form_row_heights
 
 
 class GuiBase():
@@ -190,6 +191,7 @@ class GuiBase():
                                         1, int(round(row_font.pointSize() * 0.6)))
                                     compact_font.setPointSize(compact_size)
                                     child.setFont(compact_font)
+                preserve_form_row_heights(panel2_w1)
         return panel2_w1
 
     def combined_panel(self, device_list, combine_form_with_onshot=False):
@@ -218,6 +220,68 @@ class GuiBase():
             self.add_command(panel3_layout, d, command_list=[
                              'get_ready', 'relax', 'reset_number', 'send_software_trigger', 'clear_queue'],  cmd_parameters=[None, None, [0], None, None])
         self.gui.createPanel(panel3, f'{len(device_list)} devices')
+
+    def tile_device_panels(self, device_names=None):
+        """Tile different devices; tab together panels belonging to one device.
+
+        Call after panel creation. Panel names must be the device name or the
+        device name plus an underscore suffix. Unmatched shared panels are left
+        alone. Pass logical group names for panels shared by paired devices.
+        """
+        devices = list(dict.fromkeys(
+            self.attr_list if device_names is None else device_names))
+        groups = {device: [] for device in devices}
+        for name in self.gui.getPanelNames():
+            matches = [device for device in devices
+                       if name == device or name.startswith(device + '_')]
+            if matches:
+                # Device names themselves may contain underscores/prefixes.
+                groups[max(matches, key=len)].append(name)
+        groups = [names for names in groups.values() if names]
+        if len(groups) < 2:
+            return groups  # Preserve single-device layouts.
+
+        # Show the primary controls initially, rather than diagnostics/minimum.
+        def priority(name):
+            if name in devices or name.endswith(('_less', '_form')):
+                return 0
+            return 1
+
+        docks = [[self.gui.getPanel(name) for name in sorted(names, key=priority)]
+                 for names in groups]
+        horizontal = Qt.Qt.Orientation.Horizontal
+        vertical = Qt.Qt.Orientation.Vertical
+        self.gui.setDockNestingEnabled(True)
+        # Explicitly detach all grouped docks to break Taurus's initial tab group.
+        for group in docks:
+            for panel in group:
+                self.gui.removeDockWidget(panel)
+                panel.setFloating(False)
+        for group in docks:
+            for panel in group:
+                self.gui.addDockWidget(
+                    Qt.Qt.DockWidgetArea.TopDockWidgetArea, panel)
+                panel.show()
+
+        anchors = [group[0] for group in docks]
+        columns = 2 if len(anchors) == 4 else min(3, len(anchors))
+        rows = [anchors[i:i + columns]
+                for i in range(0, len(anchors), columns)]
+        for previous, row in zip(rows, rows[1:]):
+            self.gui.splitDockWidget(previous[0], row[0], vertical)
+        for row in rows:
+            for left, right in zip(row, row[1:]):
+                self.gui.splitDockWidget(left, right, horizontal)
+        for group in docks:
+            for panel in group[1:]:
+                self.gui.tabifyDockWidget(group[0], panel)
+            group[0].raise_()
+        for row in rows:
+            self.gui.resizeDocks(row, [1] * len(row), horizontal)
+        if len(rows) > 1:
+            self.gui.resizeDocks([row[0] for row in rows], [
+                                 1] * len(rows), vertical)
+        return groups
 
     def tile_panels(self, names=None, orientation='h', sizes=None):
         """Arrange Taurus panels as docked tiles instead of tabbed panels.

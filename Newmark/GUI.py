@@ -5,6 +5,7 @@ from taurus.external.qt import Qt
 from taurus.qt.qtgui.panel import TaurusForm
 
 from common.GUI import GuiBase
+from common.taurus_widget import preserve_form_row_heights
 from common.TaurusGUI_Argparse import TaurusArgparse
 from common.ui_config import device_name_table
 from common.my_motor_widget import mymotor_read_only_item_factory
@@ -68,6 +69,7 @@ def add_distance_row(layout, model, control=None):
     form = TaurusForm(withButtons=False)
     form.setModel([model])
     configure_distance_row(form[0], control)
+    preserve_form_row_heights(form)
     form.setSizePolicy(Qt.QSizePolicy.Preferred, Qt.QSizePolicy.Expanding)
     layout.addWidget(form, 1)
     return form
@@ -88,6 +90,7 @@ def add_minimum_form(layout, devices, control):
                 if widget is not None:
                     widget.setFont(Qt.QFont("Sans Serif", 20))
     configure_distance_row(form[len(models)], control)
+    preserve_form_row_heights(form)
     form.setSizePolicy(Qt.QSizePolicy.Preferred, Qt.QSizePolicy.Expanding)
     layout.addWidget(form, 1)
     return form
@@ -249,6 +252,11 @@ def build_gui(devices, polling):
 def create_app():
     newmark_app = build_gui(args.device, args.polling)
     newmark_app.gui.show()
+    # The coupled grating panels are one logical group, not two independent docks.
+    newmark_app.tile_device_panels([
+        GRATING_PANEL_NAME if device in GRATING_DEVICES else device
+        for device in newmark_app.attr_list
+    ])
     newmark_app.app.exec_()
 
 

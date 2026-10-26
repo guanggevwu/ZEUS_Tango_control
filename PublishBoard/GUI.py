@@ -42,6 +42,7 @@ def create_app():
 
     app.gui.removePanel("Manual")
     app.gui.show()
+    app.tile_device_panels()
     app.app.exec_()
 
 
